@@ -20,7 +20,7 @@
     with version selection via dropdown.
 
 .PARAMETER Clean
-    Optional. Performs a clean build by removing .pio/build directories first.
+    Optional. Performs a clean build by removing the PlatformIO build directory first.
 
 .PARAMETER Version
     Optional. Version identifier for the build (default: "local").
@@ -164,11 +164,22 @@ if (-not (Test-Path $platformioExe)) {
     exit 1
 }
 
+# Resolve the build and packages folders from the PlatformIO config so
+# overrides in platformio_local.ini (or PLATFORMIO_* env vars) are honored
+$platformioPython = "$env:USERPROFILE\.platformio\penv\Scripts\python.exe"
+$pioDirs = & $platformioPython -c "from platformio.project.config import ProjectConfig as P; c=P('platformio.ini'); print(c.get('platformio','build_dir')); print(c.get('platformio','packages_dir'))"
+if ($LASTEXITCODE -ne 0 -or $pioDirs.Count -ne 2) {
+    Write-Host "ERROR: Could not read build/packages folders from platformio.ini" -ForegroundColor Red
+    exit 1
+}
+$buildDir = $pioDirs[0]
+$packagesDir = $pioDirs[1]
+
 # Clean build if requested
 if ($Clean) {
     Write-Host "[0/4] Cleaning previous builds..." -ForegroundColor Yellow
-    if (Test-Path ".pio/build") {
-        Remove-Item -Path ".pio/build" -Recurse -Force
+    if (Test-Path $buildDir) {
+        Remove-Item -Path $buildDir -Recurse -Force
         Write-Host "✓ Build directory cleaned" -ForegroundColor Green
     } else {
         Write-Host "✓ No previous builds to clean" -ForegroundColor Green
@@ -247,7 +258,7 @@ Write-Host ""
 Write-Host "[5/5] Copying firmware files to web installer..." -ForegroundColor Yellow
 
 # Get boot_app0.bin path (required for OTA updates)
-$bootApp0 = "$env:USERPROFILE\.platformio\packages\framework-arduinoespressif32\tools\partitions\boot_app0.bin"
+$bootApp0 = "$packagesDir\framework-arduinoespressif32\tools\partitions\boot_app0.bin"
 
 if (-not (Test-Path $bootApp0)) {
     Write-Host "ERROR: boot_app0.bin not found at $bootApp0" -ForegroundColor Red
@@ -257,23 +268,23 @@ if (-not (Test-Path $bootApp0)) {
 
 # Copy Basic firmware (4 files required for ESP Web Tools)
 Write-Host "  Copying Basic firmware files..." -ForegroundColor Gray
-Copy-Item ".pio/build/elecrow-crowpanel-7-basic/firmware.bin" "$outputBasePath/basic/firmware.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-basic/bootloader.bin" "$outputBasePath/basic/bootloader.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-basic/partitions.bin" "$outputBasePath/basic/partitions.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-basic/firmware.bin" "$outputBasePath/basic/firmware.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-basic/bootloader.bin" "$outputBasePath/basic/bootloader.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-basic/partitions.bin" "$outputBasePath/basic/partitions.bin"
 Copy-Item $bootApp0 "$outputBasePath/basic/boot_app0.bin"
 
 # Copy Advance v1.3 firmware (4 files required for ESP Web Tools)
 Write-Host "  Copying Advance v1.3 firmware files..." -ForegroundColor Gray
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v13/firmware.bin" "$outputBasePath/advance-v1.3/firmware.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v13/bootloader.bin" "$outputBasePath/advance-v1.3/bootloader.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v13/partitions.bin" "$outputBasePath/advance-v1.3/partitions.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v13/firmware.bin" "$outputBasePath/advance-v1.3/firmware.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v13/bootloader.bin" "$outputBasePath/advance-v1.3/bootloader.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v13/partitions.bin" "$outputBasePath/advance-v1.3/partitions.bin"
 Copy-Item $bootApp0 "$outputBasePath/advance-v1.3/boot_app0.bin"
 
 # Copy Advance v1.2 firmware (4 files required for ESP Web Tools)
 Write-Host "  Copying Advance v1.2 firmware files..." -ForegroundColor Gray
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v12/firmware.bin" "$outputBasePath/advance-v1.2/firmware.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v12/bootloader.bin" "$outputBasePath/advance-v1.2/bootloader.bin"
-Copy-Item ".pio/build/elecrow-crowpanel-7-advance-v12/partitions.bin" "$outputBasePath/advance-v1.2/partitions.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v12/firmware.bin" "$outputBasePath/advance-v1.2/firmware.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v12/bootloader.bin" "$outputBasePath/advance-v1.2/bootloader.bin"
+Copy-Item "$buildDir/elecrow-crowpanel-7-advance-v12/partitions.bin" "$outputBasePath/advance-v1.2/partitions.bin"
 Copy-Item $bootApp0 "$outputBasePath/advance-v1.2/boot_app0.bin"
 
 Write-Host "✓ All firmware files copied" -ForegroundColor Green

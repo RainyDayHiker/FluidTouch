@@ -1,5 +1,6 @@
 # PlatformIO
 .pio
+platformio_local.ini
 .pioenvs
 .piolibdeps
 .clang_complete
