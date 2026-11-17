@@ -3,7 +3,7 @@
 ## 1. Layers
 
 ```
-src/app/        screens, top bar, navigation            new   depends on services
+src/app/        screens, tabs, status bar               new   depends on services
 src/services/   machine, job, files, macros, settings   new   depends on lib/gcode, platform
 lib/gcode/      tokenizer, simulator, ops, outline      new   plain C++17, no Arduino/LVGL
 src/core/       display, touch, power                   kept
@@ -26,9 +26,10 @@ Kept deliberately small, to stay mergeable (G11):
 
 | File | Change |
 |------|--------|
-| `network/fluidnc_client.cpp` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through a listener interface. The classic UI registers a listener that does what the calls did. |
+| `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
+| `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
 | `ui/upload_manager.*` | Used as is by `FileService`. A download function is added next to it (new file). |
-| `main.cpp` | Reads the UI mode at boot and starts either the classic UI or the new app. |
+| `main.cpp` | Registers the classic listener after `FluidNCClient::init()` (M1). Reads the UI mode at boot and starts either the classic UI or the new app. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
 | `sim/` | Same additions to `CMakeLists.txt`; fake FluidNC extended ([06](06-test-and-spikes.md)). |
 

@@ -6,7 +6,7 @@ new work reviewable, and always be able to say which commit is on the device.
 ## 1. Remotes
 
 ```powershell
-git remote add upstream https://github.com/jeyeager65/FluidTouch.git   # confirm the URL
+git remote add upstream https://github.com/jeyeager65/FluidTouch.git
 git fetch upstream
 ```
 
@@ -19,8 +19,7 @@ git fetch upstream
 | `main` | Mirror of upstream's default branch | Fast-forward only from `upstream`. No LowRider Touch commits |
 | `lrt/main` | The new firmware; always builds (firmware and simulator) and boots | Changes arrive by merging topic branches. Never rebased or force-pushed |
 | `lrt/<milestone>-<topic>` | One piece of work, e.g. `lrt/m1-client-events`, `lrt/m2-setup-screen` | Short-lived, branched from `lrt/main`, deleted after merge. May be rebased before merging |
-| `upstream/<topic>` | A fix worth offering to upstream | Branched from `main`, contains only that fix, then cherry-picked or merged into `lrt/main` |
-| `build/local-config-overrides` | Existing branch | Check whether its commits are already upstream. If yes, delete it. If not, treat it as an `upstream/<topic>` branch and merge it into `lrt/main` |
+| `fix/<topic>` | A fix to upstream-owned code that could be offered to upstream | Branched from `main`, contains only that fix, then merged into `lrt/main`. Keep it local unless a pull request to upstream is being opened: `fix/**` matches upstream's `build-branch-preview.yml`, so pushing it to the fork runs that workflow there (a preview build committed to the fork's `gh-pages`) if Actions are enabled. Delete it once merged, or once the upstream pull request is closed |
 
 First setup:
 
@@ -53,7 +52,7 @@ git push -u origin lrt/main
 - **Never mix `platform` or `sim` changes with new code in one commit.** This is the rule
   that keeps upstream merges manageable: a conflict then always lands in a small commit
   whose whole purpose is visible, and such a commit can be cherry-picked to an
-  `upstream/<topic>` branch if it turns out to be useful upstream.
+  `fix/<topic>` branch if it turns out to be useful upstream.
 - In a `platform` commit body, say why the edit is needed and which spec section lists it
   ([02 §2](02-architecture.md#2-changes-to-kept-code)). If an edit is not listed there, add
   it to the list in the same commit.

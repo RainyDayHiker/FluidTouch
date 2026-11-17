@@ -29,7 +29,8 @@
 | D23 | Setup has Reset and a Probe Z panel; jog to typed coordinates is not carried over | | Soft reset and manual Z probe are used; typed jog is not |
 | D24 | Probe Z reports the value only, for now | Set zero and retract | Asked for; can be extended later |
 | D25 | Go to XY zero has no Z height check, for now | Warn or refuse when Z is low | Not needed yet |
-| D26 | Top bar shows work and machine position at all times | Work only, tap for machine | Asked for |
+| D26 | The status bar shows work and machine position at all times | Work only, tap for machine | Asked for |
+| D27 | Screen tabs are at the top; the status bar (state, positions, WiFi, STOP) is at the bottom ([03 §1](03-screens.md#1-frame)) | Status in a top bar with navigation elsewhere | Matches the classic layout, so the positions stay where they are read today |
 
 ## Open questions
 

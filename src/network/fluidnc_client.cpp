@@ -1,7 +1,5 @@
 #include "network/fluidnc_client.h"
 #include "network/xmodem_sender.h"
-#include "ui/ui_common.h"
-#include "ui/tabs/control/ui_tab_control_probe.h"
 #include "debug_log.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -36,6 +34,7 @@ uint32_t FluidNCClient::lastStatusRequestMs = 0;
 bool FluidNCClient::initialized = false;
 FluidNCMessageCallback FluidNCClient::messageCallback = nullptr;
 FluidNCMessageCallback FluidNCClient::terminalCallback = nullptr;
+FluidNCClientListener* FluidNCClient::listener = nullptr;
 bool FluidNCClient::autoReportingEnabled = false;
 bool FluidNCClient::autoReportingAttempted = false;
 uint32_t FluidNCClient::lastPollingMs = 0;
@@ -798,6 +797,10 @@ void FluidNCClient::clearMessageCallback() {
     LOG_PRINTLN("[FluidNC] Message callback cleared");
 }
 
+void FluidNCClient::setListener(FluidNCClientListener* l) {
+    listener = l;
+}
+
 void FluidNCClient::setTerminalCallback(FluidNCMessageCallback callback) {
     terminalCallback = callback;
     LOG_PRINTLN("[FluidNC] Terminal callback registered");
@@ -934,7 +937,7 @@ void FluidNCClient::onEventsCallback(WebsocketsEvent event, String data) {
                         "Lost connection to machine.\n\nCheck network connection and\nmachine power, then restart.");
                 
                 // Show error dialog
-                UICommon::showConnectionErrorDialog("Machine Disconnected", error_msg);
+                if (listener) listener->onConnectionLost("Machine Disconnected", error_msg);
             }
             
             currentStatus.is_connected = false;
@@ -971,11 +974,8 @@ void FluidNCClient::parseStatusReport(const char* message) {
         currentStatus.is_connected = true;
         LOG_PRINTLN("[FluidNC] ✓ Connection established (status received)");
         
-        // Hide connecting popup
-        UICommon::hideConnectingPopup();
-        
-        // Also hide error dialog if showing
-        UICommon::hideConnectionErrorDialog();
+        // The UI hides its connecting popup and any connection error dialog
+        if (listener) listener->onConnectionEstablished();
     }
     
     // Only log status every 5 seconds to reduce spam
@@ -1184,7 +1184,7 @@ void FluidNCClient::parseRealtimeFeedback(const char* message) {
         int success;
         if (sscanf(message + 5, "%f,%f,%f:%d", &x, &y, &z, &success) == 4) {
             // Update probe tab result display with coordinates
-            UITabControlProbe::updateResult(x, y, z, success != 0);
+            if (listener) listener->onProbeResult(x, y, z, success != 0);
             
             LOG_PRINTF("[FluidNC] Probe %s at (%.3f, %.3f, %.3f)\n", 
                          success ? "SUCCESS" : "FAILED", x, y, z);
@@ -1217,11 +1217,8 @@ void FluidNCClient::parseRealtimeFeedback(const char* message) {
             currentStatus.is_connected = true;
             LOG_PRINTLN("[FluidNC] ✓ Connection established");
             
-            // Hide connecting popup
-            UICommon::hideConnectingPopup();
-            
-            // Also hide error dialog if showing (connection succeeded after error)
-            UICommon::hideConnectionErrorDialog();
+            // The UI hides its connecting popup and any connection error dialog
+            if (listener) listener->onConnectionEstablished();
         }
     }
     
