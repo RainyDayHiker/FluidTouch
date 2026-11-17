@@ -8,6 +8,7 @@
 #include "core/power_manager.h"
 #include "network/screenshot_server.h"
 #include "config.h"
+#include "app/ui_mode.h"  // LowRider Touch: restart into the new UI
 #include <Preferences.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -232,6 +233,12 @@ static void on_power_off_confirm(lv_event_t *e) {
 static void on_machine_select_cancel(lv_event_t *e) {
     Serial.println("UICommon: Machine selection cancelled");
     UICommon::hideMachineSelectConfirmDialog();
+}
+
+// LowRider Touch: leave the classic UI for the new one (boot-selected)
+static void on_restart_new_ui(lv_event_t *e) {
+    UICommon::hideMachineSelectConfirmDialog();
+    UiMode::restartInto(UiMode::APP);
 }
 
 static void on_connection_error_connect(lv_event_t *e);
@@ -827,13 +834,24 @@ void UICommon::showMachineSelectConfirmDialog() {
     
     // Dialog content box (wider than the HOLD/ALARM popups to fit four buttons)
     lv_obj_t *content = lv_obj_create(machine_select_dialog);
-    lv_obj_set_size(content, 700, 300);
+    lv_obj_set_size(content, 700, 370);  // LowRider Touch: 70 px taller for the "new UI" row
     lv_obj_center(content);
     lv_obj_set_style_bg_color(content, UITheme::BG_MEDIUM, 0);
     lv_obj_set_style_border_color(content, UITheme::ACCENT_PRIMARY, 0);
     lv_obj_set_style_border_width(content, 3, 0);
     lv_obj_set_style_pad_all(content, 20, 0);
     lv_obj_clear_flag(content, LV_OBJ_FLAG_SCROLLABLE);
+
+    // LowRider Touch: a row of its own above the standard buttons
+    lv_obj_t *new_ui_btn = lv_btn_create(content);
+    lv_obj_set_size(new_ui_btn, 660, 50);
+    lv_obj_align(new_ui_btn, LV_ALIGN_BOTTOM_MID, 0, -70);
+    lv_obj_set_style_bg_color(new_ui_btn, UITheme::ACCENT_SECONDARY, 0);
+    lv_obj_add_event_cb(new_ui_btn, on_restart_new_ui, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t *new_ui_label = lv_label_create(new_ui_btn);
+    lv_label_set_text(new_ui_label, LV_SYMBOL_REFRESH " Restart into new UI (LowRider Touch)");
+    lv_obj_set_style_text_font(new_ui_label, &lv_font_montserrat_18, 0);
+    lv_obj_center(new_ui_label);
     
     // Title (positioned near top)
     lv_obj_t *title = lv_label_create(content);

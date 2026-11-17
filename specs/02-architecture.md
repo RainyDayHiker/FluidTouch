@@ -29,15 +29,18 @@ Kept deliberately small, to stay mergeable (G11):
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
 | `ui/upload_manager.*` | Used as is by `FileService`. A download function is added next to it (new file). |
-| `main.cpp` | Registers the classic listener after `FluidNCClient::init()` (M1). Reads the UI mode at boot and starts either the classic UI or the new app. |
+| `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
+| `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
 | `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` later. The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
 
 ## 3. UI mode
 
-An NVS key selects `app` (default) or `classic` at boot. Settings > Tools has "Restart into
-classic UI"; the classic UI's System Options popup gains "Restart into new UI". Only one UI
-is created per boot, so RAM use is that of one.
+An NVS key (namespace `lrt`, key `ui_mode`, u8: 0 = `app`, 1 = `classic`; missing or any
+other value = `app`) selects the UI at boot. Settings > Tools has "Restart into classic UI";
+the classic UI's System Options popup (tap the right end of its status bar) has "Restart
+into new UI". Only one UI is created per boot, so RAM use is that of one. The classic
+settings auto-import from the display SD runs before the switch, in both modes.
 
 Both UIs use the same stored machine connection: the new SettingsService reads and writes
 machine slot 0 of the classic `fluidtouch` preferences. Settings that only the new UI has
