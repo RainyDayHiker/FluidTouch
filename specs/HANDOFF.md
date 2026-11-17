@@ -42,9 +42,6 @@ has since done the setup and the first M1 step.
    5. `build:` commit adding a CI workflow for `lrt/**`.
 3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
    results into [06](06-test-and-spikes.md).
-4. Open point for Jeffrey: [03 §1](03-screens.md#1-frame) cites decision D27 (tabs on top,
-   status bar at the bottom), but the log in [07](07-decisions.md) ends at D26, and D26
-   says "top bar" shows the positions. Add D27 and reword D26, or correct 03.
 
 ### Working notes for the simulator
 

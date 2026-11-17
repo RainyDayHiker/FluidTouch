@@ -3,7 +3,7 @@
 ## 1. Layers
 
 ```
-src/app/        screens, top bar, navigation            new   depends on services
+src/app/        screens, tabs, status bar               new   depends on services
 src/services/   machine, job, files, macros, settings   new   depends on lib/gcode, platform
 lib/gcode/      tokenizer, simulator, ops, outline      new   plain C++17, no Arduino/LVGL
 src/core/       display, touch, power                   kept
