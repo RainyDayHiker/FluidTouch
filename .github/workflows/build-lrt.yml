@@ -1,0 +1,117 @@
+name: LowRider Touch build
+
+# Builds and checks the LowRider Touch branches (specs/09-git-workflow.md).
+# Publishes nothing: no release, no web installer, no gh-pages. The firmware
+# and the simulator screenshots are kept as workflow artifacts only.
+
+on:
+  push:
+    branches:
+      - 'lrt/**'
+  pull_request:
+    branches:
+      - 'lrt/main'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lrt-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    name: Firmware (Advance v1.3)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: ${{ runner.os }}-pio-lrt-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-lrt-
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Build firmware
+        run: platformio run --environment elecrow-crowpanel-7-advance-v13
+
+      - name: Keep the firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-advance-v13-${{ github.sha }}
+          path: .pio/build/elecrow-crowpanel-7-advance-v13/firmware.bin
+          retention-days: 14
+
+  simulator:
+    name: Simulator (Windows, MSYS2)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+
+      - name: Build simulator
+        run: |
+          cmake -S sim -B sim/build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
+          cmake --build sim/build
+
+      - name: XModem sender test
+        run: sim/build/xmodem_sender_test.exe
+
+      - name: Start both UIs without a window
+        run: bash sim/tools/smoke_test.sh sim/build/smoke
+
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulator-smoke-${{ github.sha }}
+          path: |
+            sim/build/smoke/*.bmp
+            sim/build/smoke/*.log
+          retention-days: 14
+
+  fake-fluidnc:
+    name: Fake FluidNC test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Job playback and HTTP
+        run: python sim/tools/test_fake_fluidnc.py
