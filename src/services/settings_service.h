@@ -23,7 +23,7 @@ public:
         int xyStepCount;
         float zSteps[MAX_STEPS];
         int zStepCount;
-        float xyStep;              // the selected step (D36)
+        float xyStep;              // the step Setup starts with (classic Settings > Jog, D45)
         float zStep;
         int xyFeed;                // mm/min; set in Settings only (D35)
         int zFeed;
@@ -48,14 +48,6 @@ public:
     static Jog jog();
     static Probe probe();
     static LaserOffset laserOffset();
-
-    // Written back to classic slot 0 (D36): remembered at once, written to
-    // flash by poll() a few seconds after the last change (D44)
-    static void saveJogXYStep(float step);
-    static void saveJogZStep(float step);
-
-    // Writes pending changes when they are due; call from the main loop
-    static void poll();
 };
 
 #endif // LRT_SETTINGS_SERVICE_H

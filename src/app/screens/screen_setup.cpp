@@ -208,16 +208,16 @@ void onZero(lv_event_t *e) {
 void onUnlock(lv_event_t *) { MachineService::unlock(); }
 void onReset(lv_event_t *) { MachineService::reset(); }
 
+// The chosen step lasts until a restart; the one Setup starts with is set
+// in Settings (D45)
 void onXYStep(lv_event_t *e) {
     xyStepIndex = (int)(intptr_t)lv_event_get_user_data(e);
     showSteps();
-    SettingsService::saveJogXYStep(jog.xySteps[xyStepIndex]);
 }
 
 void onZStep(lv_event_t *e) {
     zStepIndex = (int)(intptr_t)lv_event_get_user_data(e);
     showSteps();
-    SettingsService::saveJogZStep(jog.zSteps[zStepIndex]);
 }
 
 // User data: (dx + 1) * 3 + (dy + 1), each of dx, dy being -1, 0 or 1.

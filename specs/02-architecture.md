@@ -44,17 +44,17 @@ settings auto-import from the display SD runs before the switch, in both modes.
 
 Both UIs use the same stored machine connection: the new SettingsService reads and writes
 machine slot 0 of the classic `fluidtouch` preferences. The jog steps, jog feeds and probe
-values come from the same slot; Setup writes the chosen steps back to it
-(D36). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
+values come from the same slot; the default jog steps too, which Setup starts with but
+does not write (D45). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
 the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11), and the probe back-off
 `probe_back` (default 10 mm, D43).
 
 Every flash access, read or write, briefly stops the RGB panel from reading its frame from
 PSRAM, which shows as a flicker (seen on the device, 2026-11-17). SettingsService therefore
-reads slot 0 and the `lrt` values once and keeps them, and writes a changed jog step as its
-single key 5 s after the last change, instead of classic's `saveMachine()`, which rewrites
-every key of every machine (D44). Settings screens that write (M3) should save on an
-explicit action, not per press.
+reads slot 0 and the `lrt` values once and keeps them, and the working screens never write
+(D44, D45). Settings is the one place that saves, on an explicit action, not per press (M3).
+Classic's `saveMachine()` rewrites every key of every machine; the new Settings should
+write only the keys that changed.
 
 ## 4. Services
 

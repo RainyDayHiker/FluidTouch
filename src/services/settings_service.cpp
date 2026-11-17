@@ -1,7 +1,5 @@
 #include "services/settings_service.h"
 #include "app/app_prefs.h"
-#include "config.h"
-#include <Arduino.h>
 #include <Preferences.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,11 +34,9 @@ void stepsOrDefault(const char *text, const char *fallback, float *out, int &cou
 
 // Every flash access (read or write) briefly stops the RGB panel from
 // reading its picture from PSRAM, which shows as a flicker. So slot 0 and the
-// "lrt" values are read once and kept, and a changed jog step is written as
-// one key, a few seconds after the last change (D44).
+// "lrt" values are read once and kept, and nothing on the screens writes
+// (D44).
 namespace {
-
-const uint32_t SAVE_DELAY_MS = 5000;
 
 MachineConfig slot0;
 bool slot0Loaded = false;
@@ -51,10 +47,6 @@ struct LrtValues {
 };
 LrtValues lrt;
 bool lrtLoaded = false;
-
-bool xyStepPending = false;
-bool zStepPending = false;
-uint32_t stepChangedMs = 0;
 
 const MachineConfig *loadSlot0() {
     if (!slot0Loaded) {
@@ -127,33 +119,4 @@ SettingsService::Probe SettingsService::probe() {
 SettingsService::LaserOffset SettingsService::laserOffset() {
     const LrtValues &v = loadLrt();
     return {v.laserX, v.laserY};
-}
-
-void SettingsService::saveJogXYStep(float step) {
-    if (!loadSlot0() || slot0.jog_xy_step == step) return;
-    slot0.jog_xy_step = step;
-    xyStepPending = true;
-    stepChangedMs = millis();
-}
-
-void SettingsService::saveJogZStep(float step) {
-    if (!loadSlot0() || slot0.jog_z_step == step) return;
-    slot0.jog_z_step = step;
-    zStepPending = true;
-    stepChangedMs = millis();
-}
-
-void SettingsService::poll() {
-    if (!(xyStepPending || zStepPending) || millis() - stepChangedMs < SAVE_DELAY_MS) return;
-    // Only the changed keys of slot 0, by the names classic uses
-    // (ui/machine_config.cpp); classic's saveMachine() would rewrite every
-    // key of every machine
-    Preferences prefs;
-    prefs.begin(PREFS_NAMESPACE, false);
-    if (xyStepPending) prefs.putFloat("m0_jxy_st", slot0.jog_xy_step);
-    if (zStepPending) prefs.putFloat("m0_jz_st", slot0.jog_z_step);
-    prefs.end();
-    xyStepPending = zStepPending = false;
-    // Classic's cached copy is now out of date; it reads again when next asked
-    MachineConfigManager::reloadMachines();
 }
