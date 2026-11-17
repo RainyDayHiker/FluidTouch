@@ -29,7 +29,8 @@ public:
     // only passed on to the screenshot server.
     static void begin(DisplayDriver *display);
 
-    // Call every pass of the main loop, after FluidNCClient::loop()
+    // Call every pass of the main loop. Runs FluidNCClient::loop() itself,
+    // except while a connection attempt is in progress on the worker task.
     static void poll();
 
     static Link link() { return linkState; }
@@ -70,6 +71,7 @@ private:
 
     static void startWifi();
     static void connectController();
+    static void connectTask(void *);
     static void retryControllerIn(uint32_t ms);
 
     static Listener listener;
@@ -82,6 +84,12 @@ private:
     static bool lastJobActive;
     static bool networkServicesStarted;
     static bool connectPending;      // connectController() is due at connectAtMs
+    // A connection attempt runs on its own task because FluidNCClient::connect()
+    // blocks for many seconds when the controller is off. While it runs, the
+    // main loop leaves FluidNCClient alone.
+    static volatile bool connectRunning;
+    static volatile bool connectFinished;
+    static volatile bool connectOk;
     static uint32_t connectAtMs;
     static uint32_t stateSinceMs;    // when the current wait started
     static MachineState lastState;
