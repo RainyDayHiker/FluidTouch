@@ -63,6 +63,7 @@ find_package(SDL2 REQUIRED CONFIG)
 set(FT_INCLUDE_DIRS
     "${SIM_DIR}/include"
     "${FT_ROOT}/include"
+    "${FT_ROOT}/src"  # headers that live next to their sources (src/app, src/services), as PlatformIO does
     "${lvgl_SOURCE_DIR}"
     "${lvgl_SOURCE_DIR}/.."
     "${arduinojson_SOURCE_DIR}/src"

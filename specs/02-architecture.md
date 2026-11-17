@@ -31,7 +31,7 @@ Kept deliberately small, to stay mergeable (G11):
 | `ui/upload_manager.*` | Used as is by `FileService`. A download function is added next to it (new file). |
 | `main.cpp` | Registers the classic listener after `FluidNCClient::init()` (M1). Reads the UI mode at boot and starts either the classic UI or the new app. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
-| `sim/` | Same additions to `CMakeLists.txt`; fake FluidNC extended ([06](06-test-and-spikes.md)). |
+| `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` later. The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
 
 ## 3. UI mode
 
