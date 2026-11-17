@@ -1,6 +1,7 @@
 #include "app/frame.h"
 #include "app/screens/screens.h"
 #include "app/ui_mode.h"
+#include "app/widgets.h"
 #include "services/machine_service.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
@@ -39,12 +40,7 @@ bool bannerButtonEnabled = true;
 const lv_color_t BANNER_ALARM_BG = LV_COLOR_MAKE(0x7A, 0x10, 0x10);
 const lv_color_t BANNER_LINK_BG = LV_COLOR_MAKE(0x4A, 0x3A, 0x00);
 
-// lv_label_set_text() redraws even when nothing changed
-void setText(lv_obj_t *label, const char *text) {
-    if (strcmp(lv_label_get_text(label), text) != 0) {
-        lv_label_set_text(label, text);
-    }
-}
+using Widgets::setText;
 
 lv_obj_t *plainBox(lv_obj_t *parent, int x, int y, int w, int h, lv_color_t bg) {
     lv_obj_t *box = lv_obj_create(parent);

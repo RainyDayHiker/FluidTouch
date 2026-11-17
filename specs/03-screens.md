@@ -60,7 +60,7 @@ spec.
 | Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre has no button. Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
 | Z+/Z- | `$J=G91 G21 Z.. F..` | Own step selector. The Z feed is not on Setup: it is set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
 | Step selectors | | XY: 100, 50, 10, 1, 0.1 mm. Z: 50, 25, 10, 1, 0.1 mm. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
-| XY feed | | [-] and [+] change the XY jog feed by 10% of the XY maximum jog feed, within 10% and 100% of it. Saved to classic slot 0 (D36) |
+| XY feed | | [-] and [+] change the XY jog feed by 100 mm/min, not below 100. FluidNC limits a jog to the axes' maximum rates itself. Saved to classic slot 0 as the XY jog feed, which is classic Settings > Jog's XY "Feed" (D36) |
 | Laser -> bit | `$J=G91 G21 X33.6 Y-28.2 F..` | Offset from Settings (defaults from `laser_offset.gcode`). A jog, so it can be cancelled and leaves G90/G91 alone. XY jog feed |
 | Bit -> laser | The reverse move | |
 | Go to XY zero | `$J=G90 G21 X0 Y0 F..` | STOP cancels it. No Z height check. XY jog feed |

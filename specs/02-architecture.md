@@ -43,8 +43,10 @@ into new UI". Only one UI is created per boot, so RAM use is that of one. The cl
 settings auto-import from the display SD runs before the switch, in both modes.
 
 Both UIs use the same stored machine connection: the new SettingsService reads and writes
-machine slot 0 of the classic `fluidtouch` preferences. Settings that only the new UI has
-live in their own namespace (`lrt`).
+machine slot 0 of the classic `fluidtouch` preferences. The jog steps, jog feeds and probe
+values come from the same slot; Setup writes the chosen step and the XY jog feed back to it
+(D36). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
+and the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11).
 
 ## 4. Services
 
@@ -78,6 +80,13 @@ answering and back to `WiFi` when the network goes.
 Only `MachineService` and `SettingsService` exist so far. `SettingsService` reads classic
 slot 0 and reports "not configured" or "not a WiFi machine" (D4). File, Job and Macro
 services arrive with the screens that need them (M3).
+
+`MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
+`canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
+to enable buttons, and each action checks them again before it sends anything. Probe Z
+sends `G91` and `G38.2`, and puts `G90` back when the result arrives; after a miss FluidNC
+is in alarm and would reject it, so it goes out with the next Unlock instead. A reset
+cancels it, since a reset restores the modal defaults.
 
 `src/app` uses the classic colour constants (`ui/ui_theme.h`, header only) so both UIs look
 alike; nothing else from `src/ui` is included by the new code except `ui/machine_config.h`.
