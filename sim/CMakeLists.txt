@@ -87,7 +87,9 @@ set(FT_DEFINES
 
 # Sim-side ArduinoWebsockets platform glue (defines WSDefaultTcpClient) is
 # force-included into every C++ file, since the library only knows ESP/Teensy.
-set(FT_CXX_FORCE_INCLUDE "${SIM_DIR}/include/sim_ws_platform.h")
+# Named without a directory (found through the sim/include search path) so the
+# option survives a checkout path that contains a space.
+set(FT_CXX_FORCE_INCLUDE "sim_ws_platform.h")
 
 # ---------------------------------------------------------------------------
 # LVGL (compiled from source with the firmware's lv_conf.h + SDL enabled)
