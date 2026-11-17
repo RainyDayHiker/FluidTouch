@@ -7,7 +7,9 @@
 // Timing of the connection state machine
 static const uint32_t WIFI_TIMEOUT_MS = 15000;        // then WiFi.begin() again
 static const uint32_t CONTROLLER_TIMEOUT_MS = 10000;  // no status report after connecting
-static const uint32_t RETRY_DELAY_MS = 5000;          // between controller attempts
+// Back-off between controller attempts, then wait for Reconnect (D46)
+static const uint32_t RETRY_DELAYS_MS[] = {5000, 5000, 10000, 10000};
+static const int RETRY_COUNT = sizeof(RETRY_DELAYS_MS) / sizeof(RETRY_DELAYS_MS[0]);
 static const uint32_t FIRST_CONNECT_DELAY_MS = 150;   // lets the frame draw "Connecting" first
 
 MachineService::Listener MachineService::listener;
@@ -20,6 +22,8 @@ bool MachineService::jobAtDrop = false;
 bool MachineService::lastJobActive = false;
 bool MachineService::networkServicesStarted = false;
 bool MachineService::connectPending = false;
+int MachineService::retryCount = 0;
+bool MachineService::retriesStopped = false;
 volatile bool MachineService::connectRunning = false;
 volatile bool MachineService::connectFinished = false;
 volatile bool MachineService::connectOk = false;
@@ -78,7 +82,19 @@ void MachineService::startWifi() {
 void MachineService::retryControllerIn(uint32_t ms) {
     linkState = LINK_CONTROLLER;
     connectPending = true;
+    retriesStopped = false;
     connectAtMs = millis() + ms;
+}
+
+void MachineService::scheduleRetry() {
+    if (retryCount < RETRY_COUNT) {
+        retryControllerIn(RETRY_DELAYS_MS[retryCount++]);
+        return;
+    }
+    Serial.println("MachineService: no connection after the retries; waiting for Reconnect");
+    linkState = LINK_CONTROLLER;
+    connectPending = false;
+    retriesStopped = true;
 }
 
 // FluidNCClient::connect() blocks while it resolves the name and opens the
@@ -110,7 +126,7 @@ void MachineService::poll() {
         if (!connectFinished) return;  // the task owns FluidNCClient for now
         connectRunning = false;
         stateSinceMs = millis();       // the wait for the first status report starts here
-        if (!connectOk) retryControllerIn(RETRY_DELAY_MS);
+        if (!connectOk) scheduleRetry();
     }
     FluidNCClient::loop();
 
@@ -130,6 +146,7 @@ void MachineService::poll() {
                 }
                 if (display) ScreenshotServer::init(display);
             }
+            retryCount = 0;  // a fresh start once the network is back
             retryControllerIn(FIRST_CONNECT_DELAY_MS);
         } else if (now - stateSinceMs >= WIFI_TIMEOUT_MS) {
             Serial.println("MachineService: WiFi not connected yet, trying again");
@@ -157,12 +174,15 @@ void MachineService::poll() {
             wasOnline = true;
             jobAtDrop = false;
             lastState = STATE_DISCONNECTED;
+            retryCount = 0;
+        } else if (retriesStopped) {
+            // nothing until Reconnect
         } else if (connectPending) {
             if ((int32_t)(now - connectAtMs) >= 0) connectController();
         } else if (now - stateSinceMs >= CONTROLLER_TIMEOUT_MS) {
-            Serial.println("MachineService: no status from FluidNC, trying again");
+            Serial.println("MachineService: no status from FluidNC");
             FluidNCClient::disconnect();
-            retryControllerIn(RETRY_DELAY_MS);
+            scheduleRetry();
         }
         return;
     }
@@ -174,7 +194,7 @@ void MachineService::poll() {
         probing = false;
         homeYStage = HOME_Y_NONE;
         FluidNCClient::disconnect();
-        retryControllerIn(RETRY_DELAY_MS);
+        scheduleRetry();
         return;
     }
 
@@ -343,7 +363,9 @@ void MachineService::probeZ(int maxDistance, int feed, float backOff) {
 void MachineService::reconnect() {
     if (connectRunning) return;  // an attempt is already under way
     if (linkState == LINK_CONTROLLER) {
-        if (!connectPending) return;  // waiting for the first status report of an attempt
+        // Ignored while waiting for the first status report of an attempt
+        if (!connectPending && !retriesStopped) return;
+        retryCount = 0;  // a press starts the back-off again
         retryControllerIn(FIRST_CONNECT_DELAY_MS);
     } else if (linkState == LINK_WIFI) {
         WiFi.disconnect();

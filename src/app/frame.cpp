@@ -329,7 +329,15 @@ void Frame::updateBanner() {
         case MachineService::LINK_CONTROLLER: {
             kind = BANNER_LINK;
             const char *job = MachineService::jobRunningAtDrop() ? "\nThe job continues on the controller." : "";
-            if (MachineService::attemptInProgress()) {
+            if (MachineService::waitingForReconnect()) {
+                // The automatic retries are used up (D46)
+                if (MachineService::everOnline()) {
+                    snprintf(text, sizeof(text), "Connection lost. Press Reconnect to try again.%s", job);
+                } else {
+                    snprintf(text, sizeof(text), "No answer from %s. Press Reconnect to try again.",
+                             MachineService::machineName());
+                }
+            } else if (MachineService::attemptInProgress()) {
                 // Reconnect could do nothing now, so it is shown disabled
                 buttonEnabled = false;
                 if (MachineService::everOnline()) {

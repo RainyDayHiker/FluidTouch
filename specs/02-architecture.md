@@ -69,15 +69,19 @@ write only the keys that changed.
 ### Connection (MachineService)
 
 Implemented in M1. The classic UI connects once and asks the user to reconnect; the new UI
-keeps trying on its own (S4):
+retries on its own for a while, then waits for Reconnect (S4, D46):
 
 `No machine | WiFi -> Controller -> Online`, back to `Controller` when FluidNC stops
 answering and back to `WiFi` when the network goes.
 
 - WiFi: `WiFi.begin()` without blocking; started again after 15 s without a connection.
-- Controller: one `FluidNCClient::connect()` per attempt, 5 s between attempts, 10 s
-  allowed for the first status report. The Reconnect button starts an attempt at once
-  (ignored while one is under way).
+- Controller: one `FluidNCClient::connect()` per attempt, 10 s allowed for the first
+  status report. After a failed attempt or a dropped connection the retries come after 5,
+  5, 10 and 10 s; then the service stops and waits for Reconnect (`waitingForReconnect()`).
+  A failed attempt takes 10 to 12 s on the device with the controller off, so that is
+  about a minute and a half of trying. Reconnect starts an attempt at once and the back-off
+  again (ignored while an attempt is under way); so do a successful connection and WiFi
+  coming back. WiFi itself is retried without limit.
 - `connect()` blocks while it resolves the name and opens the socket: 10 to 12 s on the
   device with the controller switched off (2026-11-16), which froze the screen. Each
   attempt therefore runs on its own task on core 0. `FluidNCClient` is not thread-safe, so

@@ -49,6 +49,7 @@
 | D43 | After a touch, Probe Z raises Z by a back-off of the new UI's own (`lrt` `probe_back`, default 10 mm), sent as `G0 Z..` queued behind `G38.2` as classic's retract is (2026-11-17) | No retract (D24); classic's retract setting (2 mm by default) | Tried on the device: the bit should come clear of the plate |
 | D44 | The new UI keeps slot 0 and its `lrt` settings in RAM after the first read; the working screens don't write to flash (2026-11-17) | Reading and writing settings on each press | On the device every step press made the screen flicker: saving went through classic's `saveMachine()`, which rewrites every key of every machine, and flash access stalls the panel's PSRAM reads. Writing one key 5 s later still flickered visibly |
 | D45 | The default jog steps are set in Settings (classic Settings > Jog until M3); Setup starts with them, and a step chosen on Setup lasts until a restart (2026-11-17) | Saving the step chosen on Setup (D36) | Settings is the one place that saves; no flash writes, so no flicker, during setup |
+| D46 | Reconnecting backs off: retries after 5, 5, 10 and 10 s, then the banner asks for Reconnect, which starts the same sequence again. A successful connection or WiFi coming back resets it. WiFi joining is unchanged (every 15 s, without limit) (2026-11-17) | Retrying every 5 s without end | Asked for: a controller that is off should not be retried for ever |
 
 ## Open questions
 
