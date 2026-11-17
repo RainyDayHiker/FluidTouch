@@ -22,8 +22,11 @@ public:
     struct ProbeResult {
         uint32_t count;    // increments with every [PRB:...] received; 0 = none yet
         float x, y, z;     // machine coordinates
+        float workZ;       // z in work coordinates, with the offset at the time of the result
         bool success;
     };
+
+    enum Axes : uint8_t { AXIS_X = 1, AXIS_Y = 2, AXIS_Z = 4, AXES_XY = 3, AXES_XYZ = 7 };
 
     // Loads the machine from settings and starts connecting. The display is
     // only passed on to the screenshot server.
@@ -61,11 +64,42 @@ public:
 
     static const ProbeResult &lastProbe() { return probe; }
 
+    // A probe started by probeZ() has not reported its result yet
+    static bool probeActive() { return probing; }
+
+    // --- What may be done now (specs/03-screens.md section 2, S3) ----------
+    // The actions below check these themselves and do nothing otherwise.
+    static bool canHome();    // idle or in alarm, no job, nothing under way
+    static bool canZero();    // idle, no job, nothing under way (also for probeZ)
+    static bool canMove();    // idle or jogging, no job, nothing else under way
+    static bool canUnlock() { return online(); }
+    static bool canReset() { return online(); }
+
+    // Why the can*() checks fail at the moment, as a short sentence for the
+    // status bar, e.g. "Wait for the jog to finish."
+    static const char *busyReason();
+
     // --- Actions -----------------------------------------------------------
     // Feed hold, or jog cancel while jogging (S1)
     static void stop();
+    // Jog cancel (0x85): ends the joystick's jog when it is let go
+    static void cancelJog();
     // Clear an alarm ($X)
     static void unlock();
+    // Soft reset (0x18)
+    static void reset();
+    // $H; $HZ for Z only; $HX, then $HY once X has finished, for XY
+    static void homeAll();
+    static void homeZ();
+    static void homeXY();
+    // G10 L20 P0 with 0 for each axis in the mask
+    static void zero(uint8_t axes);
+    // $J=G91 G21 with the axes that are not 0
+    static void jogBy(float dx, float dy, float dz, int feed);
+    // G91, G38.2 Z-maxDistance, G0 Z+backOff once it touches, then back to
+    // G90 if that was active. The result (the touch point) arrives in
+    // lastProbe().
+    static void probeZ(int maxDistance, int feed, float backOff);
     // Retry the connection now instead of waiting for the next attempt.
     // Does nothing while an attempt is under way.
     static void reconnect();
@@ -101,6 +135,14 @@ private:
     static uint32_t stateSinceMs;    // when the current wait started
     static MachineState lastState;
     static ProbeResult probe;
+    static bool probing;
+    // G90 is still to be sent after a probe: the probe failed into an alarm,
+    // which rejects it until unlocked
+    static bool restoreG90;
+    // Home XY: $HY is due once the $HX cycle has been seen and has ended
+    enum HomeYStage : uint8_t { HOME_Y_NONE, HOME_Y_WAIT_START, HOME_Y_WAIT_END };
+    static HomeYStage homeYStage;
+    static uint32_t homeYSinceMs;
 };
 
 #endif // LRT_MACHINE_SERVICE_H

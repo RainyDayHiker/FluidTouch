@@ -26,14 +26,28 @@ volatile bool MachineService::connectOk = false;
 uint32_t MachineService::connectAtMs = 0;
 uint32_t MachineService::stateSinceMs = 0;
 MachineState MachineService::lastState = STATE_DISCONNECTED;
-MachineService::ProbeResult MachineService::probe = {0, 0, 0, 0, false};
+MachineService::ProbeResult MachineService::probe = {0, 0, 0, 0, 0, false};
+bool MachineService::probing = false;
+bool MachineService::restoreG90 = false;
+MachineService::HomeYStage MachineService::homeYStage = MachineService::HOME_Y_NONE;
+uint32_t MachineService::homeYSinceMs = 0;
+
+// How long $HX may take to show up as Home in the status before Home XY gives up
+static const uint32_t HOME_X_START_TIMEOUT_MS = 3000;
 
 void MachineService::Listener::onProbeResult(float x, float y, float z, bool success) {
     probe.count++;
     probe.x = x;
     probe.y = y;
     probe.z = z;
+    probe.workZ = z - FluidNCClient::getStatus().wco_z;
     probe.success = success;
+    probing = false;
+    // After a miss FluidNC is in alarm and would reject G90; unlock() sends it
+    if (success && restoreG90) {
+        FluidNCClient::sendCommand("G90\n");
+        restoreG90 = false;
+    }
 }
 
 void MachineService::begin(DisplayDriver *displayDriver) {
@@ -129,6 +143,8 @@ void MachineService::poll() {
         // The network went away; the controller connection goes with it
         Serial.println("MachineService: WiFi lost");
         if (linkState == LINK_ONLINE) jobAtDrop = lastJobActive;
+        probing = false;
+        homeYStage = HOME_Y_NONE;
         FluidNCClient::disconnect();
         startWifi();
         return;
@@ -155,6 +171,8 @@ void MachineService::poll() {
     if (!FluidNCClient::isConnected()) {
         Serial.println("MachineService: connection to FluidNC lost");
         jobAtDrop = lastJobActive;
+        probing = false;
+        homeYStage = HOME_Y_NONE;
         FluidNCClient::disconnect();
         retryControllerIn(RETRY_DELAY_MS);
         return;
@@ -165,6 +183,22 @@ void MachineService::poll() {
     if (lastState == STATE_ALARM && s.state != STATE_ALARM) {
         // The alarm text belongs to the alarm that has just been cleared
         FluidNCClient::clearAlarmMessage();
+    }
+    if (s.state == STATE_ALARM) probing = false;  // the [PRB:] line normally comes first
+
+    // Home XY, second half
+    if (homeYStage != HOME_Y_NONE && s.state == STATE_ALARM) {
+        homeYStage = HOME_Y_NONE;
+    } else if (homeYStage == HOME_Y_WAIT_START) {
+        if (s.state == STATE_HOME) {
+            homeYStage = HOME_Y_WAIT_END;
+        } else if (now - homeYSinceMs >= HOME_X_START_TIMEOUT_MS) {
+            Serial.println("MachineService: $HX did not start homing; $HY not sent");
+            homeYStage = HOME_Y_NONE;
+        }
+    } else if (homeYStage == HOME_Y_WAIT_END && s.state == STATE_IDLE) {
+        homeYStage = HOME_Y_NONE;
+        FluidNCClient::sendCommand("$HY\n");
     }
     lastState = s.state;
 }
@@ -177,6 +211,10 @@ uint32_t MachineService::msToNextAttempt() {
     return remaining > 500 ? (uint32_t)remaining : 0;
 }
 
+void MachineService::cancelJog() {
+    if (online()) FluidNCClient::sendCommand("\x85");
+}
+
 void MachineService::stop() {
     if (!online()) return;
     if (status().state == STATE_JOG) {
@@ -187,8 +225,119 @@ void MachineService::stop() {
 }
 
 void MachineService::unlock() {
-    if (!online()) return;
+    if (!canUnlock()) return;
     FluidNCClient::sendCommand("$X\n");
+    if (restoreG90) {
+        FluidNCClient::sendCommand("G90\n");
+        restoreG90 = false;
+    }
+}
+
+// --- What may be done now ---------------------------------------------------
+
+namespace {
+// FluidNC reports Idle during a G4 dwell inside a running file, so a job
+// counts as busy whatever the state says
+bool idleNoJob(const FluidNCStatus &s) { return s.state == STATE_IDLE && !s.is_sd_printing; }
+}  // namespace
+
+bool MachineService::canHome() {
+    if (!online() || probing || homeYStage != HOME_Y_NONE) return false;
+    const FluidNCStatus &s = status();
+    return !s.is_sd_printing && (s.state == STATE_IDLE || s.state == STATE_ALARM);
+}
+
+bool MachineService::canZero() {
+    return online() && !probing && homeYStage == HOME_Y_NONE && idleNoJob(status());
+}
+
+bool MachineService::canMove() {
+    if (!online() || probing || homeYStage != HOME_Y_NONE) return false;
+    const FluidNCStatus &s = status();
+    return !s.is_sd_printing && (s.state == STATE_IDLE || s.state == STATE_JOG);
+}
+
+const char *MachineService::busyReason() {
+    if (!online()) return "Not connected.";
+    const FluidNCStatus &s = status();
+    if (s.is_sd_printing) return "Not while a job runs.";
+    if (probing) return "Wait for the probe to finish.";
+    if (homeYStage != HOME_Y_NONE || s.state == STATE_HOME) return "Wait for homing to finish.";
+    switch (s.state) {
+        case STATE_JOG:   return "Wait for the jog to finish.";
+        case STATE_ALARM: return "Unlock or home first.";
+        case STATE_HOLD:  return "The machine is in hold. Reset or STOP first.";
+        case STATE_RUN:   return "Wait for the machine to stop.";
+        case STATE_DOOR:  return "The door is open.";
+        default:          return "Not possible right now.";
+    }
+}
+
+// --- Actions ----------------------------------------------------------------
+
+void MachineService::reset() {
+    if (!canReset()) return;
+    FluidNCClient::sendCommand("\x18");
+    // A reset ends a probe and puts the modal state back to its defaults (G90)
+    probing = false;
+    restoreG90 = false;
+    homeYStage = HOME_Y_NONE;
+}
+
+void MachineService::homeAll() {
+    if (canHome()) FluidNCClient::sendCommand("$H\n");
+}
+
+void MachineService::homeZ() {
+    if (canHome()) FluidNCClient::sendCommand("$HZ\n");
+}
+
+// FluidNC's $H takes one axis letter at a time, and refuses a second $H
+// while the first runs, so $HY waits for the X cycle to end (see poll())
+void MachineService::homeXY() {
+    if (!canHome()) return;
+    FluidNCClient::sendCommand("$HX\n");
+    homeYStage = HOME_Y_WAIT_START;
+    homeYSinceMs = millis();
+}
+
+void MachineService::zero(uint8_t axes) {
+    if (!canZero() || !(axes & AXES_XYZ)) return;
+    char cmd[40] = "G10 L20 P0";
+    if (axes & AXIS_X) strcat(cmd, " X0");
+    if (axes & AXIS_Y) strcat(cmd, " Y0");
+    if (axes & AXIS_Z) strcat(cmd, " Z0");
+    strcat(cmd, "\n");
+    FluidNCClient::sendCommand(cmd);
+}
+
+void MachineService::jogBy(float dx, float dy, float dz, int feed) {
+    if (!canMove() || feed <= 0 || (dx == 0 && dy == 0 && dz == 0)) return;
+    char cmd[96];
+    int n = snprintf(cmd, sizeof(cmd), "$J=G91 G21");
+    if (dx != 0) n += snprintf(cmd + n, sizeof(cmd) - n, " X%.3f", dx);
+    if (dy != 0) n += snprintf(cmd + n, sizeof(cmd) - n, " Y%.3f", dy);
+    if (dz != 0) n += snprintf(cmd + n, sizeof(cmd) - n, " Z%.3f", dz);
+    snprintf(cmd + n, sizeof(cmd) - n, " F%d\n", feed);
+    FluidNCClient::sendCommand(cmd);
+}
+
+void MachineService::probeZ(int maxDistance, int feed, float backOff) {
+    if (!canZero() || maxDistance <= 0 || feed <= 0) return;
+    // G91 goes on a line of its own, as in the classic UI's probe tab
+    bool wasG91 = strcmp(status().modal_distance, "G91") == 0;
+    FluidNCClient::sendCommand("G91\n");
+    char cmd[48];
+    snprintf(cmd, sizeof(cmd), "G38.2 Z-%d F%d\n", maxDistance, feed);
+    FluidNCClient::sendCommand(cmd);
+    // The back-off is queued behind the probe, as classic's retract is: it
+    // runs once the probe touches, and a miss (alarm) discards it
+    if (backOff > 0) {
+        snprintf(cmd, sizeof(cmd), "G0 Z%.2f\n", backOff);
+        FluidNCClient::sendCommand(cmd);
+    }
+    probing = true;
+    restoreG90 = !wasG91;  // sent when the result arrives
 }
 
 void MachineService::reconnect() {

@@ -4,9 +4,9 @@
 #include "ui/machine_config.h"
 
 // Persistent settings (specs/02-architecture.md sections 3 and 4).
-// The machine connection is shared with the classic UI: slot 0 of its
-// "fluidtouch" preferences. Settings only the new UI has will live in the
-// "lrt" namespace; none exist yet apart from the UI mode (app/ui_mode.h).
+// The machine connection, jog and probe values are shared with the classic
+// UI: slot 0 of its "fluidtouch" preferences. Settings only the new UI has
+// live in the "lrt" namespace (app/app_prefs.h).
 class SettingsService {
 public:
     enum MachineStatus {
@@ -15,8 +15,39 @@ public:
         MACHINE_NOT_WIFI,        // slot 0 uses UART, USB or ESP-NOW; the new UI is WiFi only (D4)
     };
 
+    // Setup has room for this many steps per axis group
+    static const int MAX_STEPS = 5;
+
+    struct Jog {
+        float xySteps[MAX_STEPS];  // from classic slot 0's step lists, in mm
+        int xyStepCount;
+        float zSteps[MAX_STEPS];
+        int zStepCount;
+        float xyStep;              // the step Setup starts with (classic Settings > Jog, D45)
+        float zStep;
+        int xyFeed;                // mm/min; set in Settings only (D35)
+        int zFeed;
+        int xyMaxFeed;             // the XY joystick's feed at full deflection (classic "Max")
+    };
+
+    struct Probe {
+        int feed;                  // mm/min
+        int maxDistance;           // mm
+        float backOff;             // mm raised after a touch; "lrt" probe_back (D43)
+    };
+
+    struct LaserOffset {
+        float x, y;                // mm, from the laser crosshair to the bit (D11)
+    };
+
     // Reads the machine connection from classic slot 0
     static MachineStatus machine(MachineConfig &out);
+
+    // Jog and probe values from classic slot 0 (classic defaults when the
+    // slot is empty) and the laser offset from "lrt"
+    static Jog jog();
+    static Probe probe();
+    static LaserOffset laserOffset();
 };
 
 #endif // LRT_SETTINGS_SERVICE_H

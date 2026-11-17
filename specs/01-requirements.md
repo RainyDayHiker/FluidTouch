@@ -22,7 +22,7 @@ the display itself.
 
 | ID | Requirement |
 |----|-------------|
-| G1 | **Setup on one screen:** home, unlock, jog XY and Z, zero, go to zero, laser crosshair offset, with no sub-tabs. |
+| G1 | **Setup on one screen:** home, unlock, jog XY and Z, zero, laser crosshair offset, probe Z, with no sub-tabs. |
 | G2 | **Job on one screen:** pick a file, see a 2D preview with extents, rotate 90, flip, move, view and run an outline check, and select the job. |
 | G3 | **Run on one screen:** state, position, current operation and messages, a preview showing cut progress, large Pause and Abort, feed and rapid overrides. |
 | G4 | `M0` prompts are a normal step: the message and one Continue button, not a popup. |

@@ -58,6 +58,13 @@ async def main():
     assert m.state == "Alarm" and "ALARM:5" in out and any(l.endswith(":0]") for l in out), out
     # idle feed hold is ignored
     session.handle_line("$X"); session.handle_realtime(ord("!")); assert m.state == "Idle"
+    # lines sent back to back queue (Setup's probe: G91, G38.2, then G90)
+    out.clear(); m.probe_miss = False; z = m.mpos[2]
+    for line in ("G91", "G38.2 Z-10 F100", "G90"):
+        session.handle_line(line)
+    await asyncio.sleep(0.5)
+    assert any(l.startswith("[PRB:") and l.endswith(":1]") for l in out), out
+    assert abs(m.mpos[2] - (z - 6)) < 0.01 and m.absolute and not m.busy(), (m.mpos[2], m.absolute)
     print("ALL CHECKS PASSED")
 asyncio.run(main())
 

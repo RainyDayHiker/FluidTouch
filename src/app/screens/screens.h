@@ -25,10 +25,13 @@ public:
 // A centred title and a line of text, for screens that are not built yet
 void makePlaceholder(lv_obj_t *parent, const char *title, const char *text);
 
+// Home, zero, jog, laser, probe Z (specs/03-screens.md section 2). Its
+// widgets and state live in screen_setup.cpp; there is one instance.
 class SetupScreen : public Screen {
 public:
     const char *title() const override { return "Setup"; }
     void create(lv_obj_t *parent) override;
+    void update() override;
 };
 
 class JobScreen : public Screen {

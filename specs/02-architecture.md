@@ -43,8 +43,18 @@ into new UI". Only one UI is created per boot, so RAM use is that of one. The cl
 settings auto-import from the display SD runs before the switch, in both modes.
 
 Both UIs use the same stored machine connection: the new SettingsService reads and writes
-machine slot 0 of the classic `fluidtouch` preferences. Settings that only the new UI has
-live in their own namespace (`lrt`).
+machine slot 0 of the classic `fluidtouch` preferences. The jog steps, jog feeds and probe
+values come from the same slot; the default jog steps too, which Setup starts with but
+does not write (D45). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
+the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11), and the probe back-off
+`probe_back` (default 10 mm, D43).
+
+Every flash access, read or write, briefly stops the RGB panel from reading its frame from
+PSRAM, which shows as a flicker (seen on the device, 2026-11-17). SettingsService therefore
+reads slot 0 and the `lrt` values once and keeps them, and the working screens never write
+(D44, D45). Settings is the one place that saves, on an explicit action, not per press (M3).
+Classic's `saveMachine()` rewrites every key of every machine; the new Settings should
+write only the keys that changed.
 
 ## 4. Services
 
@@ -78,6 +88,15 @@ answering and back to `WiFi` when the network goes.
 Only `MachineService` and `SettingsService` exist so far. `SettingsService` reads classic
 slot 0 and reports "not configured" or "not a WiFi machine" (D4). File, Job and Macro
 services arrive with the screens that need them (M3).
+
+`MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
+`canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
+to grey out buttons and to explain a press they refuse (`busyReason()`), and each action
+checks them again before it sends anything. Home XY sends `$HY` from `poll()` once the `$HX`
+cycle has ended. Probe Z
+sends `G91` and `G38.2`, and puts `G90` back when the result arrives; after a miss FluidNC
+is in alarm and would reject it, so it goes out with the next Unlock instead. A reset
+cancels it, since a reset restores the modal defaults.
 
 `src/app` uses the classic colour constants (`ui/ui_theme.h`, header only) so both UIs look
 alike; nothing else from `src/ui` is included by the new code except `ui/machine_config.h`.
