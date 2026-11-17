@@ -48,9 +48,13 @@ the Job tab (D33).
 | [10]  |  [ < ]  3000    [ > ]              |   1000  [10]   | [ (+) > bit ]    |
 | [1]   |         mm/min                     |  mm/min [1]    | [ bit > (+) ]    |
 | [0.1] |  [<v]   [ v ]   [v>]               |  [ Z- ] [0.1]  | [ Probe Z ]      |
+| [J]   |                                    |                |                  |
 +--------------------------------------------+----------------+-----------------+
   H = home icon, 0 = zero icon (a slashed zero), (+) = laser crosshair icon,
-  bit = end mill icon; arrows as in the classic jog tab
+  bit = end mill icon, J = joystick icon; arrows as in the classic jog tab
+
+In joystick mode the pad (arrows and feed) is replaced by a round XY joystick, the XY steps
+are greyed out, and [J] shows a four-arrows icon that switches back (D42).
 ```
 
 Exact positions are settled when the screen is built; the order and grouping above are the
@@ -67,6 +71,8 @@ groups (D41).
 | Unlock | `$X` | Highlighted in ALARM |
 | Reset | soft reset (0x18) | Kept at the far right, away from the jog pad |
 | Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre shows the XY jog feed (D41). Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
+| Arrows / joystick switch | | Under the XY steps; an icon of the mode it switches to. Not remembered: Setup starts with the arrows after a restart (D42) |
+| XY joystick | `$J=G91 G21 X.. Y.. F..` every 50 ms while held, jog cancel (0x85) when let go | As the classic joystick tab, XY only: no X-only/Y-only modes, no Z joystick, no speed display. Touching anywhere on the circle moves the knob there. Speed follows the knob's distance from the centre, squared (fine near the centre), up to the classic joystick "Max" XY feed (classic Settings > Jog). Each jog covers the time since the last, so the machine follows the knob. A refused press (e.g. homing) shows the reason, as for other buttons (D38) |
 | Z+/Z- | `$J=G91 G21 Z.. F..` | Left of the Z step selector; the Z jog feed is shown between them (D41) |
 | Step selectors | | XY: 100, 50, 10, 1, 0.1 mm, in a column left of the pad. Z: 50, 25, 10, 1, 0.1 mm, in a column right of Z+/Z-. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
 | Jog feeds | | Shown on Setup, not changed there. XY and Z jog feeds are set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |

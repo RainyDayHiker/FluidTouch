@@ -211,6 +211,10 @@ uint32_t MachineService::msToNextAttempt() {
     return remaining > 500 ? (uint32_t)remaining : 0;
 }
 
+void MachineService::cancelJog() {
+    if (online()) FluidNCClient::sendCommand("\x85");
+}
+
 void MachineService::stop() {
     if (!online()) return;
     if (status().state == STATE_JOG) {

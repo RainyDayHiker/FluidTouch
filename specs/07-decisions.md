@@ -45,6 +45,7 @@
 | D39 | The status bar is 64 px: state, WiFi and STOP full height; between them, positions on one row and the last FluidNC message on the other. Content is 800 x 360 (2026-11-17) | 48 px bar without messages | The classic UI's message box is useful |
 | D40 | Setup has no Go to XY zero and no feed controls; Z+/Z- are left of the Z steps; home and zero buttons show icons (2026-11-17) | The first M2 layout | Seen on screen: rarely used controls removed, more room for jogging |
 | D41 | Setup, second pass: the XY steps are a column left of a square jog pad; the pad's centre shows the XY jog feed and the gap between Z+ and Z- the Z jog feed; Z+/Z- and the step buttons are narrower; laser and bit moves are two equal buttons drawn as crosshair and end mill icons; zero is a slashed-zero icon drawn for this UI (`src/app/icons/make_icons.py`) (2026-11-17) | Steps in a row above the pad; the step shown in the pad's centre; a small "b>l" text button (D40) | Seen on screen: the step is already visible on its selector, the feed is not; square arrows; space around the controls |
+| D42 | Setup has an XY joystick, swapped with the jog pad by a button under the XY steps. It works as the classic joystick tab's XY mode (short jogs every 50 ms, quadratic response, classic's joystick Max XY feed, jog cancel on release), without X-only/Y-only, Z or speed display. The mode is not remembered across restarts (2026-11-17) | Leaving the joystick in the classic UI only | Asked for: continuous positioning without choosing steps |
 
 ## Open questions
 

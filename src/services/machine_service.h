@@ -82,6 +82,8 @@ public:
     // --- Actions -----------------------------------------------------------
     // Feed hold, or jog cancel while jogging (S1)
     static void stop();
+    // Jog cancel (0x85): ends the joystick's jog when it is let go
+    static void cancelJog();
     // Clear an alarm ($X)
     static void unlock();
     // Soft reset (0x18)

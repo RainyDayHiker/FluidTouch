@@ -27,6 +27,7 @@ public:
         float zStep;
         int xyFeed;                // mm/min; set in Settings only (D35)
         int zFeed;
+        int xyMaxFeed;             // the XY joystick's feed at full deflection (classic "Max")
     };
 
     struct Probe {

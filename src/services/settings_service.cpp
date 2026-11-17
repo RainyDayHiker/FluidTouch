@@ -52,6 +52,7 @@ SettingsService::Jog SettingsService::jog() {
         j.zStep = m.jog_z_step;
         j.xyFeed = m.jog_xy_feed > 0 ? m.jog_xy_feed : 3000;
         j.zFeed = m.jog_z_feed > 0 ? m.jog_z_feed : 1000;
+        j.xyMaxFeed = m.jog_max_xy_feed > 0 ? m.jog_max_xy_feed : 3000;
     } else {
         stepsOrDefault("", DEFAULT_XY_STEPS, j.xySteps, j.xyStepCount);
         stepsOrDefault("", DEFAULT_Z_STEPS, j.zSteps, j.zStepCount);
@@ -59,6 +60,7 @@ SettingsService::Jog SettingsService::jog() {
         j.zStep = 1.0f;
         j.xyFeed = 3000;
         j.zFeed = 1000;
+        j.xyMaxFeed = 3000;
     }
     return j;
 }

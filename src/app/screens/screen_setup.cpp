@@ -34,7 +34,9 @@ const lv_color_t COLOR_LASER = LV_COLOR_MAKE(0x8E, 0x24, 0x4A);
 
 const int LOWER_Y = 72;                 // below the top row; 280 px high
 const int STEP_W = 68, STEP_H = 56;     // step selector buttons
-const int XY_STEP_X = 8;                // XY steps, a column left of the pad
+const int XY_STEP_X = 8, XY_STEP_H = 44; // XY steps, a column left of the pad,
+const int MODE_Y = LOWER_Y + 232, MODE_H = 48;  // then the arrows / joystick switch
+const int PAD_SIZE = 280;               // the jog pad or the joystick
 const int PAD_X = 92, PAD_CELL = 88, PAD_GAP = 8;  // 3 x 3 square jog pad
 const int DIVIDER1_X = 396;
 const int Z_X = 436, Z_W = 72;          // Z+/Z-, then the Z steps
@@ -54,6 +56,22 @@ lv_obj_t *xyStepButtons[SettingsService::MAX_STEPS];
 lv_obj_t *zStepButtons[SettingsService::MAX_STEPS];
 int xyStepIndex = 0;
 int zStepIndex = 0;
+
+// XY: the 3 x 3 pad or the joystick, switched by modeButton (D42)
+lv_obj_t *padGroup;
+lv_obj_t *stickGroup;
+lv_obj_t *stickBase;                    // the circle; takes the touches
+lv_obj_t *stickKnob;
+lv_obj_t *modeButton;
+lv_obj_t *modeIcon;
+bool stickMode = false;
+
+// Joystick jogging, as in the classic joystick tab: a short jog every
+// JOG_INTERVAL_MS while held, cancelled when let go
+const uint32_t JOG_INTERVAL_MS = 50;
+bool stickRefused = false;              // this press was refused; ignore its drag
+bool stickJogging = false;
+uint32_t lastStickJogMs = 0;
 
 // Limit and probe pins
 lv_obj_t *pinDots[4];                   // X, Y, Z limit, probe
@@ -102,7 +120,7 @@ void makeSteps(lv_obj_t *parent, int x, int y, int w, int h, bool vertical, cons
         lv_obj_set_style_radius(b, 0, 0);
         lv_obj_set_style_border_width(b, 1, 0);
         lv_obj_set_style_border_color(b, UITheme::BG_DARKER, 0);
-        out[i] = other(b);
+        out[i] = b;
     }
 }
 
@@ -225,6 +243,80 @@ void onLaser(lv_event_t *e) {
     MachineService::jogBy(dir * o.x, dir * o.y, 0, jog.xyFeed);
 }
 
+void showXYMode() {
+    if (stickMode) {
+        lv_obj_add_flag(padGroup, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(stickGroup, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(stickGroup, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(padGroup, LV_OBJ_FLAG_HIDDEN);
+    }
+    // The button shows the mode it switches to
+    lv_image_set_src(modeIcon, stickMode ? &ICON_ARROWS : &ICON_JOYSTICK);
+}
+
+void onXYMode(lv_event_t *) {
+    stickMode = !stickMode;
+    showXYMode();
+}
+
+// Quadratic response, as in the classic UI: fine control near the centre
+float stickCurve(float percent) {
+    if (percent < 0.1f) return 0.0f;
+    float n = percent / 100.0f;
+    return n * n * 100.0f;
+}
+
+void stopStick() {
+    lv_obj_center(stickKnob);
+    if (stickJogging) MachineService::cancelJog();
+    stickJogging = false;
+}
+
+// Touches anywhere on the circle move the knob there
+void onStick(lv_event_t *e) {
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_PRESSED) {
+        stickRefused = !allowed(MachineService::canMove());
+        return;
+    }
+    if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        stopStick();
+        return;
+    }
+    if (code != LV_EVENT_PRESSING || stickRefused) return;
+
+    lv_indev_t *indev = lv_indev_active();
+    if (!indev) return;
+    lv_point_t p;
+    lv_indev_get_point(indev, &p);
+    lv_area_t a;
+    lv_obj_get_coords(stickBase, &a);
+    float dx = p.x - (a.x1 + a.x2) / 2.0f;
+    float dy = p.y - (a.y1 + a.y2) / 2.0f;
+    float dist = sqrtf(dx * dx + dy * dy);
+    float maxR = lv_obj_get_width(stickBase) / 2 - lv_obj_get_width(stickKnob) / 2 - 5;
+    if (dist > maxR) {
+        dx *= maxR / dist;
+        dy *= maxR / dist;
+    }
+    lv_obj_align(stickKnob, LV_ALIGN_CENTER, (int32_t)dx, (int32_t)dy);
+
+    uint32_t now = millis();
+    if (stickJogging && now - lastStickJogMs < JOG_INTERVAL_MS) return;
+    float percent = dist >= maxR ? 100.0f : dist * 100.0f / maxR;
+    float speed = stickCurve(percent) / 100.0f * jog.xyMaxFeed;  // mm/min
+    float angle = atan2f(dy, dx);
+    float vx = speed * cosf(angle), vy = -speed * sinf(angle);    // Y+ is up
+    // Each jog covers the time since the last one, at most a few intervals
+    float dt = stickJogging ? fminf((now - lastStickJogMs) / 1000.0f, 0.2f) : JOG_INTERVAL_MS / 1000.0f;
+    float mx = vx / 60.0f * dt, my = vy / 60.0f * dt;
+    if (speed < 1.0f || (fabsf(mx) < 0.0005f && fabsf(my) < 0.0005f)) return;  // below the 0.001 mm sent
+    MachineService::jogBy(fabsf(mx) < 0.0005f ? 0 : mx, fabsf(my) < 0.0005f ? 0 : my, 0, (int)ceilf(speed));
+    stickJogging = true;
+    lastStickJogMs = now;
+}
+
 void onProbeOpen(lv_event_t *) {
     SettingsService::Probe p = SettingsService::probe();
     char buf[200];
@@ -277,8 +369,63 @@ void createTopRow(lv_obj_t *parent) {
 }
 
 void createXY(lv_obj_t *parent) {
-    makeSteps(parent, XY_STEP_X, LOWER_Y, STEP_W, STEP_H, true, jog.xySteps, jog.xyStepCount, xyStepButtons,
+    makeSteps(parent, XY_STEP_X, LOWER_Y, STEP_W, XY_STEP_H, true, jog.xySteps, jog.xyStepCount, xyStepButtons,
               onXYStep);
+
+    modeButton = button(parent, XY_STEP_X, MODE_Y, STEP_W, MODE_H, "", FONT_MID, onXYMode);
+    lv_obj_add_flag(lv_obj_get_child(modeButton, 0), LV_OBJ_FLAG_HIDDEN);
+    modeIcon = addIcon(modeButton, &ICON_JOYSTICK);
+
+    // Two groups in the same place; one is shown
+    for (lv_obj_t **group : {&padGroup, &stickGroup}) {
+        *group = lv_obj_create(parent);
+        lv_obj_set_pos(*group, PAD_X, LOWER_Y);
+        lv_obj_set_size(*group, PAD_SIZE, PAD_SIZE);
+        lv_obj_set_style_bg_opa(*group, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(*group, 0, 0);
+        lv_obj_set_style_pad_all(*group, 0, 0);
+        lv_obj_clear_flag(*group, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_clear_flag(*group, LV_OBJ_FLAG_CLICKABLE);
+    }
+
+    // Joystick, as in the classic joystick tab: XY only, no speed display
+    stickBase = lv_obj_create(stickGroup);
+    lv_obj_set_size(stickBase, PAD_SIZE - 8, PAD_SIZE - 8);
+    lv_obj_center(stickBase);
+    lv_obj_set_style_radius(stickBase, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(stickBase, UITheme::JOYSTICK_BG, 0);
+    lv_obj_set_style_border_width(stickBase, 2, 0);
+    lv_obj_set_style_border_color(stickBase, UITheme::JOYSTICK_BORDER, 0);
+    lv_obj_set_style_pad_all(stickBase, 0, 0);
+    lv_obj_clear_flag(stickBase, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(stickBase, LV_OBJ_FLAG_SCROLL_CHAIN);
+    for (int vertical = 0; vertical < 2; vertical++) {
+        lv_obj_t *l = lv_obj_create(stickBase);
+        lv_obj_set_size(l, vertical ? 2 : PAD_SIZE - 28, vertical ? PAD_SIZE - 28 : 2);
+        lv_obj_set_style_bg_color(l, UITheme::JOYSTICK_LINE, 0);
+        lv_obj_set_style_border_width(l, 0, 0);
+        lv_obj_clear_flag(l, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_center(l);
+    }
+    stickKnob = lv_obj_create(stickBase);
+    lv_obj_set_size(stickKnob, 90, 90);
+    lv_obj_set_style_radius(stickKnob, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(stickKnob, UITheme::AXIS_XY, 0);
+    lv_obj_set_style_border_width(stickKnob, 3, 0);
+    lv_obj_set_style_border_color(stickKnob, lv_color_white(), 0);
+    lv_obj_set_style_bg_color(stickKnob, UITheme::BG_BUTTON, LV_STATE_DISABLED);
+    lv_obj_set_style_border_color(stickKnob, UITheme::TEXT_DISABLED, LV_STATE_DISABLED);
+    lv_obj_set_style_text_color(stickKnob, UITheme::TEXT_DISABLED, LV_STATE_DISABLED);
+    lv_obj_clear_flag(stickKnob, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(stickKnob, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_center(stickKnob);
+    lv_obj_t *knobLabel = lv_label_create(stickKnob);
+    lv_label_set_text(knobLabel, "XY");
+    lv_obj_set_style_text_font(knobLabel, FONT_BIG, 0);
+    lv_obj_center(knobLabel);
+    for (lv_event_code_t c : {LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED, LV_EVENT_PRESS_LOST}) {
+        lv_obj_add_event_cb(stickBase, onStick, c, nullptr);
+    }
 
     // 3 x 3 square pad, Y+ up; the arrows as in the classic jog tab, turned
     // 45 degrees on the diagonals. The centre shows the XY jog feed.
@@ -290,16 +437,16 @@ void createXY(lv_obj_t *parent) {
     static const int16_t angles[3][3] = {{-450, 0, 450}, {0, 0, 0}, {450, 0, -450}};
     for (int row = 0; row < 3; row++) {
         for (int col = 0; col < 3; col++) {
-            int x = PAD_X + col * (PAD_CELL + PAD_GAP);
-            int y = LOWER_Y + row * (PAD_CELL + PAD_GAP);
+            int x = col * (PAD_CELL + PAD_GAP);
+            int y = row * (PAD_CELL + PAD_GAP);
             if (!icons[row][col]) {
-                feedLabel(parent, x, y, PAD_CELL, PAD_CELL, jog.xyFeed);
+                feedLabel(padGroup, x, y, PAD_CELL, PAD_CELL, jog.xyFeed);
                 continue;
             }
             int dx = col - 1;
             int dy = 1 - row;
             lv_color_t color = dx && dy ? UITheme::AXIS_XY : (dx ? UITheme::AXIS_X : UITheme::AXIS_Y);
-            other(iconButton(parent, x, y, PAD_CELL, PAD_CELL, icons[row][col], angles[row][col], nullptr, color,
+            other(iconButton(padGroup, x, y, PAD_CELL, PAD_CELL, icons[row][col], angles[row][col], nullptr, color,
                              onPad, (void *)(intptr_t)((dx + 1) * 3 + (dy + 1))));
         }
     }
@@ -313,6 +460,7 @@ void createZ(lv_obj_t *parent) {
     other(iconButton(parent, Z_X, LOWER_Y + h + gap, Z_W, h, LV_SYMBOL_DOWN, 0, "Z-", UITheme::AXIS_Z, onZ,
                      (void *)(intptr_t)-1));
     makeSteps(parent, Z_STEP_X, LOWER_Y, STEP_W, STEP_H, true, jog.zSteps, jog.zStepCount, zStepButtons, onZStep);
+    for (int i = 0; i < jog.zStepCount; i++) other(zStepButtons[i]);
 }
 
 void createRight(lv_obj_t *parent) {
@@ -412,6 +560,7 @@ void SetupScreen::create(lv_obj_t *parent) {
     createRight(parent);
     createProbePopup(parent);
     showSteps();
+    showXYMode();
 }
 
 void SetupScreen::update() {
@@ -424,6 +573,11 @@ void SetupScreen::update() {
 
     for (lv_obj_t *b : homeButtons) setEnabled(b, online && !job);
     for (int i = 0; i < otherCount; i++) setEnabled(otherButtons[i], usable);
+    // The XY steps don't apply to the joystick
+    for (int i = 0; i < jog.xyStepCount; i++) setEnabled(xyStepButtons[i], usable && !stickMode);
+    setEnabled(stickBase, usable);
+    setEnabled(stickKnob, usable);
+    if (!usable && stickJogging) stopStick();
     setEnabled(unlockButton, MachineService::canUnlock());
     setEnabled(resetButton, MachineService::canReset());
     setButtonColor(unlockButton, alarm ? UITheme::BTN_UNLOCK : UITheme::BG_BUTTON);
