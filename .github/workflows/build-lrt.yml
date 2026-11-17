@@ -23,7 +23,7 @@ concurrency:
 jobs:
   firmware:
     name: Firmware (Advance v1.3)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -64,7 +64,7 @@ jobs:
         run: platformio run --environment elecrow-crowpanel-7-advance-v13
 
       - name: Keep the firmware
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: firmware-advance-v13-${{ github.sha }}
           path: .pio/build/elecrow-crowpanel-7-advance-v13/firmware.bin
@@ -105,7 +105,7 @@ jobs:
 
       - name: Keep the screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: simulator-smoke-${{ github.sha }}
           path: |
@@ -115,7 +115,7 @@ jobs:
 
   fake-fluidnc:
     name: Fake FluidNC test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
