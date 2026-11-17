@@ -111,7 +111,7 @@ and namespaces longer than 15 characters are rejected. Both cases print a
 
 `sim/tools/fake_fluidnc.py` is a small FluidNC stand-in that uses only the
 Python standard library. It handles status reports, auto-reporting, `$G`,
-jogging, homing, zeroing, overrides, hold/resume and file listing.
+jogging, homing, zeroing, overrides, hold/resume, file listing and running jobs.
 
 ```powershell
 python sim\tools\fake_fluidnc.py --port 81              # sample file list
@@ -132,7 +132,40 @@ sent it; the new UI has no terminal yet):
 | `$sim/probe=1` | Trigger the probe pin (`0` to clear) |
 | `$sim/state=Door:0` | Report any state string, e.g. `Door:0`, `Sleep`, or an unknown one to test "DISCONNECTED" |
 
-The fake server doesn't implement uploads (HTTP) or running jobs.
+| `$sim/speed=20` | Play jobs 20 times faster (also `--speed 20` on the command line) |
+| `$sim/probemiss=1` | The next `G38.2` finds nothing: `[PRB:...:0]` and `ALARM:5` (`0` to clear) |
+| `$sim/drop=5` | Close every connection and refuse new ones for 5 seconds; a running job continues |
+
+In the fake server's own console a single character such as `~` (cycle start)
+or `!` (feed hold) is sent as a realtime command.
+
+#### Running jobs
+
+`$SD/Run=<path>` (the Files tab's play button, a macro, or typed into the fake
+server's console) plays a G-code file from the `--sd` folder. Without `--sd`
+any path plays a built-in sample job of about 150 lines: zero, a bit prompt, a
+probe, two operations and a final prompt, like a LowRider job.
+
+- The reported position follows the path (`G0` to `G3`, `G90`/`G91`, `G53`,
+  `G10 L20`, `G4`) at the programmed feed rate, with feed and rapid overrides.
+- Status reports carry `SD:<percent>,<path>`. As on FluidNC the percent is how
+  far the file has been *read*, not cut: up to 15 lines ahead of the motion,
+  stopping at lines that wait for motion to finish (`M0`, `G4`, `G10`, `G38`).
+  The field disappears once the last line is read, while the final moves are
+  still running.
+- `(MSG text)` comments arrive as `[MSG:INFO: MSG,text]` when their line is
+  read, so a message can appear a few moves early.
+- `M0` holds until cycle start (`~`). `G38.2` makes contact at 60% of its
+  travel and sends `[PRB:x,y,z:1]`. Feed hold pauses; a reset aborts, with
+  `ALARM:3` if the machine was moving.
+- Motion lines sent directly are played the same way, e.g. `G38.2 Z-10 F100`.
+
+The read-ahead depth and the timing of messages are a model built from
+FluidNC's source, not measured on a controller.
+
+`python sim/tools/test_fake_fluidnc.py` checks the playback without a simulator.
+
+The fake server doesn't implement uploads or downloads (HTTP).
 
 #### ESP-NOW
 
