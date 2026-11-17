@@ -10,7 +10,7 @@ questions; the list is in [07-decisions.md](07-decisions.md#open-questions).
 | # | Spec | State |
 |---|------|-------|
 | 01 | [Requirements](01-requirements.md) | Draft, mostly settled |
-| 02 | [Architecture](02-architecture.md) | Draft; memory budget measured (S2), segment storage open (Q21) |
+| 02 | [Architecture](02-architecture.md) | Draft; memory budget measured (S2) |
 | 03 | [Screens](03-screens.md) | First draft; control lists need review screen by screen |
 | 04 | [G-code library](04-gcode-library.md) | Draft |
 | 05 | [File workflow](05-file-workflow.md) | Draft; inbox is OneDrive direct, pending spike S5 |

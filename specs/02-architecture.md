@@ -65,12 +65,15 @@ keeps trying on its own (S4):
 answering and back to `WiFi` when the network goes.
 
 - WiFi: `WiFi.begin()` without blocking; started again after 15 s without a connection.
-- Controller: one `FluidNCClient::connect()` per attempt (this call blocks while it resolves
-  the name and opens the socket), 5 s between attempts, 10 s allowed for the first status
-  report. The Reconnect button starts an attempt at once.
+- Controller: one `FluidNCClient::connect()` per attempt, 5 s between attempts, 10 s
+  allowed for the first status report. The Reconnect button starts an attempt at once
+  (ignored while one is under way).
+- `connect()` blocks while it resolves the name and opens the socket: 10 to 12 s on the
+  device with the controller switched off (2026-11-16), which froze the screen. Each
+  attempt therefore runs on its own task on core 0. `FluidNCClient` is not thread-safe, so
+  while an attempt runs the main loop does not call `FluidNCClient::loop()` or anything
+  else on the client; `MachineService::poll()` owns that call.
 - The service records whether a file was running when the connection dropped, for the banner.
-- Not measured on the device: how long a blocked attempt freezes the screen when the
-  controller is off. If it is noticeable, the attempt moves to the worker task.
 
 Only `MachineService` and `SettingsService` exist so far. `SettingsService` reads classic
 slot 0 and reports "not configured" or "not a WiFi machine" (D4). File, Job and Macro
@@ -110,11 +113,11 @@ Budget for the preview, replacing the earlier targets (which added up to 3.7 MB)
 |-----|------|------|
 | Preview canvas, RGB565, 480 x 360 | 337 KB | Job and Run screens |
 | Second canvas layer for cut progress | 337 KB | Run screen only |
-| Segment list | What is left: about 1.5 MB on Job, 1.1 MB on Run | While a job is selected |
+| Segment list, 8 bytes per segment (D30) | What is left: about 1.5 MB on Job, 1.1 MB on Run (about 144,000 segments) | While a job is selected |
 | Outline grids | Whatever is free once the canvases are released | Only while tracing |
 
 At 24 bytes per segment (as tested), 1.1 MB holds about 48,000 segments: 3.4 times the
-reference job, short of the "at least 5x" in G8. Options, to be chosen before M5 (**Q21**):
+reference job, short of the "at least 5x" in G8. The options were (Q21, decided as A: D30):
 
 | Option | Effect | Cost |
 |--------|--------|------|
@@ -122,7 +125,7 @@ reference job, short of the "at least 5x" in G8. Options, to be chosen before M5
 | B. Keep the segment list in a file on the display SD and draw from it in blocks | No limit from RAM | Every redraw reads the card: slower pan and zoom; no preview without a card |
 | C. Free memory elsewhere: one LVGL draw buffer instead of two, or a smaller LVGL pool | Up to about 1 MB more | Edits to upstream's display driver and `lv_conf.h`; may bring back the flicker those buffers were chosen to avoid; affects the classic UI |
 
-The draft assumes A, with B as the fallback for jobs that still do not fit (preview
+**A is chosen (D30)**, with B as the fallback for jobs that still do not fit (preview
 "simplified, and says so", G8). C is not planned.
 
 The outline grids (2 x 1 bit per cell) get whatever is free while tracing: with the canvases
@@ -135,5 +138,6 @@ released and a reference-sized job loaded that is about 1.5 MB, enough for the 4
 |---------|------|
 | Main loop (core 1) | LVGL, FluidNCClient loop, service polling |
 | Worker task (core 0), one at a time | fetch, analyse, transform, outline, upload |
+| Connect task (core 0), short-lived | one `FluidNCClient::connect()` attempt ([§4](#4-services)) |
 
 Worker results are handed over by a flag the main loop checks; no LVGL calls from the worker.
