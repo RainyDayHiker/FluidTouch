@@ -1,102 +1,81 @@
-# Handoff — state as of 2026-11-16 (end of the first development session)
+# Handoff — state as of 2026-11-17 (end of the second development session)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 1. Where things stand
 
-**M1 (chassis) is done. The next session starts M2, the Setup screen.**
+**M1 (chassis) and the Setup screen of M2 are done and checked on the device. The next
+session starts M3.**
 
-Git: only `main` (equal to `upstream/main`) and `lrt/main` exist, locally and on the fork,
-in sync, working tree clean. CI (`build-lrt.yml`) runs on every push to `lrt/main`; see the
-latest result with `gh run list --branch lrt/main --limit 1`.
+Git: `main` (equal to `upstream/main`) and `lrt/main`, locally and on the fork, in sync.
+CI (`build-lrt.yml`) passed on the last Setup commit. Use
+`gh run list -R RainyDayHiker/FluidTouch --branch lrt/main --limit 1`: without `-R`, `gh`
+looks at upstream's repository.
 
-What exists on `lrt/main`:
+What exists on `lrt/main`, besides the M1 chassis (platform edits listed in
+[02 §2](02-architecture.md#2-changes-to-kept-code), frame, banners, fake FluidNC, CI):
 
-- **Platform edits** (all listed in [02 §2](02-architecture.md#2-changes-to-kept-code)):
-  `FluidNCClient` reports to a listener; `main.cpp` starts the new UI or the classic UI by
-  the UI mode key; the classic System Options dialog has "Restart into new UI"; the
-  simulator builds from a path with a space and has `src/` on its include path.
-- **`src/services`:** `SettingsService` (machine from classic slot 0) and `MachineService`
-  (connection with its own retries, each attempt on its own task; status; stop, unlock,
-  reconnect; last probe result). No File, Job or Macro service yet.
-- **`src/app`:** the frame (tabs, status bar with STOP, alarm banner, connection banner that
-  shows an attempt or counts down to the next one, no-machine banner), five placeholder
-  screens, "Restart into classic UI" and the S2 draw test on the Settings placeholder.
-- **Fake FluidNC** (`sim/tools/fake_fluidnc.py`): job playback, probe, `M0`, messages,
-  overrides, reset, connection drop, and HTTP download, upload and file actions.
-  `sim/tools/test_fake_fluidnc.py` checks it; `sim/tools/smoke_test.sh` starts both UIs
-  without a window.
-- **CI** for `lrt/**`: firmware, simulator with the smoke test, fake FluidNC test
-  ([09 §7](09-git-workflow.md#7-ci)).
+- **Setup screen** ([03 §2](03-screens.md#2-setup), D33 to D45): home all/Z/XY, zero
+  all/Z/XY, Unlock, Reset; XY steps in a column and a square 3 x 3 jog pad that shows the XY
+  feed, swapped for an XY joystick by a button under the steps; Z+/Z- with the Z feed between
+  them and the Z steps; limit and probe pin dots; laser to bit and back; Probe Z pop-up
+  (touch point as work and machine Z, then a 10 mm back-off).
+- **Status bar** 64 px: state, WiFi, STOP full height; positions and the last FluidNC
+  message between them; the display's own notices ("Wait for the jog to finish.") in amber.
+- Buttons grey out only offline, in alarm and during a job; a press that can't go through
+  now is not sent and the status bar says why (D38).
+- **`MachineService`** actions and rules (`canHome`, `canZero`, `canMove`, `busyReason`);
+  Home XY sends `$HX`, then `$HY` from `poll()`. **`SettingsService`** reads classic slot 0
+  and the `lrt` keys (`laser_x`, `laser_y`, `probe_back`) once and keeps them in RAM.
+- **Icons** of the new UI's own (zero, crosshair, end mill, joystick, arrows): A8 images
+  drawn by `src/app/icons/make_icons.py`; run it after changing an icon.
+- The fake FluidNC queues G-code lines sent back to back (needed for G91, G38.2, G0, G90).
 
-On the device (flashed by Jeffrey on 2026-11-16, at the commit before the last two changes):
+Checked on the device (2026-11-17): the reconnect fix (screen stays responsive with the
+controller off), layout and touch sizes (could even go smaller), laser moves in both
+directions, joystick, probe with back-off, Home XY, default steps from classic Settings >
+Jog, no flicker on step presses.
 
-- The new UI boots, connects to FluidNC and restarts into the classic UI. The way back is
-  the System Options dialog (tap the right end of the classic status bar): a bit hidden,
-  fine once known (D31).
-- STOP touch area: good.
-- Spike S2 run: 1.86 MB of PSRAM free; own drawing code 2.7 times faster than LVGL's.
-  Results and conclusions in [06](06-test-and-spikes.md#s2-conclusions); memory budget in
-  [02 §6](02-architecture.md#6-memory); D28, D29, D30.
-- Spike S1: the `/sd/<path>` download and the HTTP folder listing work. Not yet tried while
-  a job runs.
-- With the controller off, each reconnect attempt froze the screen for 10 to 12 s.
+Learned on the device: **any flash access (NVS read or write) makes the RGB panel flicker**,
+because it stalls the panel's reads from PSRAM. Classic's `saveMachine()` rewrites every key
+of every machine. The working screens therefore never write, and settings are read once (D44,
+[02 §3](02-architecture.md#3-ui-mode)). The new Settings screen (M3) must save on an
+explicit action and write only the keys that changed.
 
-**Built and tested in the simulator, but not yet on the device** (needs one more flash):
-
-- The freeze fix: each connection attempt runs on its own task
-  ([02 §4](02-architecture.md#4-services)).
-- The banner showing "Connecting..." with Reconnect greyed out during an attempt, and
-  "Next attempt in N s." between attempts.
-
-To confirm after that flash: the screen stays responsive with the controller off, and
-connecting still works with it on (the connect call now runs on the other core).
+FluidNC has no command that homes X and Y together without Z: `$HXY` is not accepted. Home XY
+stays X then Y (D37); `$H` homes XY in one cycle as the machine's config sets it.
 
 Known gaps, deliberately left:
 
 - `MachineService::jobActive()` follows the `SD:` field, which FluidNC drops once it has
-  read the last line of the file. At the end of a job the Run dot goes away while the last
-  moves and the final `M0` are still to come. To be solved with the Run screen (M3); see
-  [06](06-test-and-spikes.md#1-test-levels).
-- Not tested anywhere: STOP as jog cancel (nothing in the new UI jogs yet; M2 will), loss
-  of WiFi (the simulator's WiFi is always up), the classic UI's upload against the fake
-  FluidNC's HTTP (it needs the fake on port 80).
-- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines such as `$HZ` inside
-  a file; the reference job uses both.
+  read the last line of the file; to be solved with the Run screen (M3).
+- Settings are read once at boot: values changed in classic Settings show after a restart
+  into the new UI, which is how the UI switch works anyway.
+- Not tested: loss of WiFi (the simulator's WiFi is always up); STOP pressed during a jog on
+  the device; the classic UI's upload against the fake FluidNC's HTTP.
+- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
 
-Spikes ([06 §2](06-test-and-spikes.md#2-spikes)): S1 mostly done, S2 done. **S3, S4 and S5
-are deferred** until their answers are needed (D32): S3 and S4 with M3, S5 before M8. Nothing
-is waiting on Jeffrey for them now.
+Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
 
 ## 2. Next steps
 
-1. **Start M2: the Setup screen** ([03 §2](03-screens.md#2-setup), decisions D11 and D18 to
-   D25, [08](08-milestones.md)). On a branch `lrt/m2-<topic>` from `lrt/main`. Expected
-   pieces:
-   - `MachineService` actions for home, zero (all, XY, Z), jog and jog cancel, go to XY
-     zero, laser offset move, probe Z, reset. The fake FluidNC already answers `$H`, `$J=`,
-     `G10 L20`, `G38.2`, reset and jog cancel.
-   - Settings the screen needs (jog steps and feeds, laser offset) in `SettingsService`:
-     the jog values are in classic slot 0, the laser offset is new (`lrt` namespace,
-     default X 33.6, Y -28.2).
-   - The screen itself, replacing the Setup placeholder. Go through its control list with
-     Jeffrey before building if anything in 03 §2 is unclear; M0's exit checklist still has
-     "Screens reviewed one by one (Setup first)" open.
-   - S3 in the requirements (no jog, zero or home while a job runs or is held).
-2. **Flash once** at the start or end of that work, to confirm the two items in §1 that are
-   not yet on the device. Steps: USB-C cable, then
-   `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e elecrow-crowpanel-7-advance-v13 -t upload`.
-   Tag `lrt-m1` once that flash checks out ([09 §6](09-git-workflow.md#6-tags-and-versions));
-   no tag exists yet.
-3. Small things still open from the device: S1 while a job runs, and the value of
+1. **Tag** the build now on the machine, if Jeffrey agrees: `lrt-m1` and/or `lrt-m2` at the
+   merge of `lrt/m2-setup` ([09 §6](09-git-workflow.md#6-tags-and-versions)). No tag exists
+   yet.
+2. **Start M3** ([08](08-milestones.md)): Job list from the controller's and the display's
+   SD (no preview), start panel, Run screen (Prompt state for `M0`, pause, abort, overrides,
+   progress, times), Macros, Settings pages, upload from the display SD; S3 and S4. Review
+   each screen's control list with Jeffrey before building it, as was done for Setup.
+3. Settings (M3) takes over from classic Settings > Jog and Probe for: jog step lists and
+   default steps, XY and Z jog feeds, joystick Max XY feed, probe feed and distance, laser
+   offset, probe back-off. Save on an explicit action, changed keys only (D44, D45).
+4. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.
-4. Later, when their milestones come up: the S3 position log (with the Run screen, M3), S4
-   (upload sizes, M3), S5 (OneDrive sketch and a Microsoft app registration, before M8).
 
-How this session worked, for the next one: topic branches merged locally into `lrt/main`
-with a merge commit and deleted; `platform:` and `sim:` commits kept separate from new
-code; every change built for the simulator and the firmware and run in the simulator
-before merging; specs updated in the same branch.
+How this session worked: topic branches merged locally into `lrt/main` with a merge commit
+and deleted; `sim:` commits kept separate from new code; every change built for the
+simulator and the firmware, run in the simulator (scripted clicks and screenshots), and the
+screen reviewed by Jeffrey from screenshots before flashing.
 
 ### Working notes for the simulator
 
@@ -120,6 +99,15 @@ before merging; specs updated in the same branch.
   `10.255.255.1` as the machine URL gives a connection attempt that hangs.
 - The simulator starts in the new UI. Type `$sim/alarm=1` and the like into the fake
   FluidNC's own console; the new UI has no terminal yet.
+- Click positions in scripts are screen coordinates: content y + 56 (the tab row).
+  `press x y` repeated, then `release`, drags (used for the joystick).
+- To see what a press redraws, a temporary `LV_EVENT_INVALIDATE_AREA` callback on the
+  display that prints each area works well; remove it before committing.
+- On the PC, `sim/build` builds from Git Bash with `export PATH="/c/msys64/ucrt64/bin:$PATH";
+  cmake --build sim/build`; `sim/build.ps1` stops on a harmless CMake "GLOB mismatch" line.
+- The device can talk to the fake FluidNC: run it on the PC (port 81, allow Python through
+  the firewall) and make it the first machine in the classic list (Move Up); the new UI
+  only uses the first one.
 - Scripted runs: start the fake with a timed stdin, e.g.
   `( sleep 10; echo '$sim/alarm=1'; sleep 30 ) | python sim/tools/fake_fluidnc.py --port 81`,
   and the simulator with `--script`. The Windows Store Python runs as `python3.10.exe`;
@@ -148,7 +136,7 @@ and pause with `M0 (MSG ...)` for bit insertion, probing and tool changes.
 - Version 1.1.0; LVGL 9.5.0, LovyanGFX 1.2.29, ArduinoWebsockets 0.5.4, ArduinoJson 7.4.3;
   pioarduino platform 55.03.312-1.
 - `custom_sdkconfig = CONFIG_SPIRAM_XIP_FROM_PSRAM=y` (code runs from PSRAM; fixes display
-  flicker). This uses PSRAM; free PSRAM is unmeasured (spike S2).
+  flicker). Flash access still makes the panel flicker (D44).
 - `include/lv_conf.h`: `LV_MEM_SIZE` 1 MB, `LV_USE_CANVAS 1`, 16-bit colour, no vector graphics.
 - `src/network/fluidnc_client.cpp` called into the UI directly in six places (connection
   popups, probe result). Replaced by `FluidNCClientListener` in M1. The header still
