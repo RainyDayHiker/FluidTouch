@@ -21,4 +21,4 @@ short device checklist. M4 can proceed alongside M2 and M3.
 - [x] Specs 01 to 08 drafted
 - [ ] Screens reviewed one by one (Setup first)
 - [x] Inbox direction decided (D17)
-- [ ] S1 tried from a browser
+- [x] S1 tried from a browser (works; during a job still to try)

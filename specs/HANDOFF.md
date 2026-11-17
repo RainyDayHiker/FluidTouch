@@ -48,10 +48,17 @@ has since done the setup and the first M1 step.
   and the classic UI's upload was not re-run against it (it needs the fake on port 80).
 - **Not tested anywhere:** STOP as jog cancel (nothing in the new UI jogs yet); loss of
   WiFi (the simulator's WiFi is always up).
-- **Not run on the device.** Firmware builds (33.7% of flash) but nothing has been flashed.
-  First things to look at on the device: that it boots into the frame and connects; how
-  long the screen freezes during a connection attempt while the controller is off
-  ([02 §4](02-architecture.md#4-services)); the size of the STOP touch area.
+- **Flashed on 2026-11-16** (Jeffrey). The new UI runs on the device, connected to FluidNC
+  (seen in the serial log), and the classic UI was entered from it. Spike S2 was run:
+  1.86 MB of PSRAM free, own drawing code 2.7 times faster than LVGL's; conclusions in
+  [06](06-test-and-spikes.md#s2-conclusions), new budget in
+  [02 §6](02-architecture.md#6-memory), D28, D29, Q21. Spike S1: the download URL and the
+  HTTP folder listing work; not yet tried during a job.
+- **Not yet reported from the device:** how long the screen freezes during a connection
+  attempt while the controller is off ([02 §4](02-architecture.md#4-services)); whether
+  the STOP touch area is comfortable; the round trip back from the classic UI (the
+  button is in System Options, opened by tapping the right end of the classic status
+  bar, not in the classic Settings tab).
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
 - CI: `build-lrt.yml` runs on pushes to `lrt/**` (firmware, simulator with a two-UI smoke
   test, fake FluidNC test) and publishes nothing; see [09 §7](09-git-workflow.md#7-ci).
@@ -61,11 +68,9 @@ has since done the setup and the first M1 step.
 ## 2. Next steps
 
 1. The PC side of M1 ([08](08-milestones.md)) is done. What is left needs the device.
-2. Flash the M1 build and go through the device points in §1. Run spike S2 from
-   Settings > "Draw test (spike S2)" and fill in the table in
-   [06](06-test-and-spikes.md#s2-procedure).
-3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
-   results into [06](06-test-and-spikes.md).
+2. Device points still open: see §1. S1 during a running job (and the value of
+   `$HTTP/BlockDuringMotion`); S3, S4, S5.
+3. Q21 (segment storage) before M5. M2 (Setup screen) can start.
 
 ### Working notes for the simulator
 

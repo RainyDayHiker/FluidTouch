@@ -31,6 +31,8 @@
 | D25 | Go to XY zero has no Z height check, for now | Warn or refuse when Z is low | Not needed yet |
 | D26 | The status bar shows work and machine position at all times | Work only, tap for machine | Asked for |
 | D27 | Screen tabs are at the top; the status bar (state, positions, WiFi, STOP) is at the bottom ([03 §1](03-screens.md#1-frame)) | Status in a top bar with navigation elsewhere | Matches the classic layout, so the positions stay where they are read today |
+| D28 | The preview is drawn by its own code writing pixels into the canvas buffer (2026-11-16) | LVGL's line and arc draw functions | Spike S2 on the device: 210 ms against 562 ms for a reference-sized job |
+| D29 | Cut progress on Run is drawn incrementally onto its layer; a full redraw only when the view changes (2026-11-16) | Redrawing the progress layer on every update | Spike S2: a full redraw costs about 320 ms |
 
 ## Open questions
 
@@ -49,3 +51,4 @@ Answered ones move into the log above.
 | Q18 | End of job: final CONTINUE then Finished? | Yes |
 | Q19 | Feed override steps: 10% only or also 1%? | 10% |
 | Q20 | Move producing negative coordinates: block or warn? (Your jobs keep all moves positive.) | Warn |
+| Q21 | How are preview segments stored, given 1.86 MB of free PSRAM ([02 §6](02-architecture.md#6-memory))? Compact 8-byte segments in RAM, a file on the display SD, or freeing memory in the platform? To settle before M5 | Compact segments in RAM; SD file as fallback for jobs that don't fit |
