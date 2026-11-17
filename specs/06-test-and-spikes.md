@@ -19,6 +19,11 @@
 - HTTP: file download and multipart upload on the same port layout as FluidNC.
 - `$sim/drop=5`: closes the connection for 5 s, to test reconnect during a job.
 
+Done so far: lines typed in the fake's own console are passed to every connected client's
+session (for the `$sim/...` helpers, since the new UI has no terminal yet), and feed hold
+(`!`) behaves as on FluidNC: it ends a jog and is ignored when idle. Until job playback
+exists there is no Run state, so Hold is reached with `$sim/state=Hold:0`.
+
 ## 2. Spikes
 
 None has been run. S1 to S5 need the machine or the display and are done at the start of M1;
