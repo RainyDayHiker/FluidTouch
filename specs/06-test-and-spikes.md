@@ -19,10 +19,25 @@
 - HTTP: file download and multipart upload on the same port layout as FluidNC.
 - `$sim/drop=5`: closes the connection for 5 s, to test reconnect during a job.
 
-Done so far: lines typed in the fake's own console are passed to every connected client's
+Done so far: job playback (`$SD/Run`, `SD:` progress, `(MSG ...)`, `M0`, `G4`, `G38.2`, feed
+hold, reset, overrides, `$sim/speed`, `$sim/probemiss`, `$sim/drop`; details in
+`sim/README.md`, checked by `sim/tools/test_fake_fluidnc.py`). HTTP download and upload are
+still missing. Lines typed in the fake's own console are passed to every connected client's
 session (for the `$sim/...` helpers, since the new UI has no terminal yet), and feed hold
-(`!`) behaves as on FluidNC: it ends a jog and is ignored when idle. Until job playback
-exists there is no Run state, so Hold is reached with `$sim/state=Hold:0`.
+(`!`) behaves as on FluidNC: it ends a jog and is ignored when idle.
+
+The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
+that the Run screen has to cope with; none has been measured on the controller, which is
+what spike S3 is for:
+
+- `SD:` percent is the position *read* in the file, ahead of the cut by the planner's
+  queue (modelled as 15 lines), and it stops at lines that wait for motion (`M0`, `G4`,
+  `G10`, `G38`).
+- The `SD:` field disappears when the last line has been read, while the last moves and
+  a final `M0` are still to come. "Job active" therefore cannot be `SD:` alone at the end
+  of a job.
+- `(MSG ...)` text arrives when its line is read. For `M0 (MSG ...)` that is before the
+  machine reaches Hold, so the prompt text is known a few moves before the prompt is due.
 
 ## 2. Spikes
 
