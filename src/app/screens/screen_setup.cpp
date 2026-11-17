@@ -471,8 +471,9 @@ void createRight(lv_obj_t *parent) {
         pinDots[i] = pinDot(parent, RIGHT_X + i * 46, LOWER_Y + 27);
         label(parent, RIGHT_X + 16 + i * 46, LOWER_Y + 24, FONT_SMALL, UITheme::TEXT_LIGHT, names[i]);
     }
-    label(parent, RIGHT_X, LOWER_Y + 48, FONT_SMALL, UITheme::TEXT_MEDIUM, "Probe");
-    pinDots[3] = pinDot(parent, RIGHT_X + 46, LOWER_Y + 51);
+    // The probe pin, dot first like the limits
+    pinDots[3] = pinDot(parent, RIGHT_X, LOWER_Y + 51);
+    label(parent, RIGHT_X + 16, LOWER_Y + 48, FONT_SMALL, UITheme::TEXT_LIGHT, "Probe");
 
     // Laser crosshair -> bit, and back (D21)
     lv_obj_t *toBit = other(button(parent, RIGHT_X, LOWER_Y + 80, RIGHT_W, 56, LV_SYMBOL_RIGHT, FONT_MID, onLaser,
