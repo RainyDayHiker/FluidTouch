@@ -22,6 +22,8 @@ bool MachineService::jobAtDrop = false;
 bool MachineService::lastJobActive = false;
 bool MachineService::networkServicesStarted = false;
 bool MachineService::connectPending = false;
+bool MachineService::jobSession = false;
+bool MachineService::userHold = false;
 int MachineService::retryCount = 0;
 bool MachineService::retriesStopped = false;
 volatile bool MachineService::connectRunning = false;
@@ -199,7 +201,7 @@ void MachineService::poll() {
     }
 
     const FluidNCStatus &s = FluidNCClient::getStatus();
-    lastJobActive = s.is_sd_printing;
+    lastJobActive = jobActive();
     if (lastState == STATE_ALARM && s.state != STATE_ALARM) {
         // The alarm text belongs to the alarm that has just been cleared
         FluidNCClient::clearAlarmMessage();
@@ -220,6 +222,8 @@ void MachineService::poll() {
         homeYStage = HOME_Y_NONE;
         FluidNCClient::sendCommand("$HY\n");
     }
+    // A hold that has ended was the user's or an M0's; the next one is new
+    if (lastState == STATE_HOLD && s.state != STATE_HOLD) userHold = false;
     lastState = s.state;
 }
 
@@ -231,6 +235,40 @@ uint32_t MachineService::msToNextAttempt() {
     return remaining > 500 ? (uint32_t)remaining : 0;
 }
 
+bool MachineService::runFile(const char *path) {
+    if (!canZero()) return false;
+    char cmd[240];
+    snprintf(cmd, sizeof(cmd), "$SD/Run=%s\n", path);
+    FluidNCClient::sendCommand(cmd);
+    return true;
+}
+
+void MachineService::hold() {
+    if (!online()) return;
+    userHold = true;
+    FluidNCClient::sendCommand("!");
+}
+
+void MachineService::resume() {
+    if (!online()) return;
+    // userHold is cleared once the hold has ended (poll())
+    FluidNCClient::sendCommand("~");
+}
+
+// Realtime override bytes, as in the classic UI's override tab
+void MachineService::feedOverride(FeedOverride change) {
+    if (!online()) return;
+    static const char codes[] = {(char)0x91, (char)0x92, (char)0x90};
+    char cmd[2] = {codes[change], 0};
+    FluidNCClient::sendCommand(cmd);
+}
+
+void MachineService::rapidOverride(int percent) {
+    if (!online()) return;
+    char cmd[2] = {(char)(percent >= 100 ? 0x95 : percent >= 50 ? 0x96 : 0x97), 0};
+    FluidNCClient::sendCommand(cmd);
+}
+
 void MachineService::cancelJog() {
     if (online()) FluidNCClient::sendCommand("\x85");
 }
@@ -240,6 +278,7 @@ void MachineService::stop() {
     if (status().state == STATE_JOG) {
         FluidNCClient::sendCommand("\x85");  // jog cancel
     } else {
+        userHold = true;
         FluidNCClient::sendCommand("!");     // feed hold
     }
 }
@@ -258,13 +297,13 @@ void MachineService::unlock() {
 namespace {
 // FluidNC reports Idle during a G4 dwell inside a running file, so a job
 // counts as busy whatever the state says
-bool idleNoJob(const FluidNCStatus &s) { return s.state == STATE_IDLE && !s.is_sd_printing; }
+bool idleNoJob(const FluidNCStatus &s) { return s.state == STATE_IDLE && !MachineService::jobActive(); }
 }  // namespace
 
 bool MachineService::canHome() {
     if (!online() || probing || homeYStage != HOME_Y_NONE) return false;
     const FluidNCStatus &s = status();
-    return !s.is_sd_printing && (s.state == STATE_IDLE || s.state == STATE_ALARM);
+    return !jobActive() && (s.state == STATE_IDLE || s.state == STATE_ALARM);
 }
 
 bool MachineService::canZero() {
@@ -274,13 +313,13 @@ bool MachineService::canZero() {
 bool MachineService::canMove() {
     if (!online() || probing || homeYStage != HOME_Y_NONE) return false;
     const FluidNCStatus &s = status();
-    return !s.is_sd_printing && (s.state == STATE_IDLE || s.state == STATE_JOG);
+    return !jobActive() && (s.state == STATE_IDLE || s.state == STATE_JOG);
 }
 
 const char *MachineService::busyReason() {
     if (!online()) return "Not connected.";
     const FluidNCStatus &s = status();
-    if (s.is_sd_printing) return "Not while a job runs.";
+    if (jobActive()) return "Not while a job runs.";
     if (probing) return "Wait for the probe to finish.";
     if (homeYStage != HOME_Y_NONE || s.state == STATE_HOME) return "Wait for homing to finish.";
     switch (s.state) {

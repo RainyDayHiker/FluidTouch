@@ -89,9 +89,23 @@ answering and back to `WiFi` when the network goes.
   else on the client; `MachineService::poll()` owns that call.
 - The service records whether a file was running when the connection dropped, for the banner.
 
-Only `MachineService` and `SettingsService` exist so far. `SettingsService` reads classic
-slot 0 and reports "not configured" or "not a WiFi machine" (D4). File, Job and Macro
-services arrive with the screens that need them (M3).
+`SettingsService` reads classic slot 0 and reports "not configured" or "not a WiFi machine"
+(D4). The Macro service arrives with the Macros screen.
+
+`FileService` (M3) lists a folder on either card, deletes a file, and uploads a display SD
+file. Controller listings are `$Files/ListGcode` replies collected through
+`FluidNCClient::setMessageCallback` (one request at a time, 6 s timeout); deletes are
+`$SD/Delete`, followed by a fresh listing. An upload first lists the uploads folder (is the
+name there already?), then runs `UploadManager` (classic, unchanged; it posts to port 80,
+creates the folder, and refuses files over 10 MB), then lists the folder again and compares
+the size (S6).
+
+`JobService` (M3) holds the chosen file and the run. A job counts as running from START (or
+from the `SD:` field, for a job started elsewhere) until FluidNC has been Idle with no `SD:`
+field for 1.5 s, which covers the end of a file, where `SD:` goes once the last line is read.
+A hold is a prompt unless it was asked for here (Pause or STOP: `MachineService::heldByUser()`).
+An alarm, or a reset from Abort, ends it as Aborted. While it runs, `MachineService::jobActive()`
+is true even after `SD:` has gone, so Setup stays greyed out to the end (S3).
 
 `MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
 `canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
