@@ -11,12 +11,14 @@ has since done the setup and the first M1 step.
   ([07](07-decisions.md#open-questions)); none blocks M1 or M2.
 - **Git is set up** per [09](09-git-workflow.md): `upstream` remote added (URL confirmed,
   `main` equals `upstream/main`), `lrt/main` created and pushed with the specs.
-  `build/local-config-overrides` was not upstream, so it is part of `lrt/main`.
+  The commit from `build/local-config-overrides` was not upstream, so it is part of
+  `lrt/main`; that branch is deleted.
 - **Baseline builds work.** Firmware `elecrow-crowpanel-7-advance-v13` builds (33.5% of
   flash). The simulator did not build from this checkout: the path contains a space and
-  the forced include was passed unquoted. Fixed on `upstream/sim-path-with-spaces`
-  (one commit from `main`, worth offering upstream), merged into `lrt/main`.
-- **M1 step 1 is done** on branch `lrt/m1-client-events` (not yet merged into `lrt/main`):
+  the forced include was passed unquoted. Fixed in commit
+  `405a0ea` ("Sim: build from a checkout path that contains a space"), merged into
+  `lrt/main`. It is not being offered upstream; its branch is deleted.
+- **M1 step 1 is done** and merged into `lrt/main` (branch `lrt/m1-client-events`, deleted):
   `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
   `ClassicClientListener`. Checked in the simulator against the fake FluidNC: connect,
   controller drop, reconnect give screenshots identical to the build before the change.
@@ -24,15 +26,15 @@ has since done the setup and the first M1 step.
   **nothing has been flashed or run on the device.**
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
 - CI: upstream's two workflows trigger on `v*.*.*` tags and on `feature/**`, `feat/**`,
-  `fix/**`, `bugfix/**`, `dev` branches. Nothing triggers on `lrt/**`, `upstream/**` or
-  `lrt-*` tags, so pushing those publishes nothing. No `lrt/**` workflow exists yet
+  `fix/**`, `bugfix/**`, `dev` branches. Nothing triggers on `lrt/**` or `lrt-*` tags, so
+  pushing those publishes nothing. `fix/<topic>` branches do match; see
+  [09 §2](09-git-workflow.md#2-branches). No `lrt/**` workflow exists yet
   ([09 §7](09-git-workflow.md#7-ci)).
 
 ## 2. Next steps
 
-1. Review and merge `lrt/m1-client-events` into `lrt/main` (pull request in the fork,
-   merge commit; [09 §4](09-git-workflow.md#4-merging-work-into-lrtmain)).
-2. Continue M1 ([08](08-milestones.md)), in this order:
+1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
+   `lrt/m1-<topic>` branch:
    1. UI mode key in NVS and the boot switch in `main.cpp`.
    2. `src/services` skeleton and `src/app` frame: tabs on top, status bar at the bottom,
       banners, five empty screens.
@@ -40,7 +42,7 @@ has since done the setup and the first M1 step.
    4. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
       download/upload. Then exercise the probe-result listener event.
    5. `build:` commit adding a CI workflow for `lrt/**`.
-3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
+2. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
    results into [06](06-test-and-spikes.md).
 
 ### Working notes for the simulator
