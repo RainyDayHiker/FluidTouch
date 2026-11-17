@@ -48,9 +48,13 @@ public:
 
     // While link() is LINK_CONTROLLER: milliseconds until the next connection
     // attempt starts, or 0 while an attempt is under way (the connect call, or
-    // the wait for the first status report after it)
+    // the wait for the first status report after it) or retries have stopped
     static uint32_t msToNextAttempt();
-    static bool attemptInProgress() { return linkState == LINK_CONTROLLER && msToNextAttempt() == 0; }
+    static bool attemptInProgress() {
+        return linkState == LINK_CONTROLLER && !retriesStopped && msToNextAttempt() == 0;
+    }
+    // The automatic retries are used up; only reconnect() tries again (D46)
+    static bool waitingForReconnect() { return linkState == LINK_CONTROLLER && retriesStopped; }
 
     // A file was running when the connection was last lost
     static bool jobRunningAtDrop() { return jobAtDrop; }
@@ -114,6 +118,7 @@ private:
     static void connectController();
     static void connectTask(void *);
     static void retryControllerIn(uint32_t ms);
+    static void scheduleRetry();     // the next delay of the back-off, or stop
 
     static Listener listener;
     static DisplayDriver *display;
@@ -125,6 +130,8 @@ private:
     static bool lastJobActive;
     static bool networkServicesStarted;
     static bool connectPending;      // connectController() is due at connectAtMs
+    static int retryCount;           // retries scheduled since the last success or Reconnect
+    static bool retriesStopped;      // back-off used up; waiting for Reconnect
     // A connection attempt runs on its own task because FluidNCClient::connect()
     // blocks for many seconds when the controller is off. While it runs, the
     // main loop leaves FluidNCClient alone.

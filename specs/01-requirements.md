@@ -50,7 +50,7 @@ the display itself.
 | S1 | A stop control is on screen at all times: feed hold while running, jog cancel while jogging. |
 | S2 | Actions take a single press, as in the classic UI (D18). Abort, Reset and Zero buttons are kept apart from frequently used buttons by layout. |
 | S3 | While a job runs or is held, jog, zero, home, file and transform actions are disabled. |
-| S4 | If the connection drops during a job, the screen says the job continues on the controller, and reconnects on its own. |
+| S4 | If the connection drops during a job, the screen says the job continues on the controller, and reconnects on its own for a while (retries after 5, 5, 10 and 10 s), then waits for Reconnect (D46). |
 | S5 | The display never sends motion on its own initiative (no auto-home, no auto-move after connect). |
 | S6 | A generated file (transform, outline) is only offered to run after it was uploaded and its size confirmed on the controller. |
 
