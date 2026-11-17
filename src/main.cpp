@@ -26,6 +26,8 @@
 #include "ui/tabs/control/ui_tab_control_override.h" // Override tab for updates
 #include "ui/tabs/control/ui_tab_control_probe.h"   // Probe tab for probe indicator
 #include "ui/machine_config.h"  // Machine configuration manager
+#include "app/ui_mode.h"        // LowRider Touch: which UI starts at boot
+#include "app/app.h"            // LowRider Touch: the new UI
 
 // Global serial-debug mute flag (declared extern in debug_log.h).
 // Set true by FluidNCClient while a UART / USB CDC connection owns UART0.
@@ -114,7 +116,6 @@ void setup()
     // Initialize FluidNC Client
     Serial.println("Initializing FluidNC client...");
     FluidNCClient::init();
-    FluidNCClient::setListener(ClassicClientListener::instance());
 
     // Check for auto-import (only if no machines configured)
     Serial.println("Checking for settings auto-import...");
@@ -123,6 +124,14 @@ void setup()
         delay(2000);  // Give user time to see serial message
         ESP.restart();
     }
+
+    // LowRider Touch: the UI mode stored in NVS selects the new UI or the
+    // classic one. Only one of them is created per boot.
+    if (UiMode::get() == UiMode::APP) {
+        LrtApp::begin(&displayDriver);
+        return;
+    }
+    FluidNCClient::setListener(ClassicClientListener::instance());
 
     // Show splash screen
     Serial.println("Showing splash screen...");
@@ -175,6 +184,12 @@ void setup()
 
 void loop()
 {
+    // LowRider Touch runs its own loop; everything below is the classic UI
+    if (LrtApp::isRunning()) {
+        LrtApp::loop();
+        return;
+    }
+
     // Handle screenshot server web requests
     ScreenshotServer::handleClient();
     
