@@ -17,7 +17,9 @@ simulator's ESP-NOW radio: $espnow/pair, $espnow/list, $espnow/unpair=<n> and
 $espnow/cancel work as on FluidNC, and --espnow-pair opens the pairing window
 at startup. Pairings are remembered in sim/data/fake_espnow_pairings.json.
 
-Test helpers (type them in the simulator's Terminal tab or console):
+Test helpers (type them in the simulator's Terminal tab or console, or in
+this server's own console, which passes each line to every connected client's
+session as if that client had sent it):
     $sim/alarm=<n>   raise ALARM:<n>
     $sim/msg=<text>  send [MSG:<text>]
     $sim/limit=XYZA  set limit pins (e.g. $sim/limit=X, or $sim/limit= to clear)
@@ -35,6 +37,8 @@ import os
 import re
 import secrets
 import struct
+import sys
+import threading
 import time
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -156,7 +160,11 @@ class Session:
         if ch == ord("?"):
             self.send(m.status())
         elif ch == ord("!"):
-            m.state = "Hold:0"
+            # As on FluidNC: feed hold ends a jog and is ignored when idle
+            if m.state == "Jog":
+                m.state = "Idle"
+            elif m.state == "Run":
+                m.state = "Hold:0"
         elif ch == ord("~"):
             if m.state.startswith("Hold"):
                 m.state = "Idle"
@@ -251,9 +259,25 @@ class Session:
             self.send("ok")
 
 
+sessions = set()  # connected websocket sessions, for console_input()
+
+
+def console_input(loop):
+    """Reads this server's console; each line goes to every connected session."""
+    def dispatch(line):
+        for session in list(sessions):
+            session.handle_line(line)
+
+    for line in sys.stdin:
+        line = line.strip()
+        if line:
+            loop.call_soon_threadsafe(dispatch, line)
+
+
 async def run_websocket(reader, writer, session):
     session.send("[MSG:INFO: FluidNC fake server for FluidTouch simulator]")
     reporter = asyncio.create_task(session.auto_report())
+    sessions.add(session)
     try:
         while True:
             await writer.drain()
@@ -267,6 +291,7 @@ async def run_websocket(reader, writer, session):
             if opcode in (0x1, 0x2):
                 session.handle_input(data)
     finally:
+        sessions.discard(session)
         reporter.cancel()
 
 
@@ -725,6 +750,7 @@ async def main():
     machine = Machine()
     server = await asyncio.start_server(lambda r, w: handle_client(r, w, machine, args.sd), args.host, args.port)
     print(f"Fake FluidNC listening on ws://{args.host}:{args.port}/ (Ctrl+C to stop)")
+    threading.Thread(target=console_input, args=(asyncio.get_running_loop(),), daemon=True).start()
     if args.espnow_port:
         global espnow_server
         espnow_server = EspNowServer(machine, args.sd, args.espnow_channel, args.espnow_store, args.hostname)

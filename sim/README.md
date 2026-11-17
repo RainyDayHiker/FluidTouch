@@ -120,7 +120,9 @@ python sim\tools\fake_fluidnc.py --port 81 --sd D:\gcode  # serve a real folder
 
 Add a machine with URL `127.0.0.1` and the same port. Windows Firewall may
 ask for permission the first time. You can drive test states from the
-simulator's **Terminal** tab:
+simulator's **Terminal** tab, or by typing the same lines into the fake
+server's own console (each line is handled as if every connected client had
+sent it; the new UI has no terminal yet):
 
 | Command | Effect |
 |---|---|
