@@ -23,9 +23,10 @@ Screen tabs are at the top; the status bar is at the bottom (D27).
 |---------|-----------|
 | State | IDLE, RUN, HOLD, JOG, HOME, ALARM, OFFLINE; colour coded |
 | Position | Work position and machine position, both always visible, in the status bar |
-| STOP | Running: feed hold (`!`). Jogging: jog cancel. Resume is only on the Run screen, so it can't be hit by habit |
-| Alarm banner | Replaces the status bar: alarm text + Unlock. On every screen |
-| Offline banner | "Connection lost. Reconnecting..." + Reconnect. If a job was running: "The job continues on the controller" |
+| STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 40 because the bar is 48 high; its touch area extends 10 px beyond it on every side (64 x 60 effective) |
+| Alarm banner | Replaces the status bar: alarm text + Unlock (`$X`). On every screen |
+| Offline banner | Replaces the status bar. Before the first connection: "Connecting to WiFi <ssid>..." then "Connecting to <machine>...". After a drop: "Connection lost. Reconnecting..." (or "WiFi lost. Reconnecting to <ssid>..."); if a job was running, a second line "The job continues on the controller." Reconnect retries at once; retries also happen on their own ([02 §4](02-architecture.md#4-services)) |
+| No-machine banner | Classic machine slot 1 is empty or not a WiFi machine: says so, with a Classic UI button (restart into classic to set it up). Until Settings > Machine exists (M3) |
 | Navigation | Always available. A dot on Run while a job is active. Starting a job switches to Run |
 
 ## 2. Setup

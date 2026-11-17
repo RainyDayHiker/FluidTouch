@@ -18,12 +18,27 @@ has since done the setup and the first M1 step.
   the forced include was passed unquoted. Fixed in commit
   `405a0ea` ("Sim: build from a checkout path that contains a space"), merged into
   `lrt/main`. It is not being offered upstream; its branch is deleted.
-- **M1 step 1 is done** and merged into `lrt/main` (branch `lrt/m1-client-events`, deleted):
-  `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
-  `ClassicClientListener`. Checked in the simulator against the fake FluidNC: connect,
-  controller drop, reconnect give screenshots identical to the build before the change.
-  The probe-result event was not exercised (the fake has no `G38` yet). Firmware builds;
-  **nothing has been flashed or run on the device.**
+- **M1 steps 1 to 3 are done** and merged into `lrt/main`:
+  1. `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
+     `ClassicClientListener`.
+  2. UI mode: NVS `lrt/ui_mode`, default `app`. `main.cpp` starts `LrtApp` or the classic
+     UI. Classic System Options has "Restart into new UI"; the new Settings screen has
+     "Restart into classic UI".
+  3. `src/services` (`SettingsService`, `MachineService` with its own reconnecting
+     connection logic) and the `src/app` frame: tabs, status bar with STOP, alarm banner
+     with Unlock, connecting / connection-lost banner with Reconnect, no-machine banner,
+     five placeholder screens.
+- **Tested in the simulator** against the fake FluidNC: classic connect, drop and reconnect
+  unchanged (screenshots identical before and after the listener change); UI mode round
+  trip; frame connecting, online, tab switching, STOP sends `!`, alarm banner and Unlock,
+  drop and automatic reconnect, no-machine banner.
+- **Not tested anywhere:** the probe-result event and the "job continues on the
+  controller" line (the fake has no `G38` or job playback yet); STOP as jog cancel (nothing
+  in the new UI jogs yet); loss of WiFi (the simulator's WiFi is always up).
+- **Not run on the device.** Firmware builds (33.7% of flash) but nothing has been flashed.
+  First things to look at on the device: that it boots into the frame and connects; how
+  long the screen freezes during a connection attempt while the controller is off
+  ([02 §4](02-architecture.md#4-services)); the size of the STOP touch area.
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
 - CI: upstream's two workflows trigger on `v*.*.*` tags and on `feature/**`, `feat/**`,
   `fix/**`, `bugfix/**`, `dev` branches. Nothing triggers on `lrt/**` or `lrt-*` tags, so
@@ -35,14 +50,13 @@ has since done the setup and the first M1 step.
 
 1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
    `lrt/m1-<topic>` branch:
-   1. UI mode key in NVS and the boot switch in `main.cpp`.
-   2. `src/services` skeleton and `src/app` frame: tabs on top, status bar at the bottom,
-      banners, five empty screens.
-   3. Hidden test screen for spike S2 (free PSRAM, canvas draw timing).
-   4. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
-      download/upload. Then exercise the probe-result listener event.
-   5. `build:` commit adding a CI workflow for `lrt/**`.
-2. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
+   1. Hidden test screen for spike S2 (free PSRAM, canvas draw timing).
+   2. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
+      download/upload, `$sim/drop`. Then exercise the probe-result event and the
+      "job continues" banner line.
+   3. `build:` commit adding a CI workflow for `lrt/**`.
+2. Flash the M1 build and go through the device points in §1.
+3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
    results into [06](06-test-and-spikes.md).
 
 ### Working notes for the simulator
@@ -55,6 +69,12 @@ has since done the setup and the first M1 step.
   the `--script` and leaves a second simulator process running; close it before
   rebuilding or the link step fails with "Permission denied".
 - The classic UI stops reconnecting after a drop; the dialog's Connect button reconnects.
+- The simulator starts in the new UI. Type `$sim/alarm=1` and the like into the fake
+  FluidNC's own console; the new UI has no terminal yet.
+- Scripted runs: start the fake with a timed stdin, e.g.
+  `( sleep 10; echo '$sim/alarm=1'; sleep 30 ) | python sim/tools/fake_fluidnc.py --port 81`,
+  and the simulator with `--script`. The Windows Store Python runs as `python3.10.exe`;
+  look for that name when a stale fake still holds the port.
 
 ## 3. People, places, files
 

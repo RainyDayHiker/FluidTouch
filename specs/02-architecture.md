@@ -56,6 +56,29 @@ live in their own namespace (`lrt`).
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |
 
+### Connection (MachineService)
+
+Implemented in M1. The classic UI connects once and asks the user to reconnect; the new UI
+keeps trying on its own (S4):
+
+`No machine | WiFi -> Controller -> Online`, back to `Controller` when FluidNC stops
+answering and back to `WiFi` when the network goes.
+
+- WiFi: `WiFi.begin()` without blocking; started again after 15 s without a connection.
+- Controller: one `FluidNCClient::connect()` per attempt (this call blocks while it resolves
+  the name and opens the socket), 5 s between attempts, 10 s allowed for the first status
+  report. The Reconnect button starts an attempt at once.
+- The service records whether a file was running when the connection dropped, for the banner.
+- Not measured on the device: how long a blocked attempt freezes the screen when the
+  controller is off. If it is noticeable, the attempt moves to the worker task.
+
+Only `MachineService` and `SettingsService` exist so far. `SettingsService` reads classic
+slot 0 and reports "not configured" or "not a WiFi machine" (D4). File, Job and Macro
+services arrive with the screens that need them (M3).
+
+`src/app` uses the classic colour constants (`ui/ui_theme.h`, header only) so both UIs look
+alike; nothing else from `src/ui` is included by the new code except `ui/machine_config.h`.
+
 ### Job state machine
 
 `None -> Fetching -> Analysing -> Ready -> (Transforming -> Ready)* -> Uploading -> Selected
