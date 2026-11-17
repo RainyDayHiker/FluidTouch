@@ -31,6 +31,8 @@ What exists on `lrt/main`, besides the M1 chassis (platform edits listed in
 - **Icons** of the new UI's own (zero, crosshair, end mill, joystick, arrows): A8 images
   drawn by `src/app/icons/make_icons.py`; run it after changing an icon.
 - The fake FluidNC queues G-code lines sent back to back (needed for G91, G38.2, G0, G90).
+- **Reconnecting backs off** (D46): retries after 5, 5, 10 and 10 s, then the banner asks
+  for Reconnect. Checked in the simulator; not yet on the device (lrt-m2 predates it).
 
 Checked on the device (2026-11-17): the reconnect fix (screen stays responsive with the
 controller off), layout and touch sizes (could even go smaller), laser moves in both
