@@ -34,6 +34,7 @@ lv_obj_t *banner;
 lv_obj_t *bannerText;
 lv_obj_t *bannerButton;
 lv_obj_t *bannerButtonLabel;
+bool bannerButtonEnabled = true;
 
 const lv_color_t BANNER_ALARM_BG = LV_COLOR_MAKE(0x7A, 0x10, 0x10);
 const lv_color_t BANNER_LINK_BG = LV_COLOR_MAKE(0x4A, 0x3A, 0x00);
@@ -273,6 +274,7 @@ void Frame::updateBanner() {
     BannerKind kind = BANNER_NONE;
     char text[200] = "";
     const char *button = "";
+    bool buttonEnabled = true;
 
     switch (MachineService::link()) {
         case MachineService::LINK_NO_MACHINE:
@@ -294,16 +296,29 @@ void Frame::updateBanner() {
             }
             button = "Reconnect";
             break;
-        case MachineService::LINK_CONTROLLER:
+        case MachineService::LINK_CONTROLLER: {
             kind = BANNER_LINK;
-            if (MachineService::everOnline()) {
-                snprintf(text, sizeof(text), "Connection lost. Reconnecting...%s",
-                         MachineService::jobRunningAtDrop() ? "\nThe job continues on the controller." : "");
+            const char *job = MachineService::jobRunningAtDrop() ? "\nThe job continues on the controller." : "";
+            if (MachineService::attemptInProgress()) {
+                // Reconnect could do nothing now, so it is shown disabled
+                buttonEnabled = false;
+                if (MachineService::everOnline()) {
+                    snprintf(text, sizeof(text), "Connection lost. Reconnecting...%s", job);
+                } else {
+                    snprintf(text, sizeof(text), "Connecting to %s...", MachineService::machineName());
+                }
             } else {
-                snprintf(text, sizeof(text), "Connecting to %s...", MachineService::machineName());
+                int seconds = (int)((MachineService::msToNextAttempt() + 999) / 1000);
+                if (MachineService::everOnline()) {
+                    snprintf(text, sizeof(text), "Connection lost. Next attempt in %d s.%s", seconds, job);
+                } else {
+                    snprintf(text, sizeof(text), "No answer from %s. Next attempt in %d s.",
+                             MachineService::machineName(), seconds);
+                }
             }
             button = "Reconnect";
             break;
+        }
         case MachineService::LINK_ONLINE:
             if (MachineService::status().state == STATE_ALARM) {
                 kind = BANNER_ALARM;
@@ -315,20 +330,31 @@ void Frame::updateBanner() {
             break;
     }
 
-    if (kind != bannerKind) {
+    bool kindChanged = kind != bannerKind;
+    if (kindChanged) {
         bannerKind = kind;
         if (kind == BANNER_NONE) {
             lv_obj_add_flag(banner, LV_OBJ_FLAG_HIDDEN);
         } else {
             lv_obj_clear_flag(banner, LV_OBJ_FLAG_HIDDEN);
-            bool alarm = kind == BANNER_ALARM;
-            lv_obj_set_style_bg_color(banner, alarm ? BANNER_ALARM_BG : BANNER_LINK_BG, 0);
-            lv_obj_set_style_bg_color(bannerButton, alarm ? UITheme::BTN_UNLOCK : UITheme::BTN_CONNECT, 0);
+            lv_obj_set_style_bg_color(banner, kind == BANNER_ALARM ? BANNER_ALARM_BG : BANNER_LINK_BG, 0);
         }
     }
-    if (kind != BANNER_NONE) {
-        setText(bannerText, text);
-        setText(bannerButtonLabel, button);
+    if (kind == BANNER_NONE) return;
+
+    setText(bannerText, text);
+    setText(bannerButtonLabel, button);
+    if (kindChanged || buttonEnabled != bannerButtonEnabled) {
+        bannerButtonEnabled = buttonEnabled;
+        if (buttonEnabled) {
+            lv_obj_clear_state(bannerButton, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_color(bannerButton, kind == BANNER_ALARM ? UITheme::BTN_UNLOCK : UITheme::BTN_CONNECT, 0);
+            lv_obj_set_style_text_color(bannerButtonLabel, lv_color_white(), 0);
+        } else {
+            lv_obj_add_state(bannerButton, LV_STATE_DISABLED);
+            lv_obj_set_style_bg_color(bannerButton, UITheme::BG_BUTTON, 0);
+            lv_obj_set_style_text_color(bannerButtonLabel, UITheme::TEXT_DISABLED, 0);
+        }
     }
 }
 

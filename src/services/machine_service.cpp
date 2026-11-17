@@ -169,6 +169,14 @@ void MachineService::poll() {
     lastState = s.state;
 }
 
+uint32_t MachineService::msToNextAttempt() {
+    if (linkState != LINK_CONTROLLER || !connectPending) return 0;
+    int32_t remaining = (int32_t)(connectAtMs - millis());
+    // Under half a second counts as "now": the first attempt is scheduled a
+    // moment ahead only to let the screen draw first
+    return remaining > 500 ? (uint32_t)remaining : 0;
+}
+
 void MachineService::stop() {
     if (!online()) return;
     if (status().state == STATE_JOG) {
@@ -186,7 +194,7 @@ void MachineService::unlock() {
 void MachineService::reconnect() {
     if (connectRunning) return;  // an attempt is already under way
     if (linkState == LINK_CONTROLLER) {
-        if (!connectPending) FluidNCClient::disconnect();
+        if (!connectPending) return;  // waiting for the first status report of an attempt
         retryControllerIn(FIRST_CONNECT_DELAY_MS);
     } else if (linkState == LINK_WIFI) {
         WiFi.disconnect();

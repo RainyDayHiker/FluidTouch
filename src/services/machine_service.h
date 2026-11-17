@@ -43,6 +43,12 @@ public:
     // difference between "connecting" and "connection lost, reconnecting"
     static bool everOnline() { return wasOnline; }
 
+    // While link() is LINK_CONTROLLER: milliseconds until the next connection
+    // attempt starts, or 0 while an attempt is under way (the connect call, or
+    // the wait for the first status report after it)
+    static uint32_t msToNextAttempt();
+    static bool attemptInProgress() { return linkState == LINK_CONTROLLER && msToNextAttempt() == 0; }
+
     // A file was running when the connection was last lost
     static bool jobRunningAtDrop() { return jobAtDrop; }
 
@@ -60,7 +66,8 @@ public:
     static void stop();
     // Clear an alarm ($X)
     static void unlock();
-    // Retry the connection now instead of waiting for the next attempt
+    // Retry the connection now instead of waiting for the next attempt.
+    // Does nothing while an attempt is under way.
     static void reconnect();
 
 private:
