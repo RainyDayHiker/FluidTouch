@@ -62,7 +62,9 @@ has since done the setup and the first M1 step.
   own task ([02 §4](02-architecture.md#4-services)). In the simulator, against an address
   that does not answer, the tabs respond during an attempt, and the connect, alarm, drop
   and reconnect scenario still passes. To confirm after the next flash: the screen stays
-  responsive with the controller off, and connecting still works when it is on.
+  responsive with the controller off, and connecting still works when it is on. The
+  banner now says whether an attempt is under way or counts down to the next one, and
+  Reconnect is greyed out during an attempt (simulator only so far).
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
 - CI: `build-lrt.yml` runs on pushes to `lrt/**` (firmware, simulator with a two-UI smoke
   test, fake FluidNC test) and publishes nothing; see [09 §7](09-git-workflow.md#7-ci).
@@ -73,7 +75,10 @@ has since done the setup and the first M1 step.
 
 1. The PC side of M1 ([08](08-milestones.md)) is done. What is left needs the device.
 2. Device points still open: see §1. S1 during a running job (and the value of
-   `$HTTP/BlockDuringMotion`); S3, S4, S5.
+   `$HTTP/BlockDuringMotion`); S3, S4, S5. S3 needs a position log to the display SD,
+   which does not exist yet, and a choice of job; S5 needs a sketch that has not been
+   written and a Microsoft app registration
+   ([06](06-test-and-spikes.md#s3-what-it-needs-and-what-the-reference-job-does)).
 3. Flash again to confirm the reconnect fix. M2 (Setup screen) can start.
 
 ### Working notes for the simulator
