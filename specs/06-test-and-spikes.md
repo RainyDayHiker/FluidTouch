@@ -51,7 +51,7 @@ been run.
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
 | S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
 | S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures | G8's 32 MB figure; whether a size confirm (S6) is enough |
-| S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time | Inbox option B |
+| S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time. **The sketch has not been written**; it also needs an app registration with Microsoft (a client ID) before it can sign in | Inbox option B |
 
 ### S1 result (2026-11-16, Jeffrey, browser on the PC)
 
@@ -77,6 +77,42 @@ points are confirmed by the result above. The fake FluidNC follows this.
   `action=createdir|delete|deletedir|rename`. This is an alternative to `$Files/ListGcode`
   that also gives exact sizes, which S6 (confirm the size after upload) can use.
 - An upload whose size field does not match what arrived is discarded by FluidNC.
+
+### S3: what it needs, and what the reference job does
+
+S3 **drives the machine**: it runs a job from FluidNC's SD card while the display records
+time, `SD:` percent and position. Two things are not there yet:
+
+- The recording. Nothing in the M1 build writes a log to the display SD. It has to be added
+  (a few lines per status report to a file) before S3 can be run.
+- A decision on which job. S3 does not need the reference job; any job with arcs, a few
+  operations and an `M0` answers the question, and a short one is easier to repeat.
+
+What `Spoilboard_DogHoles.gcode` does, read from the file (2026-11-16), for setting the
+machine up if it is used:
+
+| Step | Lines | Effect |
+|------|-------|--------|
+| Zero | `G10 L20 P0 X0 Y0 Z0` | Wherever the tool is when the job starts becomes X0 Y0 Z0 |
+| Move | `G0 X10 Y10` | To the probing spot, at the current height |
+| Prompt | `M0 (MSG Insert T2 1/8in flat endmill, attach probe)` | Waits for cycle start |
+| Probe | `G38.2 Z-110 F200 P0.5` | Moves **down up to 110 mm** until the probe makes contact; the `P0.5` word then makes the contact point Z 0.5 (the plate's thickness), as I read it, not checked on the machine. With no probe attached it keeps going until something stops it, or alarms at the end of the travel |
+| Lift | `G1 Z15` | 15 mm above the probed zero |
+| Prompt | `M0 (MSG Remove probe and start router)` | Waits for cycle start |
+| Spindle | `M3 S12000` | Switches the router on if FluidNC controls it |
+| Cut | 45 holes, each a rough and a finish operation | Travel X 0 to 459 mm, Y 0 to 824 mm from the start point; **down to Z -19.5**, 0.5 mm below the 19 mm stock; clearance moves at Z 4.95; feeds 480 to 1200 mm/min, rapids 2400 |
+| End | `M5`, `$HZ`, `G0 X0 Y0`, `M0 (MSG Job complete - stop router)`, `M2` | Router off, **homes Z**, returns to the start point, final prompt |
+
+About 14,200 moves and 63 m of cutting; roughly an hour at the programmed feeds, before
+acceleration.
+
+For an air cut, the probe step decides everything: Z zero ends up where the probe makes
+contact, and the job then goes 19.5 mm below that. So the probe has to be triggered at a
+height with at least 20 mm of free space underneath over the whole 460 x 825 mm area, and
+the router left off or unplugged.
+
+The fake FluidNC does not model two things this job uses: the `P` word on `G38.2` (it
+ignores it) and `$HZ` inside a file (it skips `$` lines).
 
 ### S2 procedure
 
