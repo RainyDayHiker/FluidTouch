@@ -118,6 +118,11 @@ platform's own PlatformIO core, `pioarduino`, at 6.2.0 (6.2.0.post1 fails the pl
 version check). Review both when the platform version changes, e.g. after an upstream merge.
 Upstream's two workflows have neither pin.
 
+The Linux jobs name their runner image (`ubuntu-26.04`), not `ubuntu-latest`, so an image
+change is a deliberate commit and not a surprise; the Windows job stays on `windows-latest`.
+Actions are kept on versions that run on Node.js 24 (`upload-artifact@v7`); GitHub warns
+about actions that still target Node.js 20.
+
 From M4 it also runs the `lib/gcode` tests. Each change to it is a `build:` commit.
 
 Before merging a topic branch locally, the same checks are: both builds, and
