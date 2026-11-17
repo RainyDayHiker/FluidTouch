@@ -13,6 +13,7 @@
 #include "ui/ui_splash.h"       // Splash screen module
 #include "ui/ui_machine_select.h" // Machine selection screen
 #include "ui/ui_common.h"       // UI common components (status bar)
+#include "ui/classic_client_listener.h" // Classic UI's FluidNCClient listener
 #include "ui/ui_tabs.h"         // UI tabs module
 #include "ui/settings_manager.h" // Settings import/export/clear
 #include "ui/tabs/ui_tab_status.h" // Status tab for updates
@@ -113,6 +114,7 @@ void setup()
     // Initialize FluidNC Client
     Serial.println("Initializing FluidNC client...");
     FluidNCClient::init();
+    FluidNCClient::setListener(ClassicClientListener::instance());
 
     // Check for auto-import (only if no machines configured)
     Serial.println("Checking for settings auto-import...");

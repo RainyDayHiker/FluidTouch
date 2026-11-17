@@ -122,10 +122,30 @@ struct FluidNCStatus {
     bool isIdle() const { return state == STATE_IDLE && !is_sd_printing; }
 };
 
+// Events FluidNCClient reports to the user interface. One listener at a time:
+// the UI that is running registers itself with FluidNCClient::setListener().
+// All methods are called from FluidNCClient::loop() (the LVGL thread).
+class FluidNCClientListener {
+public:
+    virtual ~FluidNCClientListener() {}
+
+    // First status report (or auto-report confirmation) after connecting
+    virtual void onConnectionEstablished() {}
+
+    // An established WebSocket connection closed
+    virtual void onConnectionLost(const char* title, const char* message) {}
+
+    // [PRB:x,y,z:success] received
+    virtual void onProbeResult(float x, float y, float z, bool success) {}
+};
+
 class FluidNCClient {
 public:
     // Initialize the client
     static void init();
+
+    // Register the UI's event listener (nullptr for none). Not owned.
+    static void setListener(FluidNCClientListener* listener);
     
     // Connect to FluidNC using machine config
     static bool connect(const MachineConfig &config);
@@ -218,6 +238,7 @@ private:
     static bool initialized;
     static FluidNCMessageCallback messageCallback;  // Optional callback for raw messages
     static FluidNCMessageCallback terminalCallback; // Optional callback for terminal display
+    static FluidNCClientListener* listener;         // UI event listener (may be null)
     
     // Auto-reporting and fallback polling
     static bool autoReportingEnabled;     // True if auto-reporting is active
