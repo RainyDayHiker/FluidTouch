@@ -49,6 +49,13 @@ values come from the same slot; Setup writes the chosen steps back to it
 the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11), and the probe back-off
 `probe_back` (default 10 mm, D43).
 
+Every flash access, read or write, briefly stops the RGB panel from reading its frame from
+PSRAM, which shows as a flicker (seen on the device, 2026-11-17). SettingsService therefore
+reads slot 0 and the `lrt` values once and keeps them, and writes a changed jog step as its
+single key 5 s after the last change, instead of classic's `saveMachine()`, which rewrites
+every key of every machine (D44). Settings screens that write (M3) should save on an
+explicit action, not per press.
+
 ## 4. Services
 
 | Service | Owns | Main operations |

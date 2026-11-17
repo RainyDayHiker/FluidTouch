@@ -1,5 +1,7 @@
 #include "services/settings_service.h"
 #include "app/app_prefs.h"
+#include "config.h"
+#include <Arduino.h>
 #include <Preferences.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,10 +34,57 @@ void stepsOrDefault(const char *text, const char *fallback, float *out, int &cou
 
 }  // namespace
 
-SettingsService::MachineStatus SettingsService::machine(MachineConfig &out) {
-    if (!MachineConfigManager::getMachine(0, out) || !out.is_configured) {
-        return MACHINE_NOT_CONFIGURED;
+// Every flash access (read or write) briefly stops the RGB panel from
+// reading its picture from PSRAM, which shows as a flicker. So slot 0 and the
+// "lrt" values are read once and kept, and a changed jog step is written as
+// one key, a few seconds after the last change (D44).
+namespace {
+
+const uint32_t SAVE_DELAY_MS = 5000;
+
+MachineConfig slot0;
+bool slot0Loaded = false;
+bool slot0Configured = false;
+
+struct LrtValues {
+    float laserX, laserY, probeBack;
+};
+LrtValues lrt;
+bool lrtLoaded = false;
+
+bool xyStepPending = false;
+bool zStepPending = false;
+uint32_t stepChangedMs = 0;
+
+const MachineConfig *loadSlot0() {
+    if (!slot0Loaded) {
+        slot0Loaded = true;
+        slot0Configured = MachineConfigManager::getMachine(0, slot0) && slot0.is_configured;
     }
+    return slot0Configured ? &slot0 : nullptr;
+}
+
+const LrtValues &loadLrt() {
+    if (!lrtLoaded) {
+        lrtLoaded = true;
+        Preferences prefs;
+        prefs.begin(LRT_PREFS_NAMESPACE, true);
+        // Laser defaults from laser_offset.gcode (D11); the probe back-off is
+        // the new UI's own, not classic's retract (2 mm by default) (D43)
+        lrt.laserX = prefs.getFloat("laser_x", 33.6f);
+        lrt.laserY = prefs.getFloat("laser_y", -28.2f);
+        lrt.probeBack = prefs.getFloat("probe_back", 10.0f);
+        prefs.end();
+    }
+    return lrt;
+}
+
+}  // namespace
+
+SettingsService::MachineStatus SettingsService::machine(MachineConfig &out) {
+    const MachineConfig *m = loadSlot0();
+    if (!m) return MACHINE_NOT_CONFIGURED;
+    out = *m;
     if (out.connection_type != CONN_WIFI) {
         return MACHINE_NOT_WIFI;
     }
@@ -44,15 +93,15 @@ SettingsService::MachineStatus SettingsService::machine(MachineConfig &out) {
 
 SettingsService::Jog SettingsService::jog() {
     Jog j;
-    MachineConfig m;
-    if (MachineConfigManager::getMachine(0, m) && m.is_configured) {
-        stepsOrDefault(m.jog_xy_steps, DEFAULT_XY_STEPS, j.xySteps, j.xyStepCount);
-        stepsOrDefault(m.jog_z_steps, DEFAULT_Z_STEPS, j.zSteps, j.zStepCount);
-        j.xyStep = m.jog_xy_step;
-        j.zStep = m.jog_z_step;
-        j.xyFeed = m.jog_xy_feed > 0 ? m.jog_xy_feed : 3000;
-        j.zFeed = m.jog_z_feed > 0 ? m.jog_z_feed : 1000;
-        j.xyMaxFeed = m.jog_max_xy_feed > 0 ? m.jog_max_xy_feed : 3000;
+    const MachineConfig *m = loadSlot0();
+    if (m) {
+        stepsOrDefault(m->jog_xy_steps, DEFAULT_XY_STEPS, j.xySteps, j.xyStepCount);
+        stepsOrDefault(m->jog_z_steps, DEFAULT_Z_STEPS, j.zSteps, j.zStepCount);
+        j.xyStep = m->jog_xy_step;
+        j.zStep = m->jog_z_step;
+        j.xyFeed = m->jog_xy_feed > 0 ? m->jog_xy_feed : 3000;
+        j.zFeed = m->jog_z_feed > 0 ? m->jog_z_feed : 1000;
+        j.xyMaxFeed = m->jog_max_xy_feed > 0 ? m->jog_max_xy_feed : 3000;
     } else {
         stepsOrDefault("", DEFAULT_XY_STEPS, j.xySteps, j.xyStepCount);
         stepsOrDefault("", DEFAULT_Z_STEPS, j.zSteps, j.zStepCount);
@@ -66,39 +115,45 @@ SettingsService::Jog SettingsService::jog() {
 }
 
 SettingsService::Probe SettingsService::probe() {
-    Probe p = {100, 10, 10.0f};
-    MachineConfig m;
-    if (MachineConfigManager::getMachine(0, m) && m.is_configured) {
-        if (m.probe_feed_rate > 0) p.feed = m.probe_feed_rate;
-        if (m.probe_max_distance > 0) p.maxDistance = m.probe_max_distance;
+    Probe p = {100, 10, loadLrt().probeBack};
+    const MachineConfig *m = loadSlot0();
+    if (m) {
+        if (m->probe_feed_rate > 0) p.feed = m->probe_feed_rate;
+        if (m->probe_max_distance > 0) p.maxDistance = m->probe_max_distance;
     }
-    // Not classic's retract (2 mm by default): a back-off of the new UI's own
-    Preferences prefs;
-    prefs.begin(LRT_PREFS_NAMESPACE, true);
-    p.backOff = prefs.getFloat("probe_back", 10.0f);
-    prefs.end();
     return p;
 }
 
 SettingsService::LaserOffset SettingsService::laserOffset() {
-    Preferences prefs;
-    prefs.begin(LRT_PREFS_NAMESPACE, true);
-    // Defaults from laser_offset.gcode (D11)
-    LaserOffset o = {prefs.getFloat("laser_x", 33.6f), prefs.getFloat("laser_y", -28.2f)};
-    prefs.end();
-    return o;
+    const LrtValues &v = loadLrt();
+    return {v.laserX, v.laserY};
 }
 
 void SettingsService::saveJogXYStep(float step) {
-    MachineConfig m;
-    if (!MachineConfigManager::getMachine(0, m) || !m.is_configured || m.jog_xy_step == step) return;
-    m.jog_xy_step = step;
-    MachineConfigManager::saveMachine(0, m);
+    if (!loadSlot0() || slot0.jog_xy_step == step) return;
+    slot0.jog_xy_step = step;
+    xyStepPending = true;
+    stepChangedMs = millis();
 }
 
 void SettingsService::saveJogZStep(float step) {
-    MachineConfig m;
-    if (!MachineConfigManager::getMachine(0, m) || !m.is_configured || m.jog_z_step == step) return;
-    m.jog_z_step = step;
-    MachineConfigManager::saveMachine(0, m);
+    if (!loadSlot0() || slot0.jog_z_step == step) return;
+    slot0.jog_z_step = step;
+    zStepPending = true;
+    stepChangedMs = millis();
+}
+
+void SettingsService::poll() {
+    if (!(xyStepPending || zStepPending) || millis() - stepChangedMs < SAVE_DELAY_MS) return;
+    // Only the changed keys of slot 0, by the names classic uses
+    // (ui/machine_config.cpp); classic's saveMachine() would rewrite every
+    // key of every machine
+    Preferences prefs;
+    prefs.begin(PREFS_NAMESPACE, false);
+    if (xyStepPending) prefs.putFloat("m0_jxy_st", slot0.jog_xy_step);
+    if (zStepPending) prefs.putFloat("m0_jz_st", slot0.jog_z_step);
+    prefs.end();
+    xyStepPending = zStepPending = false;
+    // Classic's cached copy is now out of date; it reads again when next asked
+    MachineConfigManager::reloadMachines();
 }

@@ -49,9 +49,13 @@ public:
     static Probe probe();
     static LaserOffset laserOffset();
 
-    // Written back to classic slot 0 (D36)
+    // Written back to classic slot 0 (D36): remembered at once, written to
+    // flash by poll() a few seconds after the last change (D44)
     static void saveJogXYStep(float step);
     static void saveJogZStep(float step);
+
+    // Writes pending changes when they are due; call from the main loop
+    static void poll();
 };
 
 #endif // LRT_SETTINGS_SERVICE_H

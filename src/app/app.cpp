@@ -7,6 +7,7 @@
 #include "network/fluidnc_client.h"
 #include "network/screenshot_server.h"
 #include "services/machine_service.h"
+#include "services/settings_service.h"
 
 bool LrtApp::running = false;
 
@@ -25,6 +26,7 @@ void LrtApp::begin(DisplayDriver *display) {
 void LrtApp::loop() {
     ScreenshotServer::handleClient();
     MachineService::poll();  // also runs FluidNCClient::loop()
+    SettingsService::poll();
 
     uint32_t now = millis();
 
