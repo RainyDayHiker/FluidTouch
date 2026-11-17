@@ -35,9 +35,16 @@ has since done the setup and the first M1 step.
   unchanged (screenshots identical before and after the listener change); UI mode round
   trip; frame connecting, online, tab switching, STOP sends `!`, alarm banner and Unlock,
   drop and automatic reconnect, no-machine banner.
-- **Not tested anywhere:** the probe-result event and the "job continues on the
-  controller" line (the fake has no `G38` or job playback yet); STOP as jog cancel (nothing
-  in the new UI jogs yet); loss of WiFi (the simulator's WiFi is always up).
+  With job playback in the fake: HOLD at an `M0` prompt, RUN and the dot on the Run tab,
+  "The job continues on the controller" during `$sim/drop`, reconnecting mid-job, and the
+  probe result reaching the client.
+- **Known gap found with the fake:** `MachineService::jobActive()` follows the `SD:` field,
+  which FluidNC drops when it has read the last line. At the end of a job the Run dot and
+  the "job continues" line therefore go away while the last moves and the final `M0` are
+  still to come. To be solved with the Run screen (M3); see
+  [06](06-test-and-spikes.md#1-test-levels).
+- **Not tested anywhere:** STOP as jog cancel (nothing in the new UI jogs yet); loss of
+  WiFi (the simulator's WiFi is always up).
 - **Not run on the device.** Firmware builds (33.7% of flash) but nothing has been flashed.
   First things to look at on the device: that it boots into the frame and connects; how
   long the screen freezes during a connection attempt while the controller is off
@@ -53,9 +60,7 @@ has since done the setup and the first M1 step.
 
 1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
    `lrt/m1-<topic>` branch:
-   1. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
-      download/upload, `$sim/drop`. Then exercise the probe-result event and the
-      "job continues" banner line.
+   1. Fake FluidNC: HTTP download and upload (job playback is done).
    2. `build:` commit adding a CI workflow for `lrt/**`.
 2. Flash the M1 build and go through the device points in §1. Run spike S2 from
    Settings > "Draw test (spike S2)" and fill in the table in
