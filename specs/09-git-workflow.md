@@ -62,9 +62,12 @@ git push -u origin lrt/main
 
 ## 4. Merging work into `lrt/main`
 
-- Open a pull request from the topic branch to `lrt/main` **in the fork** (set the base
-  repository to `RainyDayHiker/FluidTouch`; GitHub defaults to the upstream repo).
-- Merge with a merge commit, not squash, so `platform` commits stay separate.
+- Merge the topic branch into `lrt/main` locally with a merge commit
+  (`git merge --no-ff`), push `lrt/main`, and delete the topic branch. This is how it has
+  been done so far. A pull request **in the fork** is the alternative when a change should
+  be looked over first (set the base repository to `RainyDayHiker/FluidTouch`; GitHub
+  defaults to the upstream repo).
+- A merge commit, not squash, so `platform` commits stay separate.
 - Before merging: firmware builds, simulator builds, the library test runner passes (from
   M4), and the classic UI still starts in the simulator. CI checks all of these on the
   pushed topic branch (§7).

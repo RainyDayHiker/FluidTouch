@@ -1,85 +1,102 @@
-# Handoff — state as of 2026-11-16 (end of first development session)
+# Handoff — state as of 2026-11-16 (end of the first development session)
 
-Sections 1 and 2 are rewritten at the end of each working session. The planning sessions
-(chat, no git or build tools) wrote the first version; a development session in VS Code
-has since done the setup and the first M1 step.
+Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 1. Where things stand
 
-- **M0 (specs) is drafted.** Specs 01 to 09 are in this folder. Setup-screen and frame
-  questions are answered. Job, Run and file-folder questions remain open
-  ([07](07-decisions.md#open-questions)); none blocks M1 or M2.
-- **Git is set up** per [09](09-git-workflow.md): `upstream` remote added (URL confirmed,
-  `main` equals `upstream/main`), `lrt/main` created and pushed with the specs.
-  The commit from `build/local-config-overrides` was not upstream, so it is part of
-  `lrt/main`; that branch is deleted.
-- **Baseline builds work.** Firmware `elecrow-crowpanel-7-advance-v13` builds (33.5% of
-  flash). The simulator did not build from this checkout: the path contains a space and
-  the forced include was passed unquoted. Fixed in commit
-  `405a0ea` ("Sim: build from a checkout path that contains a space"), merged into
-  `lrt/main`. It is not being offered upstream; its branch is deleted.
-- **M1 steps 1 to 4 are done** and merged into `lrt/main`:
-  1. `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
-     `ClassicClientListener`.
-  2. UI mode: NVS `lrt/ui_mode`, default `app`. `main.cpp` starts `LrtApp` or the classic
-     UI. Classic System Options has "Restart into new UI"; the new Settings screen has
-     "Restart into classic UI".
-  3. `src/services` (`SettingsService`, `MachineService` with its own reconnecting
-     connection logic) and the `src/app` frame: tabs, status bar with STOP, alarm banner
-     with Unlock, connecting / connection-lost banner with Reconnect, no-machine banner,
-     five placeholder screens.
-  4. The S2 draw test screen (Settings > "Draw test (spike S2)"), with a synthetic job
-     of the reference job's size. Runs in the simulator; its numbers only mean something
-     on the device.
-- **Tested in the simulator** against the fake FluidNC: classic connect, drop and reconnect
-  unchanged (screenshots identical before and after the listener change); UI mode round
-  trip; frame connecting, online, tab switching, STOP sends `!`, alarm banner and Unlock,
-  drop and automatic reconnect, no-machine banner.
-  With job playback in the fake: HOLD at an `M0` prompt, RUN and the dot on the Run tab,
-  "The job continues on the controller" during `$sim/drop`, reconnecting mid-job, and the
-  probe result reaching the client.
-- **Known gap found with the fake:** `MachineService::jobActive()` follows the `SD:` field,
-  which FluidNC drops when it has read the last line. At the end of a job the Run dot and
-  the "job continues" line therefore go away while the last moves and the final `M0` are
-  still to come. To be solved with the Run screen (M3); see
+**M1 (chassis) is done. The next session starts M2, the Setup screen.**
+
+Git: only `main` (equal to `upstream/main`) and `lrt/main` exist, locally and on the fork,
+in sync, working tree clean. CI (`build-lrt.yml`) runs on every push to `lrt/main`; see the
+latest result with `gh run list --branch lrt/main --limit 1`.
+
+What exists on `lrt/main`:
+
+- **Platform edits** (all listed in [02 §2](02-architecture.md#2-changes-to-kept-code)):
+  `FluidNCClient` reports to a listener; `main.cpp` starts the new UI or the classic UI by
+  the UI mode key; the classic System Options dialog has "Restart into new UI"; the
+  simulator builds from a path with a space and has `src/` on its include path.
+- **`src/services`:** `SettingsService` (machine from classic slot 0) and `MachineService`
+  (connection with its own retries, each attempt on its own task; status; stop, unlock,
+  reconnect; last probe result). No File, Job or Macro service yet.
+- **`src/app`:** the frame (tabs, status bar with STOP, alarm banner, connection banner that
+  shows an attempt or counts down to the next one, no-machine banner), five placeholder
+  screens, "Restart into classic UI" and the S2 draw test on the Settings placeholder.
+- **Fake FluidNC** (`sim/tools/fake_fluidnc.py`): job playback, probe, `M0`, messages,
+  overrides, reset, connection drop, and HTTP download, upload and file actions.
+  `sim/tools/test_fake_fluidnc.py` checks it; `sim/tools/smoke_test.sh` starts both UIs
+  without a window.
+- **CI** for `lrt/**`: firmware, simulator with the smoke test, fake FluidNC test
+  ([09 §7](09-git-workflow.md#7-ci)).
+
+On the device (flashed by Jeffrey on 2026-11-16, at the commit before the last two changes):
+
+- The new UI boots, connects to FluidNC and restarts into the classic UI. The way back is
+  the System Options dialog (tap the right end of the classic status bar): a bit hidden,
+  fine once known (D31).
+- STOP touch area: good.
+- Spike S2 run: 1.86 MB of PSRAM free; own drawing code 2.7 times faster than LVGL's.
+  Results and conclusions in [06](06-test-and-spikes.md#s2-conclusions); memory budget in
+  [02 §6](02-architecture.md#6-memory); D28, D29, D30.
+- Spike S1: the `/sd/<path>` download and the HTTP folder listing work. Not yet tried while
+  a job runs.
+- With the controller off, each reconnect attempt froze the screen for 10 to 12 s.
+
+**Built and tested in the simulator, but not yet on the device** (needs one more flash):
+
+- The freeze fix: each connection attempt runs on its own task
+  ([02 §4](02-architecture.md#4-services)).
+- The banner showing "Connecting..." with Reconnect greyed out during an attempt, and
+  "Next attempt in N s." between attempts.
+
+To confirm after that flash: the screen stays responsive with the controller off, and
+connecting still works with it on (the connect call now runs on the other core).
+
+Known gaps, deliberately left:
+
+- `MachineService::jobActive()` follows the `SD:` field, which FluidNC drops once it has
+  read the last line of the file. At the end of a job the Run dot goes away while the last
+  moves and the final `M0` are still to come. To be solved with the Run screen (M3); see
   [06](06-test-and-spikes.md#1-test-levels).
-- **Fake FluidNC** now also serves HTTP (download, listing, upload, file actions); checked
-  with `sim/tools/test_fake_fluidnc.py` and curl. Nothing in the firmware uses download yet,
-  and the classic UI's upload was not re-run against it (it needs the fake on port 80).
-- **Not tested anywhere:** STOP as jog cancel (nothing in the new UI jogs yet); loss of
-  WiFi (the simulator's WiFi is always up).
-- **Flashed on 2026-11-16** (Jeffrey). The new UI runs on the device, connected to FluidNC
-  (seen in the serial log), and the classic UI was entered from it. Spike S2 was run:
-  1.86 MB of PSRAM free, own drawing code 2.7 times faster than LVGL's; conclusions in
-  [06](06-test-and-spikes.md#s2-conclusions), new budget in
-  [02 §6](02-architecture.md#6-memory), D28, D29, D30. Spike S1: the download URL and the
-  HTTP folder listing work; not yet tried during a job.
-- **Device feedback, 2026-11-16:** the STOP touch area is good. The way back from the
-  classic UI (System Options, opened by tapping the right end of the classic status bar)
-  is a bit hidden but fine (D31). With the controller off, each reconnect attempt froze
-  the screen for 10 to 12 s.
-- **Fix for the freeze, not yet on the device:** each connection attempt now runs on its
-  own task ([02 §4](02-architecture.md#4-services)). In the simulator, against an address
-  that does not answer, the tabs respond during an attempt, and the connect, alarm, drop
-  and reconnect scenario still passes. To confirm after the next flash: the screen stays
-  responsive with the controller off, and connecting still works when it is on. The
-  banner now says whether an attempt is under way or counts down to the next one, and
-  Reconnect is greyed out during an attempt (simulator only so far).
-- **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
-- CI: `build-lrt.yml` runs on pushes to `lrt/**` (firmware, simulator with a two-UI smoke
-  test, fake FluidNC test) and publishes nothing; see [09 §7](09-git-workflow.md#7-ci).
-  Upstream's two workflows don't run on `lrt/**` or `lrt-*` tags; `fix/<topic>` branches do
-  match their preview workflow ([09 §2](09-git-workflow.md#2-branches)).
+- Not tested anywhere: STOP as jog cancel (nothing in the new UI jogs yet; M2 will), loss
+  of WiFi (the simulator's WiFi is always up), the classic UI's upload against the fake
+  FluidNC's HTTP (it needs the fake on port 80).
+- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines such as `$HZ` inside
+  a file; the reference job uses both.
+
+Spikes ([06 §2](06-test-and-spikes.md#2-spikes)): S1 mostly done, S2 done. **S3, S4 and S5
+are deferred** until their answers are needed (D32): S3 and S4 with M3, S5 before M8. Nothing
+is waiting on Jeffrey for them now.
 
 ## 2. Next steps
 
-1. The PC side of M1 ([08](08-milestones.md)) is done. What is left needs the device.
-2. Device points still open: see §1. S1 during a running job (and the value of
-   `$HTTP/BlockDuringMotion`); S3, S4, S5. S3 needs a position log to the display SD,
-   which does not exist yet, and a choice of job; S5 needs a sketch that has not been
-   written and a Microsoft app registration
-   ([06](06-test-and-spikes.md#s3-what-it-needs-and-what-the-reference-job-does)).
-3. Flash again to confirm the reconnect fix. M2 (Setup screen) can start.
+1. **Start M2: the Setup screen** ([03 §2](03-screens.md#2-setup), decisions D11 and D18 to
+   D25, [08](08-milestones.md)). On a branch `lrt/m2-<topic>` from `lrt/main`. Expected
+   pieces:
+   - `MachineService` actions for home, zero (all, XY, Z), jog and jog cancel, go to XY
+     zero, laser offset move, probe Z, reset. The fake FluidNC already answers `$H`, `$J=`,
+     `G10 L20`, `G38.2`, reset and jog cancel.
+   - Settings the screen needs (jog steps and feeds, laser offset) in `SettingsService`:
+     the jog values are in classic slot 0, the laser offset is new (`lrt` namespace,
+     default X 33.6, Y -28.2).
+   - The screen itself, replacing the Setup placeholder. Go through its control list with
+     Jeffrey before building if anything in 03 §2 is unclear; M0's exit checklist still has
+     "Screens reviewed one by one (Setup first)" open.
+   - S3 in the requirements (no jog, zero or home while a job runs or is held).
+2. **Flash once** at the start or end of that work, to confirm the two items in §1 that are
+   not yet on the device. Steps: USB-C cable, then
+   `& "$env:USERPROFILE\.platformio\penv\Scripts\pio.exe" run -e elecrow-crowpanel-7-advance-v13 -t upload`.
+   Tag `lrt-m1` once that flash checks out ([09 §6](09-git-workflow.md#6-tags-and-versions));
+   no tag exists yet.
+3. Small things still open from the device: S1 while a job runs, and the value of
+   `$HTTP/BlockDuringMotion` on the controller.
+4. Later, when their milestones come up: the S3 position log (with the Run screen, M3), S4
+   (upload sizes, M3), S5 (OneDrive sketch and a Microsoft app registration, before M8).
+
+How this session worked, for the next one: topic branches merged locally into `lrt/main`
+with a merge commit and deleted; `platform:` and `sim:` commits kept separate from new
+code; every change built for the simulator and the firmware and run in the simulator
+before merging; specs updated in the same branch.
 
 ### Working notes for the simulator
 
@@ -96,6 +113,11 @@ has since done the setup and the first M1 step.
   the `--script` and leaves a second simulator process running; close it before
   rebuilding or the link step fails with "Permission denied".
 - The classic UI stops reconnecting after a drop; the dialog's Connect button reconnects.
+- The scenario scripts used this session (connect, alarm, drop, reconnect; a job with a
+  forced drop; an address that does not answer) were temporary files and are not in the
+  repo. `sim/tools/smoke_test.sh` shows the pattern: `--data <folder>`, `--script`, and
+  `SDL_VIDEODRIVER=dummy SDL_RENDER_DRIVER=software` for no window. An address such as
+  `10.255.255.1` as the machine URL gives a connection attempt that hangs.
 - The simulator starts in the new UI. Type `$sim/alarm=1` and the like into the fake
   FluidNC's own console; the new UI has no terminal yet.
 - Scripted runs: start the fake with a timed stdin, e.g.

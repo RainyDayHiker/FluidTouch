@@ -35,6 +35,7 @@
 | D29 | Cut progress on Run is drawn incrementally onto its layer; a full redraw only when the view changes (2026-11-16) | Redrawing the progress layer on every update | Spike S2: a full redraw costs about 320 ms |
 | D30 | Preview segments are 8 bytes each, held in RAM: end point as two 16-bit values scaled to the job's extents, start taken from the previous segment, 16-bit radius, 16 bits of flags and depth level. A file on the display SD is the fallback for jobs that still don't fit (2026-11-16, was Q21) | 24-byte segments; SD file as the normal case; freeing memory in the platform | 1.86 MB of PSRAM is free (S2); 8 bytes holds about ten times the reference job without touching upstream's display buffers |
 | D31 | "Restart into new UI" in the classic UI stays in the System Options dialog only (tap the right end of the classic status bar) (2026-11-16) | Also adding it to the classic Settings tab | Found to be a bit hidden, but fine once known; no further edit to upstream files |
+| D32 | Spikes S3, S4 and S5 are run when their answers are needed: S3 and S4 with M3, S5 before M8 (2026-11-16) | All spikes at the start of M1, as first planned | S3 needs a position log and a started job, S4 an upload from the new UI, S5 a sketch and an app registration; none of them affects M2 |
 
 ## Open questions
 
