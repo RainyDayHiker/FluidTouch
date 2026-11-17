@@ -38,10 +38,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pio-lrt-
 
+      # The pioarduino platform accepts Python 3.10 to 3.14 only; '3.x' has
+      # moved past that
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.x'
+          python-version: '3.13'
 
       - name: Install PlatformIO
         run: |
