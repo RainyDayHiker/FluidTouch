@@ -50,6 +50,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio
 
+      # The platform installs its own PlatformIO core ("pioarduino", unpinned)
+      # into ~/.platformio/penv. Release 6.2.0.post1 is rejected by the platform
+      # version this project pins ("not compatible with PlatformIO Core
+      # v6.2.0-post.1"), so hold it at 6.2.0 for uv and pip.
+      - name: Pin the platform's PlatformIO core
+        run: |
+          echo "pioarduino==6.2.0" > "$RUNNER_TEMP/pio-constraints.txt"
+          echo "UV_CONSTRAINT=$RUNNER_TEMP/pio-constraints.txt" >> "$GITHUB_ENV"
+          echo "PIP_CONSTRAINT=$RUNNER_TEMP/pio-constraints.txt" >> "$GITHUB_ENV"
+
       - name: Build firmware
         run: platformio run --environment elecrow-crowpanel-7-advance-v13
 
