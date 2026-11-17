@@ -33,6 +33,8 @@
 | D27 | Screen tabs are at the top; the status bar (state, positions, WiFi, STOP) is at the bottom ([03 §1](03-screens.md#1-frame)) | Status in a top bar with navigation elsewhere | Matches the classic layout, so the positions stay where they are read today |
 | D28 | The preview is drawn by its own code writing pixels into the canvas buffer (2026-11-16) | LVGL's line and arc draw functions | Spike S2 on the device: 210 ms against 562 ms for a reference-sized job |
 | D29 | Cut progress on Run is drawn incrementally onto its layer; a full redraw only when the view changes (2026-11-16) | Redrawing the progress layer on every update | Spike S2: a full redraw costs about 320 ms |
+| D30 | Preview segments are 8 bytes each, held in RAM: end point as two 16-bit values scaled to the job's extents, start taken from the previous segment, 16-bit radius, 16 bits of flags and depth level. A file on the display SD is the fallback for jobs that still don't fit (2026-11-16, was Q21) | 24-byte segments; SD file as the normal case; freeing memory in the platform | 1.86 MB of PSRAM is free (S2); 8 bytes holds about ten times the reference job without touching upstream's display buffers |
+| D31 | "Restart into new UI" in the classic UI stays in the System Options dialog only (tap the right end of the classic status bar) (2026-11-16) | Also adding it to the classic Settings tab | Found to be a bit hidden, but fine once known; no further edit to upstream files |
 
 ## Open questions
 
@@ -51,4 +53,3 @@ Answered ones move into the log above.
 | Q18 | End of job: final CONTINUE then Finished? | Yes |
 | Q19 | Feed override steps: 10% only or also 1%? | 10% |
 | Q20 | Move producing negative coordinates: block or warn? (Your jobs keep all moves positive.) | Warn |
-| Q21 | How are preview segments stored, given 1.86 MB of free PSRAM ([02 §6](02-architecture.md#6-memory))? Compact 8-byte segments in RAM, a file on the display SD, or freeing memory in the platform? To settle before M5 | Compact segments in RAM; SD file as fallback for jobs that don't fit |

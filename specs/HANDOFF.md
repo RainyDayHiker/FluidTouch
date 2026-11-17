@@ -52,13 +52,17 @@ has since done the setup and the first M1 step.
   (seen in the serial log), and the classic UI was entered from it. Spike S2 was run:
   1.86 MB of PSRAM free, own drawing code 2.7 times faster than LVGL's; conclusions in
   [06](06-test-and-spikes.md#s2-conclusions), new budget in
-  [02 §6](02-architecture.md#6-memory), D28, D29, Q21. Spike S1: the download URL and the
+  [02 §6](02-architecture.md#6-memory), D28, D29, D30. Spike S1: the download URL and the
   HTTP folder listing work; not yet tried during a job.
-- **Not yet reported from the device:** how long the screen freezes during a connection
-  attempt while the controller is off ([02 §4](02-architecture.md#4-services)); whether
-  the STOP touch area is comfortable; the round trip back from the classic UI (the
-  button is in System Options, opened by tapping the right end of the classic status
-  bar, not in the classic Settings tab).
+- **Device feedback, 2026-11-16:** the STOP touch area is good. The way back from the
+  classic UI (System Options, opened by tapping the right end of the classic status bar)
+  is a bit hidden but fine (D31). With the controller off, each reconnect attempt froze
+  the screen for 10 to 12 s.
+- **Fix for the freeze, not yet on the device:** each connection attempt now runs on its
+  own task ([02 §4](02-architecture.md#4-services)). In the simulator, against an address
+  that does not answer, the tabs respond during an attempt, and the connect, alarm, drop
+  and reconnect scenario still passes. To confirm after the next flash: the screen stays
+  responsive with the controller off, and connecting still works when it is on.
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
 - CI: `build-lrt.yml` runs on pushes to `lrt/**` (firmware, simulator with a two-UI smoke
   test, fake FluidNC test) and publishes nothing; see [09 §7](09-git-workflow.md#7-ci).
@@ -70,7 +74,7 @@ has since done the setup and the first M1 step.
 1. The PC side of M1 ([08](08-milestones.md)) is done. What is left needs the device.
 2. Device points still open: see §1. S1 during a running job (and the value of
    `$HTTP/BlockDuringMotion`); S3, S4, S5.
-3. Q21 (segment storage) before M5. M2 (Setup screen) can start.
+3. Flash again to confirm the reconnect fix. M2 (Setup screen) can start.
 
 ### Working notes for the simulator
 

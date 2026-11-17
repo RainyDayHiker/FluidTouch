@@ -24,8 +24,7 @@ void LrtApp::begin(DisplayDriver *display) {
 
 void LrtApp::loop() {
     ScreenshotServer::handleClient();
-    FluidNCClient::loop();
-    MachineService::poll();
+    MachineService::poll();  // also runs FluidNCClient::loop()
 
     uint32_t now = millis();
 

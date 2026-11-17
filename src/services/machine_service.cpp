@@ -20,6 +20,9 @@ bool MachineService::jobAtDrop = false;
 bool MachineService::lastJobActive = false;
 bool MachineService::networkServicesStarted = false;
 bool MachineService::connectPending = false;
+volatile bool MachineService::connectRunning = false;
+volatile bool MachineService::connectFinished = false;
+volatile bool MachineService::connectOk = false;
 uint32_t MachineService::connectAtMs = 0;
 uint32_t MachineService::stateSinceMs = 0;
 MachineState MachineService::lastState = STATE_DISCONNECTED;
@@ -65,17 +68,38 @@ void MachineService::retryControllerIn(uint32_t ms) {
 }
 
 // FluidNCClient::connect() blocks while it resolves the name and opens the
-// socket, so it is only called from here, one attempt at a time.
+// socket: 10 s and more when the controller is switched off (measured on the
+// device). So each attempt runs on a task of its own on core 0, and until it
+// has finished nothing else touches FluidNCClient (see poll()).
+void MachineService::connectTask(void *) {
+    connectOk = FluidNCClient::connect(config);
+    connectFinished = true;
+    vTaskDelete(nullptr);
+}
+
 void MachineService::connectController() {
     connectPending = false;
     stateSinceMs = millis();
     Serial.printf("MachineService: connecting to FluidNC at %s:%d\n", config.fluidnc_url, config.websocket_port);
-    if (!FluidNCClient::connect(config)) {
-        retryControllerIn(RETRY_DELAY_MS);
+    connectFinished = false;
+    connectRunning = true;
+    if (xTaskCreatePinnedToCore(connectTask, "lrt_connect", 8192, nullptr, 1, nullptr, 0) != pdPASS) {
+        // No task: do it here, at the price of a frozen screen
+        Serial.println("MachineService: could not start the connect task");
+        connectOk = FluidNCClient::connect(config);
+        connectFinished = true;
     }
 }
 
 void MachineService::poll() {
+    if (connectRunning) {
+        if (!connectFinished) return;  // the task owns FluidNCClient for now
+        connectRunning = false;
+        stateSinceMs = millis();       // the wait for the first status report starts here
+        if (!connectOk) retryControllerIn(RETRY_DELAY_MS);
+    }
+    FluidNCClient::loop();
+
     if (linkState == LINK_NO_MACHINE) return;
 
     uint32_t now = millis();
@@ -160,6 +184,7 @@ void MachineService::unlock() {
 }
 
 void MachineService::reconnect() {
+    if (connectRunning) return;  // an attempt is already under way
     if (linkState == LINK_CONTROLLER) {
         if (!connectPending) FluidNCClient::disconnect();
         retryControllerIn(FIRST_CONNECT_DELAY_MS);
