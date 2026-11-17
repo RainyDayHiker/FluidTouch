@@ -2,6 +2,7 @@
 #define LRT_WIDGETS_H
 
 #include <lvgl.h>
+#include <stdint.h>
 
 // Small helpers shared by the frame and the screens
 namespace Widgets {
@@ -28,6 +29,17 @@ void setTextColor(lv_obj_t *obj, lv_color_t color);
 // after its label; the label and icons are then laid out in a centred row.
 // The icon is drawn in the button's text colour, dim while it is disabled.
 lv_obj_t *addIcon(lv_obj_t *btn, const lv_image_dsc_t *icon, bool before = true);
+
+// A dimmed layer over the whole of parent, which takes every touch while
+// shown, holding a centred w x h panel. Returns the panel; it starts hidden.
+lv_obj_t *dialog(lv_obj_t *parent, int w, int h);
+void showDialog(lv_obj_t *panel, bool show);
+
+// "512 B", "212 KB", "1.4 MB"
+void formatSize(char *out, int outLen, int32_t bytes);
+
+// "0:35", "1:02:07"
+void formatDuration(char *out, int outLen, uint32_t ms);
 
 // A label at a fixed position
 lv_obj_t *label(lv_obj_t *parent, int x, int y, const lv_font_t *font, lv_color_t color, const char *text);

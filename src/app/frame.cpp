@@ -232,6 +232,8 @@ void Frame::show(ScreenId id) {
         lv_obj_set_style_text_color(tabButtons[i], selected ? lv_color_white() : UITheme::TEXT_MEDIUM, 0);
     }
     screens[id]->onShow();
+    // Drawn up to date at once, not on the next update
+    screens[id]->update();
 }
 
 void Frame::update() {
