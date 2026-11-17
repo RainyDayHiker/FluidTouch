@@ -32,7 +32,35 @@ S1 can be done from any browser as soon as the machine is on.
 | # | Question | How | Decides |
 |---|----------|-----|---------|
 | S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
-| S2 | How much PSRAM is free, and how fast is drawing? | A hidden test screen in the first M1 build: prints free heap and PSRAM, then draws the reference job's ~14,000 segments to a 480 x 360 canvas and reports the time, for full and for a 5x zoom | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
+| S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
 | S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
 | S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time | Inbox option B |
+
+### S2 procedure
+
+The test screen is built (M1) and runs in the simulator; **it has not been run on the
+device**, and the simulator's memory figures are fixed placeholders and its times are a PC's.
+
+It uses a synthetic job, not the reference file (there is no parser until M4): 14,189
+segments of which 10,689 are arcs, as in the reference job, laid out as 50 pockets cleared
+with half circles at six depths, joined by rapids. The segment list is 24 bytes per segment
+in PSRAM with arcs kept as arcs; two 480 x 360 RGB565 buffers are allocated (base picture
+and progress layer).
+
+On the device: open Settings, press "Draw test (spike S2)", and note every line of the
+result (it is also printed on the serial console; the classic screenshot server works too).
+Then press LVGL and note its two times; that run may take a while. Zoom switches the
+picture between the whole job and 5x. Back frees the buffers.
+
+| Result line | Meaning | Decides |
+|-------------|---------|---------|
+| Free PSRAM, largest block | With the segment list and both canvas buffers allocated | The budgets in [02 §6](02-architecture.md#6-memory): how much is left for a larger segment list and the outline grids |
+| Draw full, Draw 5x | Pixels written straight into the canvas buffer, arcs flattened while drawing | Whether pan and zoom can simply redraw |
+| Copy layer + Draw full | Worst case for redrawing the progress layer from the base picture | Whether cut progress is redrawn or drawn incrementally |
+| Show on screen | One LVGL refresh of the canvas | Frame cost on top of drawing |
+| LVGL: Draw full, Draw 5x | The same job through `lv_draw_line` / `lv_draw_arc` | Whether the preview needs its own rasteriser (expected: yes) |
+
+| Run | Free PSRAM | Largest block | Draw full | Draw 5x | Copy layer | Show | LVGL full | LVGL 5x |
+|-----|-----------|---------------|-----------|---------|------------|------|-----------|---------|
+| Device | | | | | | | | |
