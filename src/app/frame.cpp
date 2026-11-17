@@ -49,6 +49,7 @@ const lv_color_t BANNER_ALARM_BG = LV_COLOR_MAKE(0x7A, 0x10, 0x10);
 const lv_color_t BANNER_LINK_BG = LV_COLOR_MAKE(0x4A, 0x3A, 0x00);
 
 using Widgets::setText;
+using Widgets::setTextColor;
 
 lv_obj_t *plainBox(lv_obj_t *parent, int x, int y, int w, int h, lv_color_t bg) {
     lv_obj_t *box = lv_obj_create(parent);
@@ -249,23 +250,21 @@ void Frame::update() {
 void Frame::updateStatusBar() {
     if (!MachineService::online()) {
         setText(stateLabel, "OFFLINE");
-        lv_obj_set_style_text_color(stateLabel, UITheme::STATE_ALARM, 0);
+        setTextColor(stateLabel, UITheme::STATE_ALARM);
         static const char *const dashes[3] = {"X ---.--", "Y ---.--", "Z ---.--"};
         for (int i = 0; i < 3; i++) {
             setText(workLabels[i], dashes[i]);
             setText(machineLabels[i], dashes[i]);
         }
-        lv_obj_set_style_text_color(wifiLabel,
-                                    MachineService::link() == MachineService::LINK_CONTROLLER ? UITheme::STATE_HOLD
-                                                                                              : UITheme::STATE_ALARM,
-                                    0);
+        setTextColor(wifiLabel, MachineService::link() == MachineService::LINK_CONTROLLER ? UITheme::STATE_HOLD
+                                                                                          : UITheme::STATE_ALARM);
         return;
     }
 
     const FluidNCStatus &s = MachineService::status();
     StateStyle style = stateStyle(s);
     setText(stateLabel, style.text);
-    lv_obj_set_style_text_color(stateLabel, style.color, 0);
+    setTextColor(stateLabel, style.color);
 
     const float work[3] = {s.wpos_x, s.wpos_y, s.wpos_z};
     const float machine[3] = {s.mpos_x, s.mpos_y, s.mpos_z};
@@ -277,7 +276,7 @@ void Frame::updateStatusBar() {
         snprintf(buf, sizeof(buf), "%c %.2f", axis[i], machine[i]);
         setText(machineLabels[i], buf);
     }
-    lv_obj_set_style_text_color(wifiLabel, UITheme::STATE_IDLE, 0);
+    setTextColor(wifiLabel, UITheme::STATE_IDLE);
 
     // A new message from FluidNC replaces a notice at once
     if (strcmp(s.last_message, lastDeviceMessage) != 0) {

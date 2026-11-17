@@ -78,7 +78,7 @@ groups (D41).
 | Jog feeds | | Shown on Setup, not changed there. XY and Z jog feeds are set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
 | Laser -> bit | `$J=G91 G21 X33.6 Y-28.2 F..` | Shown as crosshair icon > end mill icon. Offset from Settings (defaults from `laser_offset.gcode`). A jog, so it can be cancelled and leaves G90/G91 alone. XY jog feed |
 | Bit -> laser | The reverse move | End mill icon > crosshair icon, same size as Laser -> bit (D21, D41) |
-| Probe Z | Opens a pop-up: what it will do (feed, max distance from Settings), [Probe], [Close], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, then restores the G90/G91 that was active. Classic's probe thickness and retract are not used. Reports the probed Z only: it does not set zero or retract. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
+| Probe Z | Opens a pop-up: what it will do (feed, max distance from Settings), [Probe], [Close], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, `G0 Z<back-off>` (10 mm, its own setting, D43), then restores the G90/G91 that was active. The back-off is queued behind the probe, as classic's retract is, so a miss (alarm) discards it. Classic's probe thickness and retract are not used. Reports the touch point: it does not set zero. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
 | Limit and probe dots | | From the `Pn:` field of the status report; lit while the pin is active |
 
 Buttons are greyed out only in states that last, so nothing flickers while jogging (D38):

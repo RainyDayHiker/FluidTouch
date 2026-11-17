@@ -96,9 +96,10 @@ public:
     static void zero(uint8_t axes);
     // $J=G91 G21 with the axes that are not 0
     static void jogBy(float dx, float dy, float dz, int feed);
-    // G91, G38.2 Z-maxDistance, then back to G90 if that was active. The
-    // result arrives in lastProbe().
-    static void probeZ(int maxDistance, int feed);
+    // G91, G38.2 Z-maxDistance, G0 Z+backOff once it touches, then back to
+    // G90 if that was active. The result (the touch point) arrives in
+    // lastProbe().
+    static void probeZ(int maxDistance, int feed, float backOff);
     // Retry the connection now instead of waiting for the next attempt.
     // Does nothing while an attempt is under way.
     static void reconnect();

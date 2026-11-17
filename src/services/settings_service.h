@@ -33,6 +33,7 @@ public:
     struct Probe {
         int feed;                  // mm/min
         int maxDistance;           // mm
+        float backOff;             // mm raised after a touch; "lrt" probe_back (D43)
     };
 
     struct LaserOffset {

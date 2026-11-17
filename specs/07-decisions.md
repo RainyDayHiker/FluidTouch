@@ -27,7 +27,7 @@
 | D21 | Laser moves in both directions | One direction | Fits; occasionally useful |
 | D22 | Abort is a soft reset | Pause, then stop and raise | Abort is used when something has gone wrong |
 | D23 | Setup has Reset and a Probe Z panel; jog to typed coordinates is not carried over | | Soft reset and manual Z probe are used; typed jog is not |
-| D24 | Probe Z reports the value only, for now | Set zero and retract | Asked for; can be extended later |
+| D24 | Probe Z reports the value only, for now. **Changed by D43**: it backs off after the touch | Set zero and retract | Asked for; can be extended later |
 | D25 | Go to XY zero has no Z height check, for now. **Moot since D40**: the button was removed | Warn or refuse when Z is low | Not needed yet |
 | D26 | The status bar shows work and machine position at all times | Work only, tap for machine | Asked for |
 | D27 | Screen tabs are at the top; the status bar (state, positions, WiFi, STOP) is at the bottom ([03 §1](03-screens.md#1-frame)) | Status in a top bar with navigation elsewhere | Matches the classic layout, so the positions stay where they are read today |
@@ -46,6 +46,7 @@
 | D40 | Setup has no Go to XY zero and no feed controls; Z+/Z- are left of the Z steps; home and zero buttons show icons (2026-11-17) | The first M2 layout | Seen on screen: rarely used controls removed, more room for jogging |
 | D41 | Setup, second pass: the XY steps are a column left of a square jog pad; the pad's centre shows the XY jog feed and the gap between Z+ and Z- the Z jog feed; Z+/Z- and the step buttons are narrower; laser and bit moves are two equal buttons drawn as crosshair and end mill icons; zero is a slashed-zero icon drawn for this UI (`src/app/icons/make_icons.py`) (2026-11-17) | Steps in a row above the pad; the step shown in the pad's centre; a small "b>l" text button (D40) | Seen on screen: the step is already visible on its selector, the feed is not; square arrows; space around the controls |
 | D42 | Setup has an XY joystick, swapped with the jog pad by a button under the XY steps. It works as the classic joystick tab's XY mode (short jogs every 50 ms, quadratic response, classic's joystick Max XY feed, jog cancel on release), without X-only/Y-only, Z or speed display. The mode is not remembered across restarts (2026-11-17) | Leaving the joystick in the classic UI only | Asked for: continuous positioning without choosing steps |
+| D43 | After a touch, Probe Z raises Z by a back-off of the new UI's own (`lrt` `probe_back`, default 10 mm), sent as `G0 Z..` queued behind `G38.2` as classic's retract is (2026-11-17) | No retract (D24); classic's retract setting (2 mm by default) | Tried on the device: the bit should come clear of the plate |
 
 ## Open questions
 

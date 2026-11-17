@@ -52,6 +52,15 @@ void setButtonColor(lv_obj_t *btn, lv_color_t color) {
     lv_obj_set_style_bg_color(btn, color, 0);
 }
 
+void setTextColor(lv_obj_t *obj, lv_color_t color) {
+    lv_style_value_t current;
+    if (lv_obj_get_local_style_prop(obj, LV_STYLE_TEXT_COLOR, &current, 0) == LV_STYLE_RES_FOUND &&
+        lv_color_eq(current.color, color)) {
+        return;
+    }
+    lv_obj_set_style_text_color(obj, color, 0);
+}
+
 // Image recolour is not inherited, so the icons follow the button's state
 static void onIconButtonState(lv_event_t *e) {
     lv_obj_t *btn = (lv_obj_t *)lv_event_get_current_target(e);

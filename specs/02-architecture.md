@@ -46,7 +46,8 @@ Both UIs use the same stored machine connection: the new SettingsService reads a
 machine slot 0 of the classic `fluidtouch` preferences. The jog steps, jog feeds and probe
 values come from the same slot; Setup writes the chosen steps back to it
 (D36). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
-and the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11).
+the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11), and the probe back-off
+`probe_back` (default 10 mm, D43).
 
 ## 4. Services
 

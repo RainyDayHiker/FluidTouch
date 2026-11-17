@@ -66,12 +66,17 @@ SettingsService::Jog SettingsService::jog() {
 }
 
 SettingsService::Probe SettingsService::probe() {
-    Probe p = {100, 10};
+    Probe p = {100, 10, 10.0f};
     MachineConfig m;
     if (MachineConfigManager::getMachine(0, m) && m.is_configured) {
         if (m.probe_feed_rate > 0) p.feed = m.probe_feed_rate;
         if (m.probe_max_distance > 0) p.maxDistance = m.probe_max_distance;
     }
+    // Not classic's retract (2 mm by default): a back-off of the new UI's own
+    Preferences prefs;
+    prefs.begin(LRT_PREFS_NAMESPACE, true);
+    p.backOff = prefs.getFloat("probe_back", 10.0f);
+    prefs.end();
     return p;
 }
 

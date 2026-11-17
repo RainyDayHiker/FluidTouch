@@ -321,9 +321,9 @@ void onProbeOpen(lv_event_t *) {
     SettingsService::Probe p = SettingsService::probe();
     char buf[200];
     snprintf(buf, sizeof(buf),
-             "Moves Z down at %d mm/min until the probe touches, at most %d mm. "
-             "Feed and distance are in the classic UI, Settings > Probe.",
-             p.feed, p.maxDistance);
+             "Moves Z down at %d mm/min until the probe touches, at most %d mm, "
+             "then raises Z %g mm. Feed and distance are in the classic UI, Settings > Probe.",
+             p.feed, p.maxDistance, p.backOff);
     setText(probeInfo, buf);
     setText(probeResult, "");
     probeStarted = false;
@@ -337,7 +337,7 @@ void onProbe(lv_event_t *) {
     SettingsService::Probe p = SettingsService::probe();
     probeCountAtStart = MachineService::lastProbe().count;
     probeStarted = true;
-    MachineService::probeZ(p.maxDistance, p.feed);
+    MachineService::probeZ(p.maxDistance, p.feed, p.backOff);
 }
 
 // --- Building ------------------------------------------------------------------

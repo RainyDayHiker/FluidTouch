@@ -322,7 +322,7 @@ void MachineService::jogBy(float dx, float dy, float dz, int feed) {
     FluidNCClient::sendCommand(cmd);
 }
 
-void MachineService::probeZ(int maxDistance, int feed) {
+void MachineService::probeZ(int maxDistance, int feed, float backOff) {
     if (!canZero() || maxDistance <= 0 || feed <= 0) return;
     // G91 goes on a line of its own, as in the classic UI's probe tab
     bool wasG91 = strcmp(status().modal_distance, "G91") == 0;
@@ -330,6 +330,12 @@ void MachineService::probeZ(int maxDistance, int feed) {
     char cmd[48];
     snprintf(cmd, sizeof(cmd), "G38.2 Z-%d F%d\n", maxDistance, feed);
     FluidNCClient::sendCommand(cmd);
+    // The back-off is queued behind the probe, as classic's retract is: it
+    // runs once the probe touches, and a miss (alarm) discards it
+    if (backOff > 0) {
+        snprintf(cmd, sizeof(cmd), "G0 Z%.2f\n", backOff);
+        FluidNCClient::sendCommand(cmd);
+    }
     probing = true;
     restoreG90 = !wasG91;  // sent when the result arrives
 }
