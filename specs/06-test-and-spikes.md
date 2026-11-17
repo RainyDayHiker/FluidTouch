@@ -43,7 +43,8 @@ what spike S3 is for:
 ## 2. Spikes
 
 S1 (partly) and S2 were run on 2026-11-16; results are below the table. S3 to S5 have not
-been run.
+been run and are deferred until their answers are needed (D32): S3 and S4 with M3, when a
+job is first started and a file first uploaded from the new UI; S5 before M8.
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|
