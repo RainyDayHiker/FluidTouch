@@ -21,7 +21,7 @@ A **file source** is anything that can list files and fetch one. Three are plann
 
 | Source | List | Fetch | Needs |
 |--------|------|-------|-------|
-| Controller SD | `$Files/ListGcode` (as now) | HTTP GET from FluidNC (spike S1) | Machine on |
+| Controller SD | `$Files/ListGcode` (as now) | HTTP GET `http://<address>/sd/<path>` (works, S1; not yet tried during a job) | Machine on |
 | Display SD | Local | Local | Card carried from the PC |
 | Inbox | See §3 | See §3 | See §3 |
 

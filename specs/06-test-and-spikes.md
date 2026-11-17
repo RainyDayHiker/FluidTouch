@@ -42,8 +42,8 @@ what spike S3 is for:
 
 ## 2. Spikes
 
-None has been run. S1 to S5 need the machine or the display and are done at the start of M1;
-S1 can be done from any browser as soon as the machine is on.
+S1 (partly) and S2 were run on 2026-11-16; results are below the table. S3 to S5 have not
+been run.
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|
@@ -53,10 +53,17 @@ S1 can be done from any browser as soon as the machine is on.
 | S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time | Inbox option B |
 
+### S1 result (2026-11-16, Jeffrey, browser on the PC)
+
+- `http://<address>/sd/<path>` downloads the file. **Controller SD can be previewed.**
+- `GET /upload?path=<folder>` returns the folder listing as JSON.
+- Not done yet: the same download while a job is running, the value of
+  `$HTTP/BlockDuringMotion`, and how long the reference job takes to download.
+
 ### S1: what FluidNC's source says
 
-Read from `WebUIServer.cpp` on FluidNC's main branch (2026-11-16), not tried on the
-controller; S1 is still to be run. The fake FluidNC follows this.
+Read from `WebUIServer.cpp` on FluidNC's main branch (2026-11-16). The first and third
+points are confirmed by the result above. The fake FluidNC follows this.
 
 - There is no handler for `/sd/...`. A GET for any unregistered path goes to the not-found
   handler, which tries to send the file with that path as a download; a path that starts
@@ -73,8 +80,9 @@ controller; S1 is still to be run. The fake FluidNC follows this.
 
 ### S2 procedure
 
-The test screen is built (M1) and runs in the simulator; **it has not been run on the
-device**, and the simulator's memory figures are fixed placeholders and its times are a PC's.
+The test screen is built (M1). It was run on the device on 2026-11-16; the result and what
+follows from it are at the end of this section. The simulator's memory figures are fixed
+placeholders and its times are a PC's.
 
 It uses a synthetic job, not the reference file (there is no parser until M4): 14,189
 segments of which 10,689 are arcs, as in the reference job, laid out as 50 pockets cleared
@@ -97,4 +105,30 @@ picture between the whole job and 5x. Back frees the buffers.
 
 | Run | Free PSRAM | Largest block | Draw full | Draw 5x | Copy layer | Show | LVGL full | LVGL 5x |
 |-----|-----------|---------------|-----------|---------|------------|------|-----------|---------|
-| Device | | | | | | | | |
+| Device, 2026-11-16 | 855 KB | 847 KB | 210 ms | 56 ms | 23.6 ms | 85 ms | 562 ms | 206 ms |
+
+Also reported: free heap 169 KB, generate 15 ms. The free figures are with the test's
+1,006 KB allocated (332 KB segment list, 2 x 337 KB canvas), in the new UI, connected to
+FluidNC. So about **1.86 MB of PSRAM is free** for the preview in total.
+
+### S2 conclusions
+
+1. **Memory is the constraint, not speed.** The targets that were in
+   [02 §6](02-architecture.md#6-memory) (two canvases, a 2 MB segment list, 1 MB of outline
+   grids) add up to 3.7 MB; 1.86 MB is there. The reference job fits as tested with
+   855 KB to spare. Five times the reference job (G8) does not fit at 24 bytes per
+   segment (1.66 MB plus canvases). 02 §6 now carries the measured budget and the
+   options (Q21).
+2. **The preview draws with its own code, not LVGL's draw functions** (D28): 210 ms
+   against 562 ms for the whole job, 56 ms against 206 ms at 5x.
+3. **Pan and zoom redraw the picture.** About 0.3 s per step for a job of this size
+   (210 ms draw + 85 ms to show). Fine for zoom buttons and stepwise panning; not for
+   dragging with a finger. A job five times larger would take about a second per step.
+4. **Cut progress is drawn incrementally** (D29). Redrawing the progress layer from
+   scratch costs up to 24 + 210 + 85 = about 320 ms, too much to do on every status
+   report. Newly cut segments are drawn onto the progress layer as they are passed; a full
+   redraw happens only when the view changes.
+5. The draw time is dominated by per-arc floating-point trigonometry (10,689 arcs). It
+   has not been optimised; there is room if point 3 turns out too slow.
+
+The job was synthetic. Repeat with the reference file when the parser exists (M4/M5).

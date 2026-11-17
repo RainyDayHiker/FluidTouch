@@ -98,19 +98,36 @@ without uploading.
 
 ## 6. Memory
 
-PSRAM is 8 MB, but the build runs code from PSRAM (`CONFIG_SPIRAM_XIP_FROM_PSRAM`), which
-takes roughly the firmware's size out of it, and LVGL has 1 MB. Free PSRAM on the device is
-not yet measured, so the figures below are targets until spike S2:
+Measured on the device (spike S2, 2026-11-16; [06](06-test-and-spikes.md#s2-procedure)): in
+the new UI, connected, about **1.86 MB of PSRAM is free**, in one block of nearly that size.
+Internal heap had 169 KB free. The rest of the 8 MB goes to the code (the build runs from
+PSRAM, `CONFIG_SPIRAM_XIP_FROM_PSRAM`), LVGL's 1 MB pool, and the display's full-screen
+buffers (two 768 KB LVGL draw buffers in `display_driver.cpp`, plus the panel's own).
 
-| Use | Target |
-|-----|--------|
-| Preview canvas, RGB565, about 480 x 360 | 350 KB |
-| Second canvas layer for cut progress | 350 KB |
-| Segment list, 24 bytes per segment, arcs kept as arcs | 2 MB (about 87,000 segments; the reference job needs about 14,000) |
-| Outline grids, 2 x 1 bit per cell, 4 M cells | 1 MB, only while tracing, when the canvas layers can be released |
+Budget for the preview, replacing the earlier targets (which added up to 3.7 MB):
 
-If S2 shows less is free, the segment list moves to a file on the display SD read in
-blocks, and the grid gets coarser.
+| Use | Size | When |
+|-----|------|------|
+| Preview canvas, RGB565, 480 x 360 | 337 KB | Job and Run screens |
+| Second canvas layer for cut progress | 337 KB | Run screen only |
+| Segment list | What is left: about 1.5 MB on Job, 1.1 MB on Run | While a job is selected |
+| Outline grids | Whatever is free once the canvases are released | Only while tracing |
+
+At 24 bytes per segment (as tested), 1.1 MB holds about 48,000 segments: 3.4 times the
+reference job, short of the "at least 5x" in G8. Options, to be chosen before M5 (**Q21**):
+
+| Option | Effect | Cost |
+|--------|--------|------|
+| A. Compact segments: end point as two 16-bit values scaled to the job's extents (0.02 mm steps for a job 1.3 m long, 0.04 mm for 2.6 m), start point taken from the previous segment, radius 16 bits, flags and depth level 16 bits: 8 bytes | 1.1 MB holds about 144,000 segments, 10 times the reference job | A little more work per segment when drawing; positions rounded to the step, far below a screen pixel |
+| B. Keep the segment list in a file on the display SD and draw from it in blocks | No limit from RAM | Every redraw reads the card: slower pan and zoom; no preview without a card |
+| C. Free memory elsewhere: one LVGL draw buffer instead of two, or a smaller LVGL pool | Up to about 1 MB more | Edits to upstream's display driver and `lv_conf.h`; may bring back the flicker those buffers were chosen to avoid; affects the classic UI |
+
+The draft assumes A, with B as the fallback for jobs that still do not fit (preview
+"simplified, and says so", G8). C is not planned.
+
+The outline grids (2 x 1 bit per cell) get whatever is free while tracing: with the canvases
+released and a reference-sized job loaded that is about 1.5 MB, enough for the 4 M cells
+(1 MB) planned. For larger jobs the grid gets coarser.
 
 ## 7. Threads
 
