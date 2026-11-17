@@ -6,7 +6,7 @@ new work reviewable, and always be able to say which commit is on the device.
 ## 1. Remotes
 
 ```powershell
-git remote add upstream https://github.com/jeyeager65/FluidTouch.git   # confirm the URL
+git remote add upstream https://github.com/jeyeager65/FluidTouch.git
 git fetch upstream
 ```
 

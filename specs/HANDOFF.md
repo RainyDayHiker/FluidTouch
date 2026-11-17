@@ -1,44 +1,68 @@
-# Handoff — state as of 2026-11-16
+# Handoff — state as of 2026-11-16 (end of first development session)
 
-Written at the end of the planning sessions (done in a chat session with file access but no
-git and no build tools) so a development session in VS Code can continue.
+Sections 1 and 2 are rewritten at the end of each working session. The planning sessions
+(chat, no git or build tools) wrote the first version; a development session in VS Code
+has since done the setup and the first M1 step.
 
 ## 1. Where things stand
 
 - **M0 (specs) is drafted.** Specs 01 to 09 are in this folder. Setup-screen and frame
   questions are answered. Job, Run and file-folder questions remain open
   ([07](07-decisions.md#open-questions)); none blocks M1 or M2.
-- **No code has been written.** Nothing has been built, run in the simulator, or flashed
-  as part of this work. All statements about the existing code come from reading it.
+- **Git is set up** per [09](09-git-workflow.md): `upstream` remote added (URL confirmed,
+  `main` equals `upstream/main`), `lrt/main` created and pushed with the specs.
+  `build/local-config-overrides` was not upstream, so it is part of `lrt/main`.
+- **Baseline builds work.** Firmware `elecrow-crowpanel-7-advance-v13` builds (33.5% of
+  flash). The simulator did not build from this checkout: the path contains a space and
+  the forced include was passed unquoted. Fixed on `upstream/sim-path-with-spaces`
+  (one commit from `main`, worth offering upstream), merged into `lrt/main`.
+- **M1 step 1 is done** on branch `lrt/m1-client-events` (not yet merged into `lrt/main`):
+  `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
+  `ClassicClientListener`. Checked in the simulator against the fake FluidNC: connect,
+  controller drop, reconnect give screenshots identical to the build before the change.
+  The probe-result event was not exercised (the fake has no `G38` yet). Firmware builds;
+  **nothing has been flashed or run on the device.**
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
-- The specs files were written into the working tree **untracked**, while the branch
-  `build/local-config-overrides` was checked out. They are not committed.
+- CI: upstream's two workflows trigger on `v*.*.*` tags and on `feature/**`, `feat/**`,
+  `fix/**`, `bugfix/**`, `dev` branches. Nothing triggers on `lrt/**`, `upstream/**` or
+  `lrt-*` tags, so pushing those publishes nothing. No `lrt/**` workflow exists yet
+  ([09 §7](09-git-workflow.md#7-ci)).
 
-## 2. First steps for the development session
+## 2. Next steps
 
-1. `git status`, `git remote -v`, `git log --oneline -5`, `git branch -vv`. Confirm the
-   state described in §4 before changing anything.
-2. Set up remotes and branches per [09-git-workflow.md](09-git-workflow.md) §1 and §2, and
-   commit `CLAUDE.md` and `specs/` as the first commit on `lrt/main`.
-3. Confirm the baseline builds before touching code: simulator (`.\sim\build.ps1 -Run`) and
-   firmware (`pio run -e elecrow-crowpanel-7-advance-v13`). Record any problem here.
-4. Start M1 ([08](08-milestones.md)), in this order:
-   1. Listener interface in `FluidNCClient`, with the classic UI registered as a listener
-      (behaviour unchanged). Verify classic UI in the simulator.
-   2. UI mode key in NVS and the boot switch in `main.cpp`.
-   3. `src/services` skeleton and `src/app` frame: tabs on top, status bar at the bottom,
+1. Review and merge `lrt/m1-client-events` into `lrt/main` (pull request in the fork,
+   merge commit; [09 §4](09-git-workflow.md#4-merging-work-into-lrtmain)).
+2. Continue M1 ([08](08-milestones.md)), in this order:
+   1. UI mode key in NVS and the boot switch in `main.cpp`.
+   2. `src/services` skeleton and `src/app` frame: tabs on top, status bar at the bottom,
       banners, five empty screens.
-   4. Hidden test screen for spike S2 (free PSRAM, canvas draw timing).
-   5. Fake FluidNC: job playback, `SD:` progress, `M0` hold, HTTP download/upload.
-5. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
+   3. Hidden test screen for spike S2 (free PSRAM, canvas draw timing).
+   4. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
+      download/upload. Then exercise the probe-result listener event.
+   5. `build:` commit adding a CI workflow for `lrt/**`.
+3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
    results into [06](06-test-and-spikes.md).
+4. Open point for Jeffrey: [03 §1](03-screens.md#1-frame) cites decision D27 (tabs on top,
+   status bar at the bottom), but the log in [07](07-decisions.md) ends at D26, and D26
+   says "top bar" shows the positions. Add D27 and reword D26, or correct 03.
+
+### Working notes for the simulator
+
+- MSYS2 is installed at `C:\msys64` (UCRT64 gcc, SDL2, cmake, ninja). `pio` is not on
+  PATH; use `%USERPROFILE%\.platformio\penv\Scripts\pio.exe`.
+- To skip the Add Machine dialog in a fresh `--data` folder, put a
+  `fluidtouch_settings.json` in its `sd/` folder (auto-import on first boot).
+  `connection_type` 1 is WiFi (0 is UART). The import restarts the simulator, which drops
+  the `--script` and leaves a second simulator process running; close it before
+  rebuilding or the link step fails with "Permission denied".
+- The classic UI stops reconnecting after a drop; the dialog's Connect button reconnects.
 
 ## 3. People, places, files
 
 | What | Where |
 |------|-------|
 | This repo | `D:\Source Code\Repos\FluidTouch` (origin: `github.com/RainyDayHiker/FluidTouch`) |
-| Upstream | `github.com/jeyeager65/FluidTouch` (inferred from the README's web-installer link; confirm) |
+| Upstream | `github.com/jeyeager65/FluidTouch` (remote `upstream`) |
 | CNC-Tools (G-code Editor, TypeScript core and its specs) | `D:\Source Code\Repos\CNC-Tools\gcode-editor` |
 | Reference job (789 KB, 14,189 lines, ~75% arcs) | `%OneDrive%\Hobbies\CNC\Spoilboard\Spoilboard_DogHoles.gcode` |
 | Laser macro in use today | `%OneDrive%\Hobbies\CNC\Config\FluidTouch\macros\laser_offset.gcode` (`G91`, `G0 X33.6 Y-28.2`, `G90`) |
@@ -58,10 +82,9 @@ and pause with `M0 (MSG ...)` for bit insertion, probing and tool changes.
 - `custom_sdkconfig = CONFIG_SPIRAM_XIP_FROM_PSRAM=y` (code runs from PSRAM; fixes display
   flicker). This uses PSRAM; free PSRAM is unmeasured (spike S2).
 - `include/lv_conf.h`: `LV_MEM_SIZE` 1 MB, `LV_USE_CANVAS 1`, 16-bit colour, no vector graphics.
-- `src/network/fluidnc_client.cpp` calls into the UI directly in about six places
-  (around lines 937, 975, 978, 1221, 1224: `UICommon` connection popups; around 1187:
-  `UITabControlProbe::updateResult`). These are what the listener interface replaces.
-  The header also includes `ui/machine_config.h`.
+- `src/network/fluidnc_client.cpp` called into the UI directly in six places (connection
+  popups, probe result). Replaced by `FluidNCClientListener` in M1. The header still
+  includes `ui/machine_config.h`.
 - Job progress: status field `SD:<percent>,<filename>` parsed around line 1121 into
   `FluidNCStatus.is_sd_printing / sd_percent / sd_filename`. No line number is reported.
 - `FluidNCStatus::isIdle()` treats a running file as busy even when FluidNC reports Idle
@@ -76,8 +99,8 @@ and pause with `M0 (MSG ...)` for bit insertion, probing and tool changes.
 - Simulator compiles the real `src/ui`, `main.cpp` and `fluidnc_client.cpp` against shims in
   `sim/`; `sim/tools/fake_fluidnc.py` handles status, `$G`, jog, home, zero, overrides,
   hold/resume, file listing. It does **not** run jobs or serve HTTP.
-- `.github/workflows/` has `build-firmware.yml` and `build-branch-preview.yml`. Not read in
-  detail: check what they trigger on and publish before pushing new branches.
+- `.github/workflows/` has `build-firmware.yml` (tags `v*.*.*`: release and web installer)
+  and `build-branch-preview.yml` (feature/fix/dev branches: preview on gh-pages). See §1.
 
 **CNC-Tools `gcode-editor/packages/core/src`** (what `lib/gcode` ports)
 
@@ -96,8 +119,6 @@ operation does not exist there yet.
 - Upload reliability for multi-MB files (S4).
 - OneDrive sign-in from the ESP32. Microsoft documents the device authorization grant as
   working with personal accounts; nothing was tried (S5).
-- Whether `build/local-config-overrides` has commits that are not in upstream or in `main`.
-- The upstream URL.
 
 ## 6. Planning artefacts outside the repo
 
