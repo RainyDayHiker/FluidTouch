@@ -23,7 +23,8 @@ motion to finish (M0, G4, G10, G38), and gone once the last line is read.
 M0 holds until cycle start (~), G38.2 probes (contact at 60% of the travel)
 and sends [PRB:x,y,z:1], feed hold pauses, and a reset aborts (ALARM:3 if it
 was moving). Motion lines sent directly are played the same way, so a probe
-can be tried with e.g. "G38.2 Z-10 F100".
+can be tried with e.g. "G38.2 Z-10 F100"; lines sent while one runs queue
+behind it.
 
 HTTP is served on the same port, as FluidNC 4 does: GET /sd/<path> downloads a
 file, /upload lists, creates, deletes and takes multipart uploads for the SD
@@ -88,6 +89,8 @@ class Machine:
         # Job playback (see run_job)
         self.job = None            # Job being played, also for a single direct line
         self.task = None
+        self.direct_lines = []     # G-code lines sent directly, waiting to be played
+        self.direct_running = False
         self.holding = False       # feed hold or M0, until cycle start
         self.abort = False
         self.absolute = True       # G90 / G91
@@ -384,6 +387,25 @@ def start_job(m, data: bytes, path=None):
     return True
 
 
+def queue_direct_line(m, line):
+    m.direct_lines.append(line)
+    if not m.direct_running:
+        m.direct_running = True
+        m.task = asyncio.get_event_loop().create_task(run_direct_lines(m))
+
+
+async def run_direct_lines(m):
+    """Plays queued direct lines one after the other; an alarm or a reset drops the rest."""
+    try:
+        while m.direct_lines and m.state != "Alarm":
+            await run_job(m, Job(m.direct_lines.pop(0).encode()))
+            if m.abort:
+                break
+    finally:
+        m.direct_lines.clear()
+        m.direct_running = False
+
+
 def load_job_file(sd_root, path):
     """-> file contents for $SD/Run, or None if there is no such file."""
     if sd_root is None:
@@ -616,9 +638,11 @@ class Session:
                 espnow_server.command(self, up[len("$ESPNOW/"):])
             else:
                 self.send("error:3")
-        elif up[0] in "GMXYZF" and not m.busy() and m.state in ("Idle", "Jog"):
-            # A G-code line sent directly is played like a one-line job
-            start_job(m, line.encode())
+        elif up[0] in "GMXYZF" and (m.direct_running or (not m.busy() and m.state in ("Idle", "Jog"))):
+            # A G-code line sent directly is played like a one-line job.
+            # Lines sent while one runs queue behind it, as in FluidNC
+            # (e.g. "G91" then "G38.2 ..." from a probe button).
+            queue_direct_line(m, line)
             self.send("ok")
         else:
             self.send("ok")

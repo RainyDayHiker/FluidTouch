@@ -25,7 +25,9 @@ hold, reset, overrides, `$sim/speed`, `$sim/probemiss`, `$sim/drop`; details in
 (download, listing, multipart upload with size check, create, delete, rename,
 `$sim/httprate`, `$sim/httpblock`). Lines typed in the fake's own console are passed to every connected client's
 session (for the `$sim/...` helpers, since the new UI has no terminal yet), and feed hold
-(`!`) behaves as on FluidNC: it ends a jog and is ignored when idle.
+(`!`) behaves as on FluidNC: it ends a jog and is ignored when idle. G-code lines sent
+directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38.2` and
+`G90` back to back); before M2 a line that arrived while another ran was dropped.
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
 that the Run screen has to cope with; none has been measured on the controller, which is
