@@ -66,7 +66,8 @@ git push -u origin lrt/main
   repository to `RainyDayHiker/FluidTouch`; GitHub defaults to the upstream repo).
 - Merge with a merge commit, not squash, so `platform` commits stay separate.
 - Before merging: firmware builds, simulator builds, the library test runner passes (from
-  M4), and the classic UI still starts in the simulator.
+  M4), and the classic UI still starts in the simulator. CI checks all of these on the
+  pushed topic branch (§7).
 
 ## 5. Taking upstream changes
 
@@ -93,11 +94,25 @@ them.
 
 ## 7. CI
 
-The repo has upstream's workflows (`build-firmware.yml`, `build-branch-preview.yml`). Before
-the first push of `lrt/main`, read what they trigger on and what they publish (releases, the
-web installer on GitHub Pages) and restrict or disable anything that would publish from
-`lrt/*` branches. Add a workflow for `lrt/**` that builds the Advance v1.3 firmware and the
-simulator and, from M4, runs the `lib/gcode` tests. Each such change is a `build:` commit.
+Upstream's two workflows stay as they are. `build-firmware.yml` runs on `v*.*.*` tags and
+publishes a release and the web installer; `build-branch-preview.yml` runs on `feature/**`,
+`feat/**`, `fix/**`, `bugfix/**` and `dev` and commits a preview build to `gh-pages`. Neither
+runs on `lrt/**` branches or `lrt-*` tags. Don't push a `v*.*.*` tag to the fork.
+
+`build-lrt.yml` runs on every push to `lrt/**` and on pull requests to `lrt/main`. It
+publishes nothing; the firmware and the smoke screenshots are kept as workflow artifacts for
+14 days. Three jobs:
+
+| Job | Does |
+|-----|------|
+| Firmware | `pio run -e elecrow-crowpanel-7-advance-v13` |
+| Simulator | Builds on Windows with MSYS2, runs `xmodem_sender_test`, then `sim/tools/smoke_test.sh`: the simulator is started without a window with fresh settings (new UI) and with the UI mode set to classic, and each must reach its start-up line and produce a screenshot |
+| Fake FluidNC | `python sim/tools/test_fake_fluidnc.py` (job playback and HTTP) |
+
+From M4 it also runs the `lib/gcode` tests. Each change to it is a `build:` commit.
+
+Before merging a topic branch locally, the same checks are: both builds, and
+`bash sim/tools/smoke_test.sh` from Git Bash or MSYS2.
 
 ## 8. CNC-Tools
 

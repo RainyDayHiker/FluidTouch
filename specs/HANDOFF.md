@@ -53,18 +53,14 @@ has since done the setup and the first M1 step.
   long the screen freezes during a connection attempt while the controller is off
   ([02 §4](02-architecture.md#4-services)); the size of the STOP touch area.
 - **No spikes have been run** ([06 §2](06-test-and-spikes.md#2-spikes)).
-- CI: upstream's two workflows trigger on `v*.*.*` tags and on `feature/**`, `feat/**`,
-  `fix/**`, `bugfix/**`, `dev` branches. Nothing triggers on `lrt/**` or `lrt-*` tags, so
-  pushing those publishes nothing. `fix/<topic>` branches do match; see
-  [09 §2](09-git-workflow.md#2-branches). No `lrt/**` workflow exists yet
-  ([09 §7](09-git-workflow.md#7-ci)).
+- CI: `build-lrt.yml` runs on pushes to `lrt/**` (firmware, simulator with a two-UI smoke
+  test, fake FluidNC test) and publishes nothing; see [09 §7](09-git-workflow.md#7-ci).
+  Upstream's two workflows don't run on `lrt/**` or `lrt-*` tags; `fix/<topic>` branches do
+  match their preview workflow ([09 §2](09-git-workflow.md#2-branches)).
 
 ## 2. Next steps
 
-1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
-   `lrt/m1-<topic>` branch:
-   1. `build:` commit adding a CI workflow for `lrt/**` (firmware, simulator,
-      `python sim/tools/test_fake_fluidnc.py`).
+1. The PC side of M1 ([08](08-milestones.md)) is done. What is left needs the device.
 2. Flash the M1 build and go through the device points in §1. Run spike S2 from
    Settings > "Draw test (spike S2)" and fill in the table in
    [06](06-test-and-spikes.md#s2-procedure).
