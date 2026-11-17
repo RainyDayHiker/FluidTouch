@@ -8,7 +8,8 @@ Sections 1 and 2 are rewritten at the end of each working session.
 session starts M3.**
 
 Git: `main` (equal to `upstream/main`) and `lrt/main`, locally and on the fork, in sync.
-CI (`build-lrt.yml`) passed on the last Setup commit. Use
+CI (`build-lrt.yml`) passed on the last Setup commit. Tag `lrt-m2` marks the build on the
+machine (the merge of `lrt/m2-setup`, 80b3abe). Use
 `gh run list -R RainyDayHiker/FluidTouch --branch lrt/main --limit 1`: without `-R`, `gh`
 looks at upstream's repository.
 
@@ -59,17 +60,14 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
 
 ## 2. Next steps
 
-1. **Tag** the build now on the machine, if Jeffrey agrees: `lrt-m1` and/or `lrt-m2` at the
-   merge of `lrt/m2-setup` ([09 §6](09-git-workflow.md#6-tags-and-versions)). No tag exists
-   yet.
-2. **Start M3** ([08](08-milestones.md)): Job list from the controller's and the display's
+1. **Start M3** ([08](08-milestones.md)): Job list from the controller's and the display's
    SD (no preview), start panel, Run screen (Prompt state for `M0`, pause, abort, overrides,
    progress, times), Macros, Settings pages, upload from the display SD; S3 and S4. Review
    each screen's control list with Jeffrey before building it, as was done for Setup.
-3. Settings (M3) takes over from classic Settings > Jog and Probe for: jog step lists and
+2. Settings (M3) takes over from classic Settings > Jog and Probe for: jog step lists and
    default steps, XY and Z jog feeds, joystick Max XY feed, probe feed and distance, laser
    offset, probe back-off. Save on an explicit action, changed keys only (D44, D45).
-4. Small things still open from the device: S1 while a job runs, and the value of
+3. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.
 
 How this session worked: topic branches merged locally into `lrt/main` with a merge commit
