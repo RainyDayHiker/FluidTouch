@@ -44,12 +44,38 @@ void setEnabled(lv_obj_t *btn, bool enabled) {
 void setButtonColor(lv_obj_t *btn, lv_color_t color) {
     // The local value, not the drawn one, which differs while disabled
     lv_style_value_t current;
-    if (lv_obj_get_local_style_prop(btn, LV_STYLE_BG_COLOR, &current, LV_PART_MAIN | LV_STATE_DEFAULT) ==
+    if (lv_obj_get_local_style_prop(btn, LV_STYLE_BG_COLOR, &current, 0) ==
             LV_STYLE_RES_FOUND &&
         lv_color_eq(current.color, color)) {
         return;
     }
     lv_obj_set_style_bg_color(btn, color, 0);
+}
+
+// Image recolour is not inherited, so the icons follow the button's state
+static void onIconButtonState(lv_event_t *e) {
+    lv_obj_t *btn = (lv_obj_t *)lv_event_get_current_target(e);
+    lv_color_t color = lv_obj_get_style_text_color(btn, LV_PART_MAIN);
+    uint32_t count = lv_obj_get_child_count(btn);
+    for (uint32_t i = 0; i < count; i++) {
+        lv_obj_t *child = lv_obj_get_child(btn, i);
+        if (lv_obj_check_type(child, &lv_image_class)) lv_obj_set_style_image_recolor(child, color, 0);
+    }
+}
+
+lv_obj_t *addIcon(lv_obj_t *btn, const lv_image_dsc_t *icon, bool before) {
+    if (lv_obj_get_style_layout(btn, LV_PART_MAIN) != LV_LAYOUT_FLEX) {
+        lv_obj_set_flex_flow(btn, LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(btn, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        lv_obj_set_style_pad_column(btn, 8, 0);
+        lv_obj_add_event_cb(btn, onIconButtonState, LV_EVENT_STATE_CHANGED, nullptr);
+    }
+    lv_obj_t *img = lv_image_create(btn);
+    lv_image_set_src(img, icon);
+    lv_obj_set_style_image_recolor_opa(img, LV_OPA_COVER, 0);
+    lv_obj_set_style_image_recolor(img, lv_obj_get_style_text_color(btn, LV_PART_MAIN), 0);
+    if (before) lv_obj_move_to_index(img, 0);
+    return img;
 }
 
 lv_obj_t *label(lv_obj_t *parent, int x, int y, const lv_font_t *font, lv_color_t color, const char *text) {

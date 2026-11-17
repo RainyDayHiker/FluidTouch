@@ -20,6 +20,11 @@ void setEnabled(lv_obj_t *btn, bool enabled);
 // Sets a button's background (normal state); does nothing when unchanged
 void setButtonColor(lv_obj_t *btn, lv_color_t color);
 
+// Adds an alpha-only (A8) icon to a button made with button(), before or
+// after its label; the label and icons are then laid out in a centred row.
+// The icon is drawn in the button's text colour, dim while it is disabled.
+lv_obj_t *addIcon(lv_obj_t *btn, const lv_image_dsc_t *icon, bool before = true);
+
 // A label at a fixed position
 lv_obj_t *label(lv_obj_t *parent, int x, int y, const lv_font_t *font, lv_color_t color, const char *text);
 

@@ -43,18 +43,21 @@ the Job tab (D33).
 +--------------------------------------------------------------------------------+
 | [H All] [0 All] | [H Z] [0 Z] [H XY] [0 XY] |                 [Unlock] [Reset]  |
 +--------------------------------------------+----------------+-----------------+
-| [100][50][10][1][0.1]                      | [ Z+ ] [50]    | Limits o X o Y o Z |
-|                                            | [    ] [25]    | Probe o          |
-|   [<^]     [ ^ ]     [^>]                  |        [10]    | [ Laser > bit ]  |
-|   [ < ]   10 mm      [ > ]                 | [ Z- ] [1]     | [b>l]            |
-|   [<v]     [ v ]     [v>]                  | [    ] [0.1]   | [ Probe Z ... ]  |
+| [100] |  [<^]   [ ^ ]   [^>]               |  [ Z+ ] [50]   | Limits o X o Y o Z |
+| [50]  |                                    |  [    ] [25]   | Probe o          |
+| [10]  |  [ < ]  3000    [ > ]              |   1000  [10]   | [ (+) > bit ]    |
+| [1]   |         mm/min                     |  mm/min [1]    | [ bit > (+) ]    |
+| [0.1] |  [<v]   [ v ]   [v>]               |  [ Z- ] [0.1]  | [ Probe Z ]      |
 +--------------------------------------------+----------------+-----------------+
-  H = home icon, 0 = zero icon; arrows as in the classic jog tab
+  H = home icon, 0 = zero icon (a slashed zero), (+) = laser crosshair icon,
+  bit = end mill icon; arrows as in the classic jog tab
 ```
 
 Exact positions are settled when the screen is built; the order and grouping above are the
 spec. Home buttons are green and zero buttons amber; the jog pad is coloured by axis as in
-the classic jog tab (X blue, Y green, diagonals teal, Z purple).
+the classic jog tab (X blue, Y green, diagonals teal, Z purple). The jog pad's buttons are
+square; Z+/Z- and the step buttons are no larger than needed, leaving space around the
+groups (D41).
 
 | Control | Sends | Notes |
 |---------|-------|-------|
@@ -63,13 +66,13 @@ the classic jog tab (X blue, Y green, diagonals teal, Z purple).
 | Zero all / Zero Z / Zero XY | `G10 L20 P0 X0 Y0 Z0` / `... Z0` / `... X0 Y0` | Zero all is the everyday one; the other two are smaller |
 | Unlock | `$X` | Highlighted in ALARM |
 | Reset | soft reset (0x18) | Kept at the far right, away from the jog pad |
-| Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre shows the selected step. Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
-| Z+/Z- | `$J=G91 G21 Z.. F..` | Left of the Z step selector |
-| Step selectors | | XY: 100, 50, 10, 1, 0.1 mm, in a row above the pad. Z: 50, 25, 10, 1, 0.1 mm, in a column right of Z+/Z-. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
-| Jog feeds | | Not on Setup. XY and Z jog feeds are set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
-| Laser -> bit | `$J=G91 G21 X33.6 Y-28.2 F..` | Offset from Settings (defaults from `laser_offset.gcode`). A jog, so it can be cancelled and leaves G90/G91 alone. XY jog feed |
-| b>l | The reverse move | Small: rarely used (D21) |
-| Probe Z ... | Opens a pop-up: what it will do (feed, max distance from Settings), [Probe], [Close], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, then restores the G90/G91 that was active. Classic's probe thickness and retract are not used. Reports the probed Z only: it does not set zero or retract. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
+| Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre shows the XY jog feed (D41). Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
+| Z+/Z- | `$J=G91 G21 Z.. F..` | Left of the Z step selector; the Z jog feed is shown between them (D41) |
+| Step selectors | | XY: 100, 50, 10, 1, 0.1 mm, in a column left of the pad. Z: 50, 25, 10, 1, 0.1 mm, in a column right of Z+/Z-. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
+| Jog feeds | | Shown on Setup, not changed there. XY and Z jog feeds are set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
+| Laser -> bit | `$J=G91 G21 X33.6 Y-28.2 F..` | Shown as crosshair icon > end mill icon. Offset from Settings (defaults from `laser_offset.gcode`). A jog, so it can be cancelled and leaves G90/G91 alone. XY jog feed |
+| Bit -> laser | The reverse move | End mill icon > crosshair icon, same size as Laser -> bit (D21, D41) |
+| Probe Z | Opens a pop-up: what it will do (feed, max distance from Settings), [Probe], [Close], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, then restores the G90/G91 that was active. Classic's probe thickness and retract are not used. Reports the probed Z only: it does not set zero or retract. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
 | Limit and probe dots | | From the `Pn:` field of the status report; lit while the pin is active |
 
 Buttons are greyed out only in states that last, so nothing flickers while jogging (D38):

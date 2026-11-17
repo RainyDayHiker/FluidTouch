@@ -43,7 +43,8 @@
 | D37 | Setup has Home XY: `$HX`, then `$HY` once the X cycle has ended (2026-11-17) | `$H` only; Home X and Home Y as separate buttons | Re-homing XY without touching Z. The classic UI uses the same commands; FluidNC takes one named axis per `$H` |
 | D38 | Setup greys out buttons only in lasting states (offline, alarm, job). A press that can't be sent at the moment (e.g. Zero during a jog) is not sent, and the status bar says why (2026-11-17) | Greying out by the current state, including JOG and HOME; queueing the press until idle | Greying out by state made the screen flicker during every jog |
 | D39 | The status bar is 64 px: state, WiFi and STOP full height; between them, positions on one row and the last FluidNC message on the other. Content is 800 x 360 (2026-11-17) | 48 px bar without messages | The classic UI's message box is useful |
-| D40 | Setup has no Go to XY zero and no feed controls; Bit -> laser is a small "b>l" button; Z+/Z- are left of the Z steps; home and zero buttons show icons (2026-11-17) | The first M2 layout | Seen on screen: rarely used controls removed, more room for jogging |
+| D40 | Setup has no Go to XY zero and no feed controls; Z+/Z- are left of the Z steps; home and zero buttons show icons (2026-11-17) | The first M2 layout | Seen on screen: rarely used controls removed, more room for jogging |
+| D41 | Setup, second pass: the XY steps are a column left of a square jog pad; the pad's centre shows the XY jog feed and the gap between Z+ and Z- the Z jog feed; Z+/Z- and the step buttons are narrower; laser and bit moves are two equal buttons drawn as crosshair and end mill icons; zero is a slashed-zero icon drawn for this UI (`src/app/icons/make_icons.py`) (2026-11-17) | Steps in a row above the pad; the step shown in the pad's centre; a small "b>l" text button (D40) | Seen on screen: the step is already visible on its selector, the feed is not; square arrows; space around the controls |
 
 ## Open questions
 

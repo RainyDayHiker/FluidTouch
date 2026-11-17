@@ -1,6 +1,7 @@
 #include "app/screens/screens.h"
 #include "app/frame.h"
 #include "app/widgets.h"
+#include "app/icons/icons.h"
 #include "services/machine_service.h"
 #include "services/settings_service.h"
 #include "ui/ui_theme.h"
@@ -11,7 +12,7 @@
 // order of a session. Content area 800 x 360:
 //
 //   y   8..64   Home all, Zero all | Home Z, Zero Z, Home XY, Zero XY | Unlock, Reset
-//   y  72..352  XY steps over the jog pad | Z+/Z-, Z steps | pins, laser, probe
+//   y  72..352  XY steps, jog pad | Z+/Z-, Z steps | pins, laser, probe
 //
 // Buttons are greyed out only in states that last (offline, alarm, a job
 // running), so nothing flickers while jogging. A press that can't be sent
@@ -31,10 +32,15 @@ const lv_color_t COLOR_HOME = LV_COLOR_MAKE(0x2E, 0x7D, 0x32);
 const lv_color_t COLOR_ZERO = LV_COLOR_MAKE(0xB2, 0x6A, 0x00);
 const lv_color_t COLOR_LASER = LV_COLOR_MAKE(0x8E, 0x24, 0x4A);
 
-const int PAD_X = 8, PAD_W = 400;       // XY steps and jog pad
-const int Z_X = 428;                    // Z+/Z- then Z steps
-const int RIGHT_X = 644, RIGHT_W = 148; // pins, laser, probe
-const int LOWER_Y = 72;
+const int LOWER_Y = 72;                 // below the top row; 280 px high
+const int STEP_W = 68, STEP_H = 56;     // step selector buttons
+const int XY_STEP_X = 8;                // XY steps, a column left of the pad
+const int PAD_X = 92, PAD_CELL = 88, PAD_GAP = 8;  // 3 x 3 square jog pad
+const int DIVIDER1_X = 396;
+const int Z_X = 436, Z_W = 72;          // Z+/Z-, then the Z steps
+const int Z_STEP_X = Z_X + Z_W + 12;
+const int DIVIDER2_X = 628;
+const int RIGHT_X = 652, RIGHT_W = 140; // pins, laser, probe
 
 SettingsService::Jog jog;
 
@@ -46,7 +52,6 @@ lv_obj_t *unlockButton;
 lv_obj_t *resetButton;
 lv_obj_t *xyStepButtons[SettingsService::MAX_STEPS];
 lv_obj_t *zStepButtons[SettingsService::MAX_STEPS];
-lv_obj_t *stepDisplay;                  // centre of the jog pad
 int xyStepIndex = 0;
 int zStepIndex = 0;
 
@@ -84,9 +89,6 @@ void showSteps() {
     for (int i = 0; i < jog.zStepCount; i++) {
         setButtonColor(zStepButtons[i], i == zStepIndex ? UITheme::ACCENT_PRIMARY : UITheme::BG_BUTTON);
     }
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%g mm", jog.xySteps[xyStepIndex]);
-    setText(stepDisplay, buf);
 }
 
 // Steps that touch each other, like one control
@@ -101,6 +103,18 @@ void makeSteps(lv_obj_t *parent, int x, int y, int w, int h, bool vertical, cons
         lv_obj_set_style_border_width(b, 1, 0);
         lv_obj_set_style_border_color(b, UITheme::BG_DARKER, 0);
         out[i] = other(b);
+    }
+}
+
+// The jog feed, centred in a box: the value, "mm/min" under it
+void feedLabel(lv_obj_t *parent, int x, int y, int w, int h, int feed) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", feed);
+    lv_obj_t *value = label(parent, x, y + h / 2 - 22, FONT_MID, UITheme::TEXT_LIGHT, buf);
+    lv_obj_t *unit = label(parent, x, y + h / 2 + 2, FONT_SMALL, UITheme::TEXT_MEDIUM, "mm/min");
+    for (lv_obj_t *l : {value, unit}) {
+        lv_obj_set_width(l, w);
+        lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     }
 }
 
@@ -239,19 +253,22 @@ void onProbe(lv_event_t *) {
 void createTopRow(lv_obj_t *parent) {
     // The everyday pair, wider
     homeButtons[0] = button(parent, 8, 8, 112, 56, LV_SYMBOL_HOME "  All", FONT_BIG, onHome, (void *)0);
-    other(button(parent, 128, 8, 112, 56, LV_SYMBOL_GPS "  All", FONT_BIG, onZero,
-                 (void *)(intptr_t)MachineService::AXES_XYZ));
+    lv_obj_t *zeroAll = other(button(parent, 128, 8, 112, 56, "All", FONT_BIG, onZero,
+                                     (void *)(intptr_t)MachineService::AXES_XYZ));
 
     // The occasional ones: Z, then XY
     homeButtons[1] = button(parent, 256, 8, 88, 56, LV_SYMBOL_HOME "  Z", FONT_MID, onHome, (void *)1);
-    other(button(parent, 350, 8, 88, 56, LV_SYMBOL_GPS "  Z", FONT_MID, onZero,
-                 (void *)(intptr_t)MachineService::AXIS_Z));
+    lv_obj_t *zeroZ = other(button(parent, 350, 8, 88, 56, "Z", FONT_MID, onZero,
+                                   (void *)(intptr_t)MachineService::AXIS_Z));
     homeButtons[2] = button(parent, 444, 8, 88, 56, LV_SYMBOL_HOME "  XY", FONT_MID, onHome, (void *)2);
-    other(button(parent, 538, 8, 88, 56, LV_SYMBOL_GPS "  XY", FONT_MID, onZero,
-                 (void *)(intptr_t)MachineService::AXES_XY));
+    lv_obj_t *zeroXY = other(button(parent, 538, 8, 88, 56, "XY", FONT_MID, onZero,
+                                    (void *)(intptr_t)MachineService::AXES_XY));
 
     for (lv_obj_t *b : homeButtons) setButtonColor(b, COLOR_HOME);
-    for (int i = 0; i < 3; i++) setButtonColor(otherButtons[i], COLOR_ZERO);
+    for (lv_obj_t *b : {zeroAll, zeroZ, zeroXY}) {
+        setButtonColor(b, COLOR_ZERO);
+        addIcon(b, &ICON_ZERO);
+    }
 
     // Far right, away from the jog pad (S2)
     unlockButton = button(parent, 644, 8, 72, 56, "Unlock", FONT_MID, onUnlock);
@@ -260,41 +277,42 @@ void createTopRow(lv_obj_t *parent) {
 }
 
 void createXY(lv_obj_t *parent) {
-    makeSteps(parent, PAD_X, LOWER_Y, PAD_W / 5, 56, false, jog.xySteps, jog.xyStepCount, xyStepButtons, onXYStep);
+    makeSteps(parent, XY_STEP_X, LOWER_Y, STEP_W, STEP_H, true, jog.xySteps, jog.xyStepCount, xyStepButtons,
+              onXYStep);
 
-    // 3 x 3 pad, Y+ up; the arrows as in the classic jog tab, turned 45
-    // degrees on the diagonals. The centre shows the step.
+    // 3 x 3 square pad, Y+ up; the arrows as in the classic jog tab, turned
+    // 45 degrees on the diagonals. The centre shows the XY jog feed.
     static const char *const icons[3][3] = {
         {LV_SYMBOL_UP, LV_SYMBOL_UP, LV_SYMBOL_UP},
         {LV_SYMBOL_LEFT, nullptr, LV_SYMBOL_RIGHT},
         {LV_SYMBOL_DOWN, LV_SYMBOL_DOWN, LV_SYMBOL_DOWN},
     };
     static const int16_t angles[3][3] = {{-450, 0, 450}, {0, 0, 0}, {450, 0, -450}};
-    const int w = 128, h = 68, gap = 8;
     for (int row = 0; row < 3; row++) {
         for (int col = 0; col < 3; col++) {
-            int x = PAD_X + col * (w + gap);
-            int y = LOWER_Y + 64 + row * (h + 6);
+            int x = PAD_X + col * (PAD_CELL + PAD_GAP);
+            int y = LOWER_Y + row * (PAD_CELL + PAD_GAP);
             if (!icons[row][col]) {
-                stepDisplay = label(parent, x, y + 24, FONT_MID, UITheme::TEXT_MEDIUM, "");
-                lv_obj_set_width(stepDisplay, w);
-                lv_obj_set_style_text_align(stepDisplay, LV_TEXT_ALIGN_CENTER, 0);
+                feedLabel(parent, x, y, PAD_CELL, PAD_CELL, jog.xyFeed);
                 continue;
             }
             int dx = col - 1;
             int dy = 1 - row;
             lv_color_t color = dx && dy ? UITheme::AXIS_XY : (dx ? UITheme::AXIS_X : UITheme::AXIS_Y);
-            other(iconButton(parent, x, y, w, h, icons[row][col], angles[row][col], nullptr, color, onPad,
-                             (void *)(intptr_t)((dx + 1) * 3 + (dy + 1))));
+            other(iconButton(parent, x, y, PAD_CELL, PAD_CELL, icons[row][col], angles[row][col], nullptr, color,
+                             onPad, (void *)(intptr_t)((dx + 1) * 3 + (dy + 1))));
         }
     }
 }
 
 void createZ(lv_obj_t *parent) {
-    other(iconButton(parent, Z_X, LOWER_Y, 100, 134, LV_SYMBOL_UP, 0, "Z+", UITheme::AXIS_Z, onZ, (void *)1));
-    other(iconButton(parent, Z_X, LOWER_Y + 146, 100, 134, LV_SYMBOL_DOWN, 0, "Z-", UITheme::AXIS_Z, onZ,
+    // Z+ and Z- with the Z jog feed between them
+    const int h = 108, gap = 280 - 2 * h;
+    other(iconButton(parent, Z_X, LOWER_Y, Z_W, h, LV_SYMBOL_UP, 0, "Z+", UITheme::AXIS_Z, onZ, (void *)1));
+    feedLabel(parent, Z_X, LOWER_Y + h, Z_W, gap, jog.zFeed);
+    other(iconButton(parent, Z_X, LOWER_Y + h + gap, Z_W, h, LV_SYMBOL_DOWN, 0, "Z-", UITheme::AXIS_Z, onZ,
                      (void *)(intptr_t)-1));
-    makeSteps(parent, Z_X + 108, LOWER_Y, 88, 56, true, jog.zSteps, jog.zStepCount, zStepButtons, onZStep);
+    makeSteps(parent, Z_STEP_X, LOWER_Y, STEP_W, STEP_H, true, jog.zSteps, jog.zStepCount, zStepButtons, onZStep);
 }
 
 void createRight(lv_obj_t *parent) {
@@ -302,21 +320,25 @@ void createRight(lv_obj_t *parent) {
     label(parent, RIGHT_X, LOWER_Y, FONT_SMALL, UITheme::TEXT_MEDIUM, "Limits");
     static const char *const names[3] = {"X", "Y", "Z"};
     for (int i = 0; i < 3; i++) {
-        pinDots[i] = pinDot(parent, RIGHT_X + i * 50, LOWER_Y + 27);
-        label(parent, RIGHT_X + 16 + i * 50, LOWER_Y + 24, FONT_SMALL, UITheme::TEXT_LIGHT, names[i]);
+        pinDots[i] = pinDot(parent, RIGHT_X + i * 46, LOWER_Y + 27);
+        label(parent, RIGHT_X + 16 + i * 46, LOWER_Y + 24, FONT_SMALL, UITheme::TEXT_LIGHT, names[i]);
     }
     label(parent, RIGHT_X, LOWER_Y + 48, FONT_SMALL, UITheme::TEXT_MEDIUM, "Probe");
-    pinDots[3] = pinDot(parent, RIGHT_X + 50, LOWER_Y + 51);
+    pinDots[3] = pinDot(parent, RIGHT_X + 46, LOWER_Y + 51);
 
-    // Laser -> bit is the everyday move; bit -> laser is rare (D21), so small
-    lv_obj_t *toBit = other(button(parent, RIGHT_X, LOWER_Y + 80, RIGHT_W, 56, "Laser " LV_SYMBOL_RIGHT " bit",
-                                   FONT_MID, onLaser, (void *)1));
-    lv_obj_t *toLaser = other(button(parent, RIGHT_X, LOWER_Y + 144, 72, 56, "b>l", FONT_MID, onLaser,
-                                     (void *)(intptr_t)-1));
+    // Laser crosshair -> bit, and back (D21)
+    lv_obj_t *toBit = other(button(parent, RIGHT_X, LOWER_Y + 80, RIGHT_W, 56, LV_SYMBOL_RIGHT, FONT_MID, onLaser,
+                                   (void *)1));
+    addIcon(toBit, &ICON_CROSSHAIR, true);
+    addIcon(toBit, &ICON_BIT, false);
+    lv_obj_t *toLaser = other(button(parent, RIGHT_X, LOWER_Y + 144, RIGHT_W, 56, LV_SYMBOL_RIGHT, FONT_MID,
+                                     onLaser, (void *)(intptr_t)-1));
+    addIcon(toLaser, &ICON_BIT, true);
+    addIcon(toLaser, &ICON_CROSSHAIR, false);
     setButtonColor(toBit, COLOR_LASER);
     setButtonColor(toLaser, COLOR_LASER);
 
-    other(button(parent, RIGHT_X, LOWER_Y + 224, RIGHT_W, 56, "Probe Z ...", FONT_MID, onProbeOpen));
+    other(button(parent, RIGHT_X, LOWER_Y + 224, RIGHT_W, 56, "Probe Z", FONT_MID, onProbeOpen));
 }
 
 void createProbePopup(lv_obj_t *parent) {
@@ -384,9 +406,9 @@ void SetupScreen::create(lv_obj_t *parent) {
     createTopRow(parent);
     divider(parent, 8, LOWER_Y - 4 - 1, 784, 1);
     createXY(parent);
-    divider(parent, Z_X - 11, LOWER_Y + 4, 1, 272);
+    divider(parent, DIVIDER1_X, LOWER_Y + 4, 1, 272);
     createZ(parent);
-    divider(parent, RIGHT_X - 11, LOWER_Y + 4, 1, 272);
+    divider(parent, DIVIDER2_X, LOWER_Y + 4, 1, 272);
     createRight(parent);
     createProbePopup(parent);
     showSteps();
