@@ -69,6 +69,11 @@ has since done the setup and the first M1 step.
 
 ### Working notes for the simulator
 
+- Firmware builds on this PC depend on `%USERPROFILE%\.platformio\penv` holding `pioarduino`
+  6.2.0. If that folder is ever recreated (Python upgrade, deleted cache) the build fails
+  with "not compatible with PlatformIO Core v6.2.0-post.1"; fix it with
+  `%USERPROFILE%\.platformio\penv\Scripts\python -m pip install pioarduino==6.2.0`
+  ([09 §7](09-git-workflow.md#7-ci)).
 - MSYS2 is installed at `C:\msys64` (UCRT64 gcc, SDL2, cmake, ninja). `pio` is not on
   PATH; use `%USERPROFILE%\.platformio\penv\Scripts\pio.exe`.
 - To skip the Add Machine dialog in a fresh `--data` folder, put a

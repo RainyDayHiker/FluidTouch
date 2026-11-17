@@ -109,6 +109,12 @@ publishes nothing; the firmware and the smoke screenshots are kept as workflow a
 | Simulator | Builds on Windows with MSYS2, runs `xmodem_sender_test`, then `sim/tools/smoke_test.sh`: the simulator is started without a window with fresh settings (new UI) and with the UI mode set to classic, and each must reach its start-up line and produce a screenshot |
 | Fake FluidNC | `python sim/tools/test_fake_fluidnc.py` (job playback and HTTP) |
 
+The firmware job pins two things that a fresh machine would otherwise get wrong with the
+platform version in `platformio.ini`: Python 3.13 (the platform refuses 3.15), and the
+platform's own PlatformIO core, `pioarduino`, at 6.2.0 (6.2.0.post1 fails the platform's
+version check). Review both when the platform version changes, e.g. after an upstream merge.
+Upstream's two workflows have neither pin.
+
 From M4 it also runs the `lib/gcode` tests. Each change to it is a `build:` commit.
 
 Before merging a topic branch locally, the same checks are: both builds, and
