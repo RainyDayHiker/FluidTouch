@@ -69,11 +69,15 @@ public:
 
     // --- What may be done now (specs/03-screens.md section 2, S3) ----------
     // The actions below check these themselves and do nothing otherwise.
-    static bool canHome();    // idle or in alarm, no job
-    static bool canZero();    // idle, no job, no probe (also for probeZ)
-    static bool canMove();    // idle or jogging, no job, no probe: jog and go-to moves
-    static bool canUnlock();  // alarm, idle, or a job runs or is held
+    static bool canHome();    // idle or in alarm, no job, nothing under way
+    static bool canZero();    // idle, no job, nothing under way (also for probeZ)
+    static bool canMove();    // idle or jogging, no job, nothing else under way
+    static bool canUnlock() { return online(); }
     static bool canReset() { return online(); }
+
+    // Why the can*() checks fail at the moment, as a short sentence for the
+    // status bar, e.g. "Wait for the jog to finish."
+    static const char *busyReason();
 
     // --- Actions -----------------------------------------------------------
     // Feed hold, or jog cancel while jogging (S1)
@@ -82,15 +86,14 @@ public:
     static void unlock();
     // Soft reset (0x18)
     static void reset();
-    // $H, or $HZ for Z only
+    // $H; $HZ for Z only; $HX, then $HY once X has finished, for XY
     static void homeAll();
     static void homeZ();
+    static void homeXY();
     // G10 L20 P0 with 0 for each axis in the mask
     static void zero(uint8_t axes);
     // $J=G91 G21 with the axes that are not 0
     static void jogBy(float dx, float dy, float dz, int feed);
-    // $J=G90 G21 X0 Y0
-    static void goToXYZero(int feed);
     // G91, G38.2 Z-maxDistance, then back to G90 if that was active. The
     // result arrives in lastProbe().
     static void probeZ(int maxDistance, int feed);
@@ -133,6 +136,10 @@ private:
     // G90 is still to be sent after a probe: the probe failed into an alarm,
     // which rejects it until unlocked
     static bool restoreG90;
+    // Home XY: $HY is due once the $HX cycle has been seen and has ended
+    enum HomeYStage : uint8_t { HOME_Y_NONE, HOME_Y_WAIT_START, HOME_Y_WAIT_END };
+    static HomeYStage homeYStage;
+    static uint32_t homeYSinceMs;
 };
 
 #endif // LRT_MACHINE_SERVICE_H

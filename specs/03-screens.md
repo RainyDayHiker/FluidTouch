@@ -10,20 +10,24 @@ pixels on the 800 x 480 display. Touch targets are at least 64 x 56.
 |   Setup    |     Job     |     Run     |    Macros    |   Settings             | 56
 +--------------------------------------------------------------------------------+
 |                                                                                |
-|                              screen content  800 x 376                         |
+|                              screen content  800 x 360                         |
 |                                                                                |
 +--------------------------------------------------------------------------------+
-| IDLE  W X123.45 Y67.89 Z15.00   M X223.45 Y167.89 Z-5.00   wifi   [  STOP  ]   | 48
+|       | W X123.45 Y67.89 Z15.00   M X223.45 Y167.89 Z-5.00  |      |           | 64
+| IDLE  | Probe done. Next: insert the 6 mm end mill            | wifi | [ STOP ]  |
 +--------------------------------------------------------------------------------+
 ```
 
-Screen tabs are at the top; the status bar is at the bottom (D27).
+Screen tabs are at the top; the status bar is at the bottom (D27). State, WiFi and STOP
+take the bar's full height; between them, positions are on the first row and the last
+message on the second (D39).
 
 | Element | Behaviour |
 |---------|-----------|
 | State | IDLE, RUN, HOLD, JOG, HOME, ALARM, OFFLINE; colour coded |
 | Position | Work position and machine position, both always visible, in the status bar |
-| STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 40 because the bar is 48 high; its touch area extends 10 px beyond it on every side (64 x 60 effective). Checked on the device: good |
+| Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
+| STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 52; its touch area extends 10 px beyond it on every side. The 104 x 40 button in the 48 px bar was checked on the device: good |
 | Alarm banner | Replaces the status bar: alarm text + Unlock (`$X`). On every screen |
 | Offline banner | Replaces the status bar. The text says whether an attempt is under way or when the next one starts. During an attempt: "Connecting to <machine>..." before the first connection, "Connection lost. Reconnecting..." after a drop; Reconnect is greyed out, because it could do nothing. Between attempts: "No answer from <machine>. Next attempt in N s." or "Connection lost. Next attempt in N s.", counting down; Reconnect starts the attempt at once. While joining WiFi: "Connecting to WiFi <ssid>..." (or "WiFi lost. Reconnecting to <ssid>..."). If a job was running when the link dropped, a second line "The job continues on the controller." Retries happen on their own ([02 §4](02-architecture.md#4-services)) |
 | No-machine banner | Classic machine slot 1 is empty or not a WiFi machine: says so, with a Classic UI button (restart into classic to set it up). Until Settings > Machine exists (M3) |
@@ -32,58 +36,59 @@ Screen tabs are at the top; the status bar is at the bottom (D27).
 ## 2. Setup
 
 Laid out left to right in the order of a session: power on, **home all**, **zero all**, add
-stock, **jog** to the start point (with the laser), **start**.
+stock, **jog** to the start point (with the laser). Choosing and starting the job are on
+the Job tab (D33).
 
 ```
 +--------------------------------------------------------------------------------+
-| [Home all] [Zero all] | [Home Z] [Zero XY] [Zero Z] |  [Unlock]   [Reset]       |
-|                                                        lim X Y Z   probe o     |
-+---------------------------+-----------+----------------------------------------+
-| XY [100][50][10][1][0.1]  | Z [50]    |  [ Laser -> bit ]  [ Bit -> laser ]    |
-|                           |   [25]    |  [ Go to XY zero ] [ Probe Z ...  ]    |
-|   [\] [Y+] [/]            |   [10]    |                                        |
-|   [X-]      [X+]          |   [1]     |  Job: Spoilboard_DogHoles.gcode        |
-|   [/] [Y-] [\]            |   [0.1]   |  520 x 864 mm   fits from here: yes    |
-|  feed: [-] 2400 [+]       | [Z+] [Z-] |  [ Choose job ]       [ Start > ]      |
-+---------------------------+-----------+----------------------------------------+
+| [H All] [0 All] | [H Z] [0 Z] [H XY] [0 XY] |                 [Unlock] [Reset]  |
++--------------------------------------------+----------------+-----------------+
+| [100][50][10][1][0.1]                      | [ Z+ ] [50]    | Limits o X o Y o Z |
+|                                            | [    ] [25]    | Probe o          |
+|   [<^]     [ ^ ]     [^>]                  |        [10]    | [ Laser > bit ]  |
+|   [ < ]   10 mm      [ > ]                 | [ Z- ] [1]     | [b>l]            |
+|   [<v]     [ v ]     [v>]                  | [    ] [0.1]   | [ Probe Z ... ]  |
++--------------------------------------------+----------------+-----------------+
+  H = home icon, 0 = zero icon; arrows as in the classic jog tab
 ```
 
 Exact positions are settled when the screen is built; the order and grouping above are the
-spec.
+spec. Home buttons are green and zero buttons amber; the jog pad is coloured by axis as in
+the classic jog tab (X blue, Y green, diagonals teal, Z purple).
 
 | Control | Sends | Notes |
 |---------|-------|-------|
 | Home all / Home Z | `$H` / `$HZ` | Single press |
-| Zero all / Zero XY / Zero Z | `G10 L20 P0 X0 Y0 Z0` / `... X0 Y0` / `... Z0` | Zero all is the everyday one; the other two are smaller |
+| Home XY | `$HX`, then `$HY` | FluidNC homes one named axis per `$H` command and refuses another while one runs, so `$HY` is sent once the X cycle has been seen and has ended (back to Idle). An alarm, a reset or a lost connection cancels the `$HY`; so does `$HX` not showing as Home within 3 s (D37) |
+| Zero all / Zero Z / Zero XY | `G10 L20 P0 X0 Y0 Z0` / `... Z0` / `... X0 Y0` | Zero all is the everyday one; the other two are smaller |
 | Unlock | `$X` | Highlighted in ALARM |
 | Reset | soft reset (0x18) | Kept at the far right, away from the jog pad |
-| Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre has no button. Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
-| Z+/Z- | `$J=G91 G21 Z.. F..` | Own step selector. The Z feed is not on Setup: it is set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
-| Step selectors | | XY: 100, 50, 10, 1, 0.1 mm. Z: 50, 25, 10, 1, 0.1 mm. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
-| XY feed | | [-] and [+] change the XY jog feed by 100 mm/min, not below 100. FluidNC limits a jog to the axes' maximum rates itself. Saved to classic slot 0 as the XY jog feed, which is classic Settings > Jog's XY "Feed" (D36) |
+| Jog pad | `$J=G91 G21 X.. Y.. F..` | One step from the XY selector per press. The diagonals move one step in X and one in Y. The centre shows the selected step. Presses queue on FluidNC (five presses of 100 mm move 500 mm); STOP cancels them all |
+| Z+/Z- | `$J=G91 G21 Z.. F..` | Left of the Z step selector |
+| Step selectors | | XY: 100, 50, 10, 1, 0.1 mm, in a row above the pad. Z: 50, 25, 10, 1, 0.1 mm, in a column right of Z+/Z-. The lists are editable in Settings. The selected step is saved to classic slot 0, so both UIs remember the same one across reboots (D36) |
+| Jog feeds | | Not on Setup. XY and Z jog feeds are set in Settings (classic Settings > Jog until the new Settings page exists, M3) (D35) |
 | Laser -> bit | `$J=G91 G21 X33.6 Y-28.2 F..` | Offset from Settings (defaults from `laser_offset.gcode`). A jog, so it can be cancelled and leaves G90/G91 alone. XY jog feed |
-| Bit -> laser | The reverse move | |
-| Go to XY zero | `$J=G90 G21 X0 Y0 F..` | STOP cancels it. No Z height check. XY jog feed |
-| Probe Z ... | Opens a panel: feed, max distance (from Settings), [Probe], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, then restores the G90/G91 that was active. Classic's probe thickness and retract are not used. Reports the probed Z only: it does not set zero or retract. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
+| b>l | The reverse move | Small: rarely used (D21) |
+| Probe Z ... | Opens a pop-up: what it will do (feed, max distance from Settings), [Probe], [Close], result line | Sends `G91`, `G38.2 Z-<max> F<feed>`, then restores the G90/G91 that was active. Classic's probe thickness and retract are not used. Reports the probed Z only: it does not set zero or retract. Result: "Touched at Z -1.234 work (-81.234 machine)", or "No contact within 10 mm" (D34). For levelling, squaring and test work; jobs probe themselves |
 | Limit and probe dots | | From the `Pn:` field of the status report; lit while the pin is active |
-| Job strip | | Selected job, extents, and whether they fit machine travel from the current position. Until M3 the space is kept, showing "No job selected" with Choose job and Start greyed out; "fits from here" arrives with M5 (D33) |
-| Start | | Opens Run's start panel. Enabled when a job is selected and state is IDLE |
 
-Which controls are enabled:
+Buttons are greyed out only in states that last, so nothing flickers while jogging (D38):
 
-| State | Enabled |
-|-------|---------|
-| Offline (any banner but alarm) | None |
-| ALARM | Home all, Home Z, Unlock, Reset |
-| A job runs or is held (S3) | Unlock, Reset |
-| JOG | Jog pad, Z+/Z-, step selectors, feed, laser moves, Go to XY zero, Reset; further jog presses queue |
-| HOME, HOLD without a job, or a probe under way | Reset |
-| IDLE (no job) | Everything |
+| State | Greyed out |
+|-------|------------|
+| Offline (any banner but alarm) | Everything |
+| ALARM | Everything but Home all, Home Z, Home XY, Unlock, Reset |
+| A job runs or is held (S3) | Everything but Unlock, Reset |
+| Otherwise (IDLE, JOG, HOME, HOLD without a job, a probe under way) | Nothing |
 
-Unlock is enabled outside ALARM as well, as in the classic UI; it is highlighted only in
-ALARM.
+In the last row, a press that cannot be sent at that moment is not sent; the status bar
+shows why instead: "Wait for the jog to finish.", "Wait for homing to finish.", "Wait for
+the probe to finish.", "Wait for the machine to stop.", or "The machine is in hold. Reset
+or STOP first." Jog and laser presses during a jog are sent and queue on FluidNC. The
+services check the same rules before sending anything ([02 §4](02-architecture.md#4-services)).
 
-Not carried over (still in the classic UI): jog to typed coordinates, joystick, X/Y probing.
+Not carried over (still in the classic UI): go to XY zero (D25), jog to typed coordinates,
+joystick, X/Y probing.
 
 ## 3. Job
 

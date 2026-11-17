@@ -9,7 +9,7 @@ class Screen;
 //
 //   tabs        800 x 56   Setup | Job | Run | Macros | Settings
 //   content     800 x 376  one screen at a time
-//   status bar  800 x 48   state, work and machine position, WiFi, STOP
+//   status bar  800 x 64   state | positions over the last message | WiFi, STOP
 //
 // An alarm banner or an offline banner covers the status bar when needed.
 class Frame {
@@ -17,8 +17,13 @@ public:
     enum ScreenId { SCREEN_SETUP, SCREEN_JOB, SCREEN_RUN, SCREEN_MACROS, SCREEN_SETTINGS, SCREEN_COUNT };
 
     static const int TAB_HEIGHT = 56;
-    static const int STATUS_HEIGHT = 48;
-    static const int CONTENT_HEIGHT = 480 - TAB_HEIGHT - STATUS_HEIGHT;  // 376
+    static const int STATUS_HEIGHT = 64;
+    static const int CONTENT_HEIGHT = 480 - TAB_HEIGHT - STATUS_HEIGHT;  // 360
+
+    // Shows a short message of the display's own (e.g. why a press was not
+    // sent) in the status bar's message row for a few seconds, or until
+    // FluidNC sends a message
+    static void notice(const char *text);
 
     // Builds the frame and all screens and loads it as the active LVGL screen
     static void create();

@@ -44,7 +44,7 @@ settings auto-import from the display SD runs before the switch, in both modes.
 
 Both UIs use the same stored machine connection: the new SettingsService reads and writes
 machine slot 0 of the classic `fluidtouch` preferences. The jog steps, jog feeds and probe
-values come from the same slot; Setup writes the chosen step and the XY jog feed back to it
+values come from the same slot; Setup writes the chosen steps back to it
 (D36). Settings that only the new UI has live in their own namespace (`lrt`): `ui_mode`,
 and the laser offset `laser_x`, `laser_y` (defaults 33.6 and -28.2, D11).
 
@@ -83,7 +83,9 @@ services arrive with the screens that need them (M3).
 
 `MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
 `canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
-to enable buttons, and each action checks them again before it sends anything. Probe Z
+to grey out buttons and to explain a press they refuse (`busyReason()`), and each action
+checks them again before it sends anything. Home XY sends `$HY` from `poll()` once the `$HX`
+cycle has ended. Probe Z
 sends `G91` and `G38.2`, and puts `G90` back when the result arrives; after a miss FluidNC
 is in alarm and would reject it, so it goes out with the next Unlock instead. A reset
 cancels it, since a reset restores the modal defaults.

@@ -27,6 +27,14 @@ lv_obj_t *stateLabel;
 lv_obj_t *workLabels[3];
 lv_obj_t *machineLabels[3];
 lv_obj_t *wifiLabel;
+lv_obj_t *messageLabel;
+
+// The message row shows FluidNC's last message, or for a while a notice of
+// the display's own
+const uint32_t NOTICE_MS = 5000;
+char noticeText[96] = "";
+uint32_t noticeAtMs = 0;
+char lastDeviceMessage[128] = "";  // to tell when FluidNC sends a new one
 
 // Banner over the status bar
 enum BannerKind { BANNER_NONE, BANNER_ALARM, BANNER_LINK, BANNER_NO_MACHINE };
@@ -150,22 +158,28 @@ void Frame::createStatusBar(lv_obj_t *root) {
 
     stateLabel = textAt(statusBar, 10, &lv_font_montserrat_22, UITheme::STATE_UNKNOWN, "");
 
-    // Work position, then machine position; fixed columns so digits don't shift the rest
+    // First row: work position, then machine position; fixed columns so
+    // digits don't shift the rest
     const lv_font_t *font = &lv_font_montserrat_16;
     static const lv_color_t axisColors[3] = {UITheme::AXIS_X, UITheme::AXIS_Y, UITheme::AXIS_Z};
-    textAt(statusBar, 108, font, UITheme::POS_WORK, "W");
-    textAt(statusBar, 384, font, UITheme::POS_MACHINE, "M");
+    Widgets::label(statusBar, 108, 8, font, UITheme::POS_WORK, "W");
+    Widgets::label(statusBar, 384, 8, font, UITheme::POS_MACHINE, "M");
     for (int i = 0; i < 3; i++) {
-        workLabels[i] = textAt(statusBar, 130 + i * 84, font, axisColors[i], "");
-        machineLabels[i] = textAt(statusBar, 406 + i * 84, font, axisColors[i], "");
+        workLabels[i] = Widgets::label(statusBar, 130 + i * 84, 8, font, axisColors[i], "");
+        machineLabels[i] = Widgets::label(statusBar, 406 + i * 84, 8, font, axisColors[i], "");
     }
 
-    wifiLabel = textAt(statusBar, 660, &lv_font_montserrat_18, UITheme::STATE_ALARM, LV_SYMBOL_WIFI);
+    // Second row: the last message
+    messageLabel = Widgets::label(statusBar, 108, 36, font, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_width(messageLabel, 540);
+    lv_label_set_long_mode(messageLabel, LV_LABEL_LONG_DOT);
+
+    wifiLabel = textAt(statusBar, 664, &lv_font_montserrat_18, UITheme::STATE_ALARM, LV_SYMBOL_WIFI);
 
     // STOP: feed hold, or jog cancel while jogging (S1). The bar is lower than
-    // the 56 px touch target, so the touch area extends above the button.
+    // the 56 px touch target, so the touch area extends beyond the button.
     lv_obj_t *stop = lv_btn_create(statusBar);
-    lv_obj_set_size(stop, 104, 40);
+    lv_obj_set_size(stop, 104, 52);
     lv_obj_align(stop, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_set_style_bg_color(stop, UITheme::BTN_ESTOP, 0);
     lv_obj_set_style_shadow_width(stop, 0, 0);
@@ -190,7 +204,7 @@ void Frame::createBanner(lv_obj_t *root) {
     lv_obj_align(bannerText, LV_ALIGN_LEFT_MID, 10, 0);
 
     bannerButton = lv_btn_create(banner);
-    lv_obj_set_size(bannerButton, 140, 40);
+    lv_obj_set_size(bannerButton, 140, 52);
     lv_obj_align(bannerButton, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_set_style_shadow_width(bannerButton, 0, 0);
     lv_obj_set_ext_click_area(bannerButton, 10);
@@ -264,6 +278,27 @@ void Frame::updateStatusBar() {
         setText(machineLabels[i], buf);
     }
     lv_obj_set_style_text_color(wifiLabel, UITheme::STATE_IDLE, 0);
+
+    // A new message from FluidNC replaces a notice at once
+    if (strcmp(s.last_message, lastDeviceMessage) != 0) {
+        strncpy(lastDeviceMessage, s.last_message, sizeof(lastDeviceMessage) - 1);
+        noticeText[0] = '\0';
+    }
+    static bool noticeShown = false;
+    bool showNotice = noticeText[0] && millis() - noticeAtMs < NOTICE_MS;
+    if (!showNotice) noticeText[0] = '\0';
+    setText(messageLabel, showNotice ? noticeText : s.last_message);
+    if (showNotice != noticeShown) {
+        noticeShown = showNotice;
+        lv_obj_set_style_text_color(messageLabel, showNotice ? UITheme::UI_NOTE : UITheme::TEXT_LIGHT, 0);
+    }
+}
+
+void Frame::notice(const char *text) {
+    strncpy(noticeText, text, sizeof(noticeText) - 1);
+    noticeText[sizeof(noticeText) - 1] = '\0';
+    noticeAtMs = millis();
+    Serial.printf("Frame: notice: %s\n", text);
 }
 
 void Frame::updateBanner() {

@@ -95,10 +95,3 @@ void SettingsService::saveJogZStep(float step) {
     m.jog_z_step = step;
     MachineConfigManager::saveMachine(0, m);
 }
-
-void SettingsService::saveJogXYFeed(int feed) {
-    MachineConfig m;
-    if (!MachineConfigManager::getMachine(0, m) || !m.is_configured || m.jog_xy_feed == feed) return;
-    m.jog_xy_feed = feed;
-    MachineConfigManager::saveMachine(0, m);
-}

@@ -25,8 +25,8 @@ public:
         int zStepCount;
         float xyStep;              // the selected step (D36)
         float zStep;
-        int xyFeed;                // mm/min (D36)
-        int zFeed;                 // set in Settings only (D35)
+        int xyFeed;                // mm/min; set in Settings only (D35)
+        int zFeed;
     };
 
     struct Probe {
@@ -50,7 +50,6 @@ public:
     // Written back to classic slot 0 (D36)
     static void saveJogXYStep(float step);
     static void saveJogZStep(float step);
-    static void saveJogXYFeed(int feed);
 };
 
 #endif // LRT_SETTINGS_SERVICE_H

@@ -28,7 +28,7 @@
 | D22 | Abort is a soft reset | Pause, then stop and raise | Abort is used when something has gone wrong |
 | D23 | Setup has Reset and a Probe Z panel; jog to typed coordinates is not carried over | | Soft reset and manual Z probe are used; typed jog is not |
 | D24 | Probe Z reports the value only, for now | Set zero and retract | Asked for; can be extended later |
-| D25 | Go to XY zero has no Z height check, for now | Warn or refuse when Z is low | Not needed yet |
+| D25 | Go to XY zero has no Z height check, for now. **Moot since D40**: the button was removed | Warn or refuse when Z is low | Not needed yet |
 | D26 | The status bar shows work and machine position at all times | Work only, tap for machine | Asked for |
 | D27 | Screen tabs are at the top; the status bar (state, positions, WiFi, STOP) is at the bottom ([03 §1](03-screens.md#1-frame)) | Status in a top bar with navigation elsewhere | Matches the classic layout, so the positions stay where they are read today |
 | D28 | The preview is drawn by its own code writing pixels into the canvas buffer (2026-11-16) | LVGL's line and arc draw functions | Spike S2 on the device: 210 ms against 562 ms for a reference-sized job |
@@ -36,10 +36,14 @@
 | D30 | Preview segments are 8 bytes each, held in RAM: end point as two 16-bit values scaled to the job's extents, start taken from the previous segment, 16-bit radius, 16 bits of flags and depth level. A file on the display SD is the fallback for jobs that still don't fit (2026-11-16, was Q21) | 24-byte segments; SD file as the normal case; freeing memory in the platform | 1.86 MB of PSRAM is free (S2); 8 bytes holds about ten times the reference job without touching upstream's display buffers |
 | D31 | "Restart into new UI" in the classic UI stays in the System Options dialog only (tap the right end of the classic status bar) (2026-11-16) | Also adding it to the classic Settings tab | Found to be a bit hidden, but fine once known; no further edit to upstream files |
 | D32 | Spikes S3, S4 and S5 are run when their answers are needed: S3 and S4 with M3, S5 before M8 (2026-11-16) | All spikes at the start of M1, as first planned | S3 needs a position log and a started job, S4 an upload from the new UI, S5 a sketch and an app registration; none of them affects M2 |
-| D33 | Setup keeps the job strip's space in M2, showing "No job selected" with Choose job and Start greyed out (2026-11-17) | Leaving it out until M3; a minimal job picker in M2 | The layout is settled once; the job list belongs to M3 |
+| D33 | Setup has no job strip: no selected job, "fits from here", Choose job or Start. The Job tab picks the job and shows whether it fits; Run monitors it (2026-11-17) | Keeping the strip on Setup, at first with its space reserved until M3 | Seen on screen, it duplicated the Job tab and crowded the jog controls |
 | D34 | Probe Z shows the touch point as work Z and machine Z (2026-11-17) | One of the two | Work Z is what is read during set-up; machine Z is what FluidNC reports and stays comparable across re-zeroing |
-| D35 | The Z jog feed is not on Setup; it is set in Settings (2026-11-17) | Its own [-]/[+] in the Z column; one control switching between XY and Z | Rarely changed; keeps the Z column small |
-| D36 | The jog step chosen on Setup and the XY jog feed are saved to classic slot 0 (2026-11-17) | The new UI's own `lrt` settings; session only | Both UIs remember the same values, as with the connection (D5) |
+| D35 | The XY and Z jog feeds are not on Setup; they are set in Settings (2026-11-17) | [-]/[+] feed controls on Setup | Not changed on the fly; frees room for the jog pad |
+| D36 | The jog step chosen on Setup is saved to classic slot 0 (2026-11-17) | The new UI's own `lrt` settings; session only | Both UIs remember the same values, as with the connection (D5) |
+| D37 | Setup has Home XY: `$HX`, then `$HY` once the X cycle has ended (2026-11-17) | `$H` only; Home X and Home Y as separate buttons | Re-homing XY without touching Z. The classic UI uses the same commands; FluidNC takes one named axis per `$H` |
+| D38 | Setup greys out buttons only in lasting states (offline, alarm, job). A press that can't be sent at the moment (e.g. Zero during a jog) is not sent, and the status bar says why (2026-11-17) | Greying out by the current state, including JOG and HOME; queueing the press until idle | Greying out by state made the screen flicker during every jog |
+| D39 | The status bar is 64 px: state, WiFi and STOP full height; between them, positions on one row and the last FluidNC message on the other. Content is 800 x 360 (2026-11-17) | 48 px bar without messages | The classic UI's message box is useful |
+| D40 | Setup has no Go to XY zero and no feed controls; Bit -> laser is a small "b>l" button; Z+/Z- are left of the Z steps; home and zero buttons show icons (2026-11-17) | The first M2 layout | Seen on screen: rarely used controls removed, more room for jogging |
 
 ## Open questions
 
