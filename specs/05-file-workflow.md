@@ -62,14 +62,14 @@ Works from the first build, no network. Copy files to the card at the PC.
 OneDrive directly (option B) is the preferred inbox (D17). An always-on PC that syncs
 OneDrive exists, so option A is the fallback if spike S5 shows B is not practical.
 
-1. M3: file-source interface with Controller SD and Display SD.
+1. M3: file-source interface with Controller SD and Display SD, in Job's file picker ([03 §3](03-screens.md#3-job)).
 2. M1: spike S5, so the answer is known early.
 3. M8: build B, or A if S5 fails. The source interface is the same either way.
 
 ## 5. On the controller
 
-- Generated and uploaded jobs go to one folder on FluidNC's SD (**Q7**: `/sd/lrt/` or the
-  existing `/sd/fluidtouch/uploads/`).
+- Generated and uploaded jobs go to `/sd/fluidtouch/uploads/`, the folder the classic UI's
+  upload already uses (D53).
 - Uploading a name that exists overwrites it after a confirm.
 - **Q6** Should the display offer to delete old uploaded jobs, e.g. keep the newest 20?
 

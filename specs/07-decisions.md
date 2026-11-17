@@ -50,6 +50,13 @@
 | D44 | The new UI keeps slot 0 and its `lrt` settings in RAM after the first read; the working screens don't write to flash (2026-11-17) | Reading and writing settings on each press | On the device every step press made the screen flicker: saving went through classic's `saveMachine()`, which rewrites every key of every machine, and flash access stalls the panel's PSRAM reads. Writing one key 5 s later still flickered visibly |
 | D45 | The default jog steps are set in Settings (classic Settings > Jog until M3); Setup starts with them, and a step chosen on Setup lasts until a restart (2026-11-17) | Saving the step chosen on Setup (D36) | Settings is the one place that saves; no flash writes, so no flicker, during setup |
 | D46 | Reconnecting backs off: retries after 5, 5, 10 and 10 s, then the banner asks for Reconnect, which starts the same sequence again. A successful connection or WiFi coming back resets it. WiFi joining is unchanged (every 15 s, without limit) (2026-11-17) | Retrying every 5 s without end | Asked for: a controller that is off should not be retried for ever |
+| D47 | M3 builds Job (no preview) and Run first, then Settings, then Macros; each screen's controls are reviewed before it is built (2026-11-17) | Settings first; Run alone first | A real job from file to finish is the core of M3 |
+| D48 | Job's top line is the chosen file; tapping it opens a file picker over the screen. The rest of Job is for preview, transforms and "Use this job" (2026-11-17) | A file list beside the preview, as first drawn | The list is used once per job; the preview and transforms need the room |
+| D49 | The picker browses folders on both cards; folders first, then files, by name A to Z (2026-11-17) | Newest first | `$Files/ListGcode` gives no dates, and FluidNC has no clock |
+| D50 | The picker deletes files, after a confirm (2026-11-17) | Single press (D18) | Clearing old files is a common step; a deleted file can't be brought back. D18 was about machine actions |
+| D51 | "Use this job" opens Run's start panel: file and a large START, nothing else until M5. Until the preview exists, Run's preview area shows the file and the current message in large type; time left is estimated from the `SD:` percent, marked ~ (2026-11-17) | Starting from Job; a full-width Run layout until M5; elapsed time only | Starting stays on Run; the layout doesn't change when the preview arrives |
+| D52 | Run: the final `M0` is a Prompt like the others, and CONTINUE then Finished ends the job (was Q18). Feed override in 10% steps only (was Q19) (2026-11-17) | Finished at the last `M0`; 1% steps as well | |
+| D53 | Uploaded and generated jobs go to `/sd/fluidtouch/uploads/` on the controller (was Q7) (2026-11-17) | `/sd/lrt/`; the SD root | The classic UI's upload already uses it: one place for both UIs |
 
 ## Open questions
 
@@ -61,10 +68,7 @@ Answered ones move into the log above.
 | Q3 | Which folder should be the inbox (e.g. `OneDrive\Hobbies\CNC\To Cut`)? Flat, or with subfolders? | One flat folder |
 | Q4 | Want "Save to CNC inbox" in the G-code Editor? | Yes, late |
 | Q6 | Offer clean-up of old uploaded jobs on the controller's SD? | No |
-| Q7 | Folder on FluidNC's SD for uploaded and generated jobs | `/sd/lrt/` |
 | Q14 | Rough time estimate on Job and Run? | Yes |
 | Q15 | Preview colours: by depth, or by operation/tool? | Depth |
 | Q16 | Move: typed values only, or nudge buttons too? | Typed |
-| Q18 | End of job: final CONTINUE then Finished? | Yes |
-| Q19 | Feed override steps: 10% only or also 1%? | 10% |
 | Q20 | Move producing negative coordinates: block or warn? (Your jobs keep all moves positive.) | Warn |

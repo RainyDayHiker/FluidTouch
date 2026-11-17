@@ -120,7 +120,7 @@ without uploading.
 | Working copy of the selected file, transform outputs, outline file | Display SD, `/lrt/work/` (cleared when a new job is selected) |
 | Fallback when no SD card is present | PSRAM, files up to 2 MB; larger files can be run but not previewed |
 | Segment list for preview | PSRAM |
-| Jobs to run | FluidNC SD, as now. Generated files go to `/sd/lrt/` **Q7** |
+| Jobs to run | FluidNC SD, as now. Uploaded and generated files go to `/sd/fluidtouch/uploads/` (D53) |
 
 ## 6. Memory
 

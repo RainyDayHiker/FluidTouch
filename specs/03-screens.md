@@ -101,40 +101,63 @@ joystick, X/Y probing.
 
 ## 3. Job
 
+The top line is the chosen file; tapping it opens the file picker. The rest of the screen
+previews that file, transforms it, and hands it to Run (D48).
+
 ```
-+---------------------------+----------------------------------------------------+
-| Source: [Inbox v]  [Refr] |                                                    |
-|---------------------------|                                                    |
-| Spoilboard_DogHoles  789K |                 preview  ~500 x 290                |
-| Clock_Frame_A        212K |                                                    |
-| ...                       |                                                    |
-|                           |----------------------------------------------------|
-|                           | 520 x 864 mm  Z -19..15  T2  90 ops  ~2h10         |
-|                           | [Rot L][Rot R][Flip H][Flip V][Move] [Outline] [Fit]|
-|                           | [ Undo ]                         [ Use this job ]  |
-+---------------------------+----------------------------------------------------+
++--------------------------------------------------------------------------------+
+| Spoilboard_DogHoles.gcode    789 KB    Controller SD  /jobs           [Change] |
+|--------------------------------------------------------------------------------|
+|                                                                                |
+|                          preview  ~784 x 220   (M5)                            |
+|                                                                                |
+|--------------------------------------------------------------------------------|
+| 520 x 864 mm  Z -19..15  T2  90 ops  ~2h10                               (M5)  |
+| [Rot L][Rot R][Flip H][Flip V][Move] [Outline] [Fit] [Undo]  (M6) [Use this job >]|
++--------------------------------------------------------------------------------+
 ```
 
 | Control | Behaviour |
 |---------|-----------|
-| Source | Where the list comes from: the inbox ([05](05-file-workflow.md)), FluidNC SD, display SD |
-| File list | Newest first. Tap = fetch to the working folder and analyse; progress shown in the preview area |
-| Preview | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job |
-| Info line | Extents, Z range, tools, operation count, time estimate from feeds, warnings (tap for the list) |
-| Rot L / Rot R | Rotate 90 CCW / CW per CNC-Tools spec 06 |
-| Flip H / Flip V | Mirror per CNC-Tools spec 12. First version: "flip only", with the climb/conventional warning. Reverse-cuts later |
-| Move | Enter X and Y shift in mm. Preview shows the result against the stock box |
-| Blocked | If a transform can't be done faithfully: a list of line numbers and reasons; nothing changes |
-| Undo | Steps back one transform (each step is a file in the working folder) |
-| Outline | Switches the preview to the outline: outer edge of the cut, one loop per separate part. Shows "Run outline" in place of "Use this job" |
-| Run outline | Uploads the generated outline file and opens Run's start panel for it, marked as an outline check: rapids only, no Z, raise the bit first. After it finishes, the real job is still selected |
-| Use this job | Untransformed and already on the controller: select it. Otherwise upload the working copy under a new name (`name.r90.gcode`, `name.fh.gcode`, `name.m10x-5y.gcode`) and select that |
+| File line | Name, size, card and folder of the chosen file. With none chosen: "No job chosen. Tap to choose a file." Tapping it, or Change, opens the picker |
+| Use this job | A file on the controller's SD: chosen, and Run opens on its start panel. A file on the display SD: uploaded first to `/sd/fluidtouch/uploads/` (D53) with a progress bar and Cancel; a file of that name already there is overwritten after a confirm ([05 §5](05-file-workflow.md#5-on-the-controller)); the upload counts once the controller lists it at the right size (S6); then Run's start panel. Greyed out while a job runs (S3) |
+| Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job |
+| Info line (M5) | Extents, Z range, tools, operation count, time estimate from feeds, warnings (tap for the list) |
+| Rot L / Rot R (M6) | Rotate 90 CCW / CW per CNC-Tools spec 06 |
+| Flip H / Flip V (M6) | Mirror per CNC-Tools spec 12. First version: "flip only", with the climb/conventional warning. Reverse-cuts later |
+| Move (M6) | Enter X and Y shift in mm. Preview shows the result against the stock box |
+| Blocked (M6) | If a transform can't be done faithfully: a list of line numbers and reasons; nothing changes |
+| Undo (M6) | Steps back one transform (each step is a file in the working folder) |
+| Outline (M7) | Switches the preview to the outline: outer edge of the cut, one loop per separate part. Shows "Run outline" in place of "Use this job" |
+| Run outline (M7) | Uploads the generated outline file and opens Run's start panel for it, marked as an outline check: rapids only, no Z, raise the bit first. After it finishes, the real job is still selected |
 
-Questions:
+With transforms (M6), "Use this job" uploads the working copy under a new name
+(`name.r90.gcode`, `name.fh.gcode`, `name.m10x-5y.gcode`) into the same uploads folder.
+Until M5 the preview area shows the file line's details in large type.
 
-- **Q14** Time estimate: wanted, even if rough (it ignores acceleration)?
-- **Q15** In the preview, would you rather colour by depth or by operation/tool?
-- **Q16** For Move, are typed X/Y values enough, or do you want nudge buttons (1, 5, 10 mm)?
+### File picker
+
+Opens over the screen's content (800 x 360); the status bar stays visible.
+
+```
++--------------------------------------------------------------------------------+
+| [Controller SD] [Display SD]    /jobs                          [Up]   [Close]  |
+|--------------------------------------------------------------------------------|
+| > Clocks                                                                       |
+| > Spoilboard                                                                   |
+| Spoilboard_DogHoles.gcode                              789 KB          [trash] |
+| Clock_Frame_A.gcode                                    212 KB          [trash] |
+| ...                                                                 (scrolls)  |
++--------------------------------------------------------------------------------+
+```
+
+| Control | Behaviour |
+|---------|-----------|
+| Card | Controller SD (`$Files/ListGcode`, which lists G-code files and folders) or Display SD (files ending in `.gcode`, `.gc`, `.nc`, `.ngc`, `.tap`, and folders). An inbox source comes in M8 |
+| List | Folders first, then files, each by name A to Z (D49). Tap a folder to open it; tap a file to choose it and close the picker. Opens in the folder last used, for the session |
+| Up / Close | Parent folder / back to Job without changing the choice |
+| Delete (trash) | Asks "Delete <name> from <card>?" with Delete and Cancel (D50), then deletes and refreshes the list. Controller: `$SD/Delete=<path>`. Not offered while a job runs (S3) |
+| Errors | Controller offline: the controller card says so and offers the display SD. A list that fails shows the reason in place of the list |
 
 ## 4. Run
 
@@ -157,19 +180,20 @@ States of the right-hand panel:
 
 | State | Panel shows |
 |-------|-------------|
-| Start | File, extents, first tool, "Zero will be set at the current position", START button |
+| Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5) |
 | Running | As drawn |
 | Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") and one large CONTINUE button. Pause/Abort stay below |
 | Paused (HOLD by the user) | RESUME in place of PAUSE |
 | Probing | "Probing..." and the probe indicator |
-| Finished / Aborted | Result, total time, [Run again] [Back to Setup] |
+| Finished / Aborted | Result, total time, [Run again] [Back to Setup]. The job's final `M0` is a Prompt like the others; CONTINUE ends the file and Finished follows (D52) |
+| No job | Nothing chosen and nothing running: "No job. Choose one on the Job tab." and [Go to Job]. A job started elsewhere (classic UI, FluidNC's web UI) shows as Running |
 
 | Control | Sends | Notes |
 |---------|-------|-------|
 | PAUSE / RESUME | `!` / `~` | |
 | CONTINUE | `~` | Only in Prompt |
 | ABORT | soft reset (0x18), then the alarm banner offers Unlock | Single press. Placed apart from PAUSE |
-| Feed override | realtime override commands | Range 10 to 200% |
+| Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
 | Rapid override | realtime override commands | |
 | Preview | | Cut so far in a bright colour, the rest dim, marker at the work position. Follows the tool when zoomed in |
 
@@ -178,11 +202,11 @@ Notes:
 - The current operation text is the last `[MSG:...]` received; "op N of M" comes from the file's operation list.
 - The router is switched by hand; the display does not show spindle speed or spindle override.
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
-
-Questions:
-
-- **Q18** After the job's final `M0 (MSG Job complete - stop router)`, is CONTINUE then "Finished" the right ending?
-- **Q19** Feed override steps: 10% only, or 1% as well?
+- Until the preview exists (M5), the preview area shows the file name and the current
+  FluidNC message in large type (D51).
+- Time left: "~1:35 left" = elapsed x (100 - percent) / percent, from the controller's
+  `SD:` percent (by file position, so rough). Hidden for the first minute and below 2%
+  (D51). Replaced by an estimate from the file once M5 has one.
 
 ## 5. Macros
 
