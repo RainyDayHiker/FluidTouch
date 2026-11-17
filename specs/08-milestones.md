@@ -19,6 +19,6 @@ short device checklist. M4 can proceed alongside M2 and M3.
 
 - [x] Recommendation agreed: fork as chassis, new UI (D1)
 - [x] Specs 01 to 08 drafted
-- [ ] Screens reviewed one by one (Setup first)
+- [ ] Screens reviewed one by one (Setup first). Setup done 2026-11-17 (D33 to D36)
 - [x] Inbox direction decided (D17)
 - [x] S1 tried from a browser (works; during a job still to try)
