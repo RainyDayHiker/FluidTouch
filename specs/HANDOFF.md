@@ -43,6 +43,9 @@ has since done the setup and the first M1 step.
   the "job continues" line therefore go away while the last moves and the final `M0` are
   still to come. To be solved with the Run screen (M3); see
   [06](06-test-and-spikes.md#1-test-levels).
+- **Fake FluidNC** now also serves HTTP (download, listing, upload, file actions); checked
+  with `sim/tools/test_fake_fluidnc.py` and curl. Nothing in the firmware uses download yet,
+  and the classic UI's upload was not re-run against it (it needs the fake on port 80).
 - **Not tested anywhere:** STOP as jog cancel (nothing in the new UI jogs yet); loss of
   WiFi (the simulator's WiFi is always up).
 - **Not run on the device.** Firmware builds (33.7% of flash) but nothing has been flashed.
@@ -60,8 +63,8 @@ has since done the setup and the first M1 step.
 
 1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
    `lrt/m1-<topic>` branch:
-   1. Fake FluidNC: HTTP download and upload (job playback is done).
-   2. `build:` commit adding a CI workflow for `lrt/**`.
+   1. `build:` commit adding a CI workflow for `lrt/**` (firmware, simulator,
+      `python sim/tools/test_fake_fluidnc.py`).
 2. Flash the M1 build and go through the device points in §1. Run spike S2 from
    Settings > "Draw test (spike S2)" and fill in the table in
    [06](06-test-and-spikes.md#s2-procedure).

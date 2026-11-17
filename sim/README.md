@@ -111,10 +111,11 @@ and namespaces longer than 15 characters are rejected. Both cases print a
 
 `sim/tools/fake_fluidnc.py` is a small FluidNC stand-in that uses only the
 Python standard library. It handles status reports, auto-reporting, `$G`,
-jogging, homing, zeroing, overrides, hold/resume, file listing and running jobs.
+jogging, homing, zeroing, overrides, hold/resume, file listing, running jobs
+and FluidNC's HTTP file transfer.
 
 ```powershell
-python sim\tools\fake_fluidnc.py --port 81              # sample file list
+python sim\tools\fake_fluidnc.py --port 81              # sample files on a temporary card
 python sim\tools\fake_fluidnc.py --port 81 --sd D:\gcode  # serve a real folder
 ```
 
@@ -135,6 +136,8 @@ sent it; the new UI has no terminal yet):
 | `$sim/speed=20` | Play jobs 20 times faster (also `--speed 20` on the command line) |
 | `$sim/probemiss=1` | The next `G38.2` finds nothing: `[PRB:...:0]` and `ALARM:5` (`0` to clear) |
 | `$sim/drop=5` | Close every connection and refuse new ones for 5 seconds; a running job continues |
+| `$sim/httprate=100` | Limit HTTP transfers to 100 KB/s, to watch progress or try a cancel (`0` = no limit) |
+| `$sim/httpblock=1` | Refuse downloads with 503 while the machine moves, like FluidNC's `HTTP/BlockDuringMotion` setting (`0` to clear) |
 
 In the fake server's own console a single character such as `~` (cycle start)
 or `!` (feed hold) is sent as a realtime command.
@@ -163,9 +166,27 @@ probe, two operations and a final prompt, like a LowRider job.
 The read-ahead depth and the timing of messages are a model built from
 FluidNC's source, not measured on a controller.
 
-`python sim/tools/test_fake_fluidnc.py` checks the playback without a simulator.
+#### HTTP file transfer
 
-The fake server doesn't implement uploads or downloads (HTTP).
+HTTP is served on the same port as the websocket, as FluidNC 4 does:
+
+| Request | Effect |
+|---|---|
+| `GET /sd/<path>` | Download a file from the SD card. Any other path is looked up on the flash filesystem |
+| `GET /upload?path=<folder>` | List an SD folder as JSON |
+| `GET /upload?action=createdir\|delete\|deletedir\|rename&filename=<name>&path=<folder>` | Do that, then list (`&dontlist=yes` to skip the list; `&newname=` for rename) |
+| `POST /upload` | Multipart upload to the SD card: fields `path`, `<name>S` (size) and the file part `myfiles`. A size that doesn't match discards the file |
+| `/files` | The same for the flash filesystem |
+
+The classic UI's upload always connects to port 80, whatever the websocket
+port is. To try it, run the fake server with `--port 80`, or add
+`--http-port 80` to serve HTTP there as well.
+
+Without `--sd` the SD card is a temporary folder holding the sample job under
+a few names; it is deleted when the server stops. The server prints its path.
+
+`python sim/tools/test_fake_fluidnc.py` checks the playback and the HTTP side
+without a simulator.
 
 #### ESP-NOW
 

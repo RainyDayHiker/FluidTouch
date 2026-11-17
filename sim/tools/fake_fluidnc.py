@@ -25,6 +25,12 @@ and sends [PRB:x,y,z:1], feed hold pauses, and a reset aborts (ALARM:3 if it
 was moving). Motion lines sent directly are played the same way, so a probe
 can be tried with e.g. "G38.2 Z-10 F100".
 
+HTTP is served on the same port, as FluidNC 4 does: GET /sd/<path> downloads a
+file, /upload lists, creates, deletes and takes multipart uploads for the SD
+card, /files does the same for the flash filesystem. The classic UI uploads
+to port 80 whatever the websocket port is, so use --port 80 or --http-port 80
+to try its uploads.
+
 It also plays FluidNC's side of ESP-NOW (v4.0.4+) on UDP port 8182, for the
 simulator's ESP-NOW radio: $espnow/pair, $espnow/list, $espnow/unpair=<n> and
 $espnow/cancel work as on FluidNC, and --espnow-pair opens the pairing window
@@ -42,6 +48,8 @@ session as if that client had sent it):
     $sim/probemiss=1|0  G38.2 finds nothing: [PRB:...:0] and ALARM:5
     $sim/drop=<s>    close every connection and refuse new ones for s seconds
                      (a running job continues)
+    $sim/httprate=<n>  limit HTTP transfers to n KB/s (0 = no limit)
+    $sim/httpblock=1|0  refuse downloads with 503 while the machine moves
 """
 
 import argparse
@@ -54,10 +62,13 @@ import math
 import os
 import re
 import secrets
+import shutil
 import struct
 import sys
+import tempfile
 import threading
 import time
+import urllib.parse
 
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 AXES = "XYZA"
@@ -88,6 +99,8 @@ class Machine:
         self.probe_miss = False
         self.probe_hit_until = 0.0
         self.drop_until = 0.0
+        self.http_rate = 0         # KB/s limit for HTTP transfers, 0 = none
+        self.http_block = False    # refuse downloads while moving
         self.broadcast = lambda line: None  # send a line to every connected client
 
     def tick(self):
@@ -574,6 +587,12 @@ class Session:
         elif up.startswith("$SIM/PROBEMISS="):
             m.probe_miss = line.split("=", 1)[1].strip() == "1"
             self.send("ok")
+        elif up.startswith("$SIM/HTTPRATE="):
+            m.http_rate = max(0.0, float(line.split("=", 1)[1] or 0))
+            self.send("ok")
+        elif up.startswith("$SIM/HTTPBLOCK="):
+            m.http_block = line.split("=", 1)[1].strip() == "1"
+            self.send("ok")
         elif up.startswith("$SIM/DROP="):
             m.drop_until = time.monotonic() + float(line.split("=", 1)[1] or 5)
             for writer in list(writers):
@@ -1058,15 +1077,209 @@ class EspNowServer(asyncio.DatagramProtocol):
 espnow_server = None
 
 
-async def handle_client(reader, writer, machine, sd_root):
+# ---------------------------------------------------------------------------
+# HTTP (FluidNC's web server, as far as a pendant uses it)
+#
+# Served on the same port as the websocket, as FluidNC 4 does:
+#   GET  /sd/<path>            download a file from the SD card (any other path
+#                              is looked up on the flash filesystem)
+#   GET  /upload?path=<dir>    list an SD folder as JSON; with
+#        &action=createdir|delete|deletedir|rename&filename=<name>[&newname=]
+#        do that first
+#   POST /upload               multipart upload to the SD card; fields "path",
+#                              "<name>S" (size) and the file part "myfiles"
+#   /files                     the same for the flash filesystem
+# Modelled on FluidNC's WebUIServer.cpp.
+# ---------------------------------------------------------------------------
+
+HTTP_REASONS = {200: "OK", 404: "Not Found", 500: "Internal Server Error", 503: "Service Unavailable"}
+HTTP_CHUNK = 16 * 1024
+MAX_UPLOAD = 64 * 1024 * 1024
+
+
+def safe_join(root, rel):
+    """-> absolute path of rel inside root, or None if it would escape root."""
+    root = os.path.realpath(root)
+    full = os.path.realpath(os.path.join(root, rel.replace("\\", "/").lstrip("/")))
+    if full != root and not full.startswith(root + os.sep):
+        return None
+    return full
+
+
+def format_bytes(n):
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.2f} {unit}" if unit != "B" else f"{n} B"
+        n /= 1024.0
+
+
+def file_list_json(root, path, status, list_files=True):
+    folder = safe_join(root, path)
+    reply = {}
+    if list_files and folder and os.path.isdir(folder):
+        reply["files"] = [
+            {"name": name, "shortname": name, "datetime": "",
+             "size": os.path.getsize(os.path.join(folder, name)) if os.path.isfile(os.path.join(folder, name)) else -1}
+            for name in sorted(os.listdir(folder))]
+    used = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(root) for f in fs)
+    total = 8 * 1024 ** 3  # pretend 8 GB card
+    reply.update({"path": path, "total": format_bytes(total), "used": format_bytes(used),
+                  "occupation": used * 100 // total, "status": status})
+    return json.dumps(reply, separators=(",", ":")).encode()
+
+
+def parse_multipart(body, boundary):
+    """-> (fields {name: text}, file (filename, bytes) or None)"""
+    fields, upload = {}, None
+    for part in body.split(b"--" + boundary):
+        head, sep, content = part.partition(b"\r\n\r\n")
+        if not sep:
+            continue
+        if content.endswith(b"\r\n"):
+            content = content[:-2]
+        disposition = head.decode(errors="replace")
+        name = re.search(r'name="([^"]*)"', disposition)
+        filename = re.search(r'filename="([^"]*)"', disposition)
+        if filename:
+            upload = (filename.group(1), content)
+        elif name:
+            fields[name.group(1)] = content.decode(errors="replace")
+    return fields, upload
+
+
+async def http_send(writer, code, content_type, body, extra=None, rate=0):
+    head = [f"HTTP/1.1 {code} {HTTP_REASONS.get(code, 'OK')}", f"Content-Type: {content_type}",
+            f"Content-Length: {len(body)}", "Connection: close"] + (extra or [])
+    writer.write(("\r\n".join(head) + "\r\n\r\n").encode())
+    for i in range(0, len(body), HTTP_CHUNK):
+        writer.write(body[i:i + HTTP_CHUNK])
+        await writer.drain()
+        if rate:
+            await asyncio.sleep(HTTP_CHUNK / (rate * 1024.0))
+    await writer.drain()
+
+
+async def http_file_ops(writer, machine, root, method, query, headers, body):
+    """/upload and /files: optional upload, optional action, then the listing."""
+    status = "Ok"
+    path = query.get("path", "")
+
+    if method == "POST":
+        boundary = re.search(r"boundary=([^;]+)", headers.get("content-type", ""))
+        fields, upload = parse_multipart(body, boundary.group(1).strip().encode()) if boundary else ({}, None)
+        path = fields.get("path", path)
+        if upload:
+            filename, content = upload
+            # A filename that starts with / is the full path; otherwise it is relative to "path"
+            full_name = filename if filename.startswith("/") else path.rstrip("/") + "/" + filename
+            target = safe_join(root, full_name)
+            expected = fields.get(full_name + "S") or fields.get(filename + "S")
+            if target is None or not os.path.isdir(os.path.dirname(target)):
+                await http_send(writer, 500, "text/xml", b"File creation failed")
+                return
+            if expected is not None and int(expected) != len(content):
+                # As FluidNC: a file whose size doesn't match is discarded
+                await http_send(writer, 500, "text/xml", b"Upload failed, file size mismatch")
+                return
+            with open(target, "wb") as f:
+                f.write(content)
+            print(f"  HTTP upload {full_name} ({len(content)} bytes)")
+            status = "Ok"
+
+    path = "/" + path.replace("//", "/").strip("/")
+    action, filename = query.get("action"), query.get("filename")
+    if action and filename:
+        target = safe_join(root, path + "/" + filename)
+        try:
+            if target is None:
+                raise OSError("bad path")
+            if action == "delete":
+                os.remove(target)
+                status = filename + " deleted"
+            elif action == "deletedir":
+                shutil.rmtree(target)
+                status = filename + " deleted"
+            elif action == "createdir":
+                os.makedirs(target, exist_ok=True)
+                status = filename + " created"
+            elif action == "rename":
+                os.rename(target, safe_join(root, path + "/" + query.get("newname", "")))
+                status = filename + " renamed to " + query.get("newname", "")
+        except OSError as e:
+            verb = {"createdir": "create", "rename": "rename"}.get(action, "delete")
+            status = f"Cannot {verb} {filename} {e.strerror or e}"
+        print(f"  HTTP {action} {path}/{filename}: {status}")
+
+    listing = file_list_json(root, path, status, query.get("dontlist") != "yes")
+    await http_send(writer, 200, "application/json", listing,
+                    ["Cache-Control: no-cache"])
+
+
+async def handle_http(reader, writer, machine, sd_root, localfs_root, request):
+    head = request.decode(errors="replace").split("\r\n")
+    try:
+        method, target, _ = head[0].split(" ", 2)
+    except ValueError:
+        return
+    headers = {k.strip().lower(): v.strip() for k, v in (line.split(":", 1) for line in head[1:] if ":" in line)}
+    url = urllib.parse.urlsplit(target)
+    path = urllib.parse.unquote(url.path)
+    query = {k: v[0] for k, v in urllib.parse.parse_qs(url.query, keep_blank_values=True).items()}
+
+    body = b""
+    length = int(headers.get("content-length", 0) or 0)
+    if length > MAX_UPLOAD:
+        await http_send(writer, 500, "text/xml", b"Upload rejected, not enough space")
+        return
+    while len(body) < length:
+        chunk = await reader.read(min(HTTP_CHUNK, length - len(body)))
+        if not chunk:
+            return  # the client gave up (a cancelled upload)
+        body += chunk
+        if machine.http_rate:
+            await asyncio.sleep(len(chunk) / (machine.http_rate * 1024.0))
+
+    if path == "/upload":
+        await http_file_ops(writer, machine, sd_root, method, query, headers, body)
+    elif path == "/files":
+        await http_file_ops(writer, machine, localfs_root, method, query, headers, body)
+    else:
+        # Anything else is a file download. FluidNC can refuse these while the
+        # machine moves (its HTTP/BlockDuringMotion setting).
+        if machine.http_block and machine.state.split(":")[0] in ("Run", "Jog", "Home"):
+            await http_send(writer, 503, "text/html", b"<html><body><h3>Cannot load WebUI while GCode Program is "
+                                                      b"Running</h3></body></html>")
+            return
+        full = safe_join(sd_root, path[len("/sd/"):]) if path.startswith("/sd/") else safe_join(localfs_root, path)
+        if full is None or not os.path.isfile(full):
+            await http_send(writer, 404, "text/html", b"<html><body>404 Not Found</body></html>")
+            return
+        with open(full, "rb") as f:
+            data = f.read()
+        print(f"  HTTP download {path} ({len(data)} bytes)")
+        await http_send(writer, 200, "application/octet-stream", data,
+                        ["Content-Disposition: attachment"], rate=machine.http_rate)
+
+
+async def handle_client(reader, writer, machine, sd_root, localfs_root):
     peer = writer.get_extra_info("peername")
     if time.monotonic() < machine.drop_until:  # $sim/drop
         writer.close()
         return
-    request = await reader.readuntil(b"\r\n\r\n")
+    try:
+        request = await reader.readuntil(b"\r\n\r\n")
+    except (asyncio.IncompleteReadError, asyncio.LimitOverrunError, ConnectionError):
+        writer.close()
+        return
     key = re.search(rb"Sec-WebSocket-Key:\s*(\S+)", request, re.I)
     if not key:
-        writer.close()
+        # Not a websocket handshake: a plain HTTP request
+        try:
+            await handle_http(reader, writer, machine, sd_root, localfs_root, request)
+        except (asyncio.IncompleteReadError, ConnectionError):
+            pass
+        finally:
+            writer.close()
         return
     accept = base64.b64encode(hashlib.sha1(key.group(1) + WS_GUID.encode()).digest()).decode()
     writer.write(("HTTP/1.1 101 Switching Protocols\r\n"
@@ -1101,12 +1314,35 @@ async def main():
                         help="file that remembers paired pendants ('' = don't save)")
     parser.add_argument("--hostname", default="fakefluidnc")
     parser.add_argument("--speed", type=float, default=1.0, help="play jobs this many times faster")
+    parser.add_argument("--http-port", type=int, default=0,
+                        help="serve HTTP on this port too (the classic UI uploads to port 80)")
     args = parser.parse_args()
     machine = Machine()
     machine.speed = max(0.01, args.speed)
     machine.broadcast = lambda line: [session.send(line) for session in list(sessions)]
-    server = await asyncio.start_server(lambda r, w: handle_client(r, w, machine, args.sd), args.host, args.port)
-    print(f"Fake FluidNC listening on ws://{args.host}:{args.port}/ (Ctrl+C to stop)")
+
+    # Folders behind the SD card and the flash filesystem. Without --sd a
+    # temporary card holds the sample job under a few names.
+    scratch = tempfile.TemporaryDirectory(prefix="fake_fluidnc_")
+    if not args.sd:
+        args.sd = os.path.join(scratch.name, "sd")
+        os.makedirs(os.path.join(args.sd, "projects"))
+        for name in ("facing.nc", "sign_v2.gcode", "projects/bracket.nc", "projects/drawer_front.nc"):
+            with open(os.path.join(args.sd, name), "wb") as f:
+                f.write(SAMPLE_JOB)
+    localfs = os.path.join(scratch.name, "localfs")
+    os.makedirs(localfs)
+
+    def on_client(r, w):
+        return handle_client(r, w, machine, args.sd, localfs)
+
+    server = await asyncio.start_server(on_client, args.host, args.port)
+    print(f"Fake FluidNC listening on ws://{args.host}:{args.port}/ and http://{args.host}:{args.port}/ "
+          f"(Ctrl+C to stop)")
+    print(f"SD card folder: {args.sd}")
+    if args.http_port and args.http_port != args.port:
+        await asyncio.start_server(on_client, args.host, args.http_port)
+        print(f"HTTP also on port {args.http_port}")
     threading.Thread(target=console_input, args=(asyncio.get_running_loop(),), daemon=True).start()
     if args.espnow_port:
         global espnow_server

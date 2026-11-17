@@ -21,8 +21,9 @@
 
 Done so far: job playback (`$SD/Run`, `SD:` progress, `(MSG ...)`, `M0`, `G4`, `G38.2`, feed
 hold, reset, overrides, `$sim/speed`, `$sim/probemiss`, `$sim/drop`; details in
-`sim/README.md`, checked by `sim/tools/test_fake_fluidnc.py`). HTTP download and upload are
-still missing. Lines typed in the fake's own console are passed to every connected client's
+`sim/README.md`, checked by `sim/tools/test_fake_fluidnc.py`) and HTTP on the websocket port
+(download, listing, multipart upload with size check, create, delete, rename,
+`$sim/httprate`, `$sim/httpblock`). Lines typed in the fake's own console are passed to every connected client's
 session (for the `$sim/...` helpers, since the new UI has no terminal yet), and feed hold
 (`!`) behaves as on FluidNC: it ends a jog and is ignored when idle.
 
@@ -46,11 +47,29 @@ S1 can be done from any browser as soon as the machine is on.
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|
-| S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
+| S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. See the notes below | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
 | S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
 | S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time | Inbox option B |
+
+### S1: what FluidNC's source says
+
+Read from `WebUIServer.cpp` on FluidNC's main branch (2026-11-16), not tried on the
+controller; S1 is still to be run. The fake FluidNC follows this.
+
+- There is no handler for `/sd/...`. A GET for any unregistered path goes to the not-found
+  handler, which tries to send the file with that path as a download; a path that starts
+  with `/sd/` is a file on the SD card. So `http://<address>/sd/<path>` should work.
+- With the setting `HTTP/BlockDuringMotion` on, such a request is answered with **503**
+  while the machine is moving. S1 should note that setting's value (`$HTTP/BlockDuringMotion`)
+  and what the browser gets during a job. If it is on, the Controller SD file can only be
+  fetched for preview before the job starts, which is when it is needed.
+- `GET /upload?path=<folder>` returns the folder as JSON (`files` with `name`, `size`, -1
+  for folders; `path`, `total`, `used`, `occupation`, `status`), and takes
+  `action=createdir|delete|deletedir|rename`. This is an alternative to `$Files/ListGcode`
+  that also gives exact sizes, which S6 (confirm the size after upload) can use.
+- An upload whose size field does not match what arrived is discarded by FluidNC.
 
 ### S2 procedure
 
