@@ -18,7 +18,7 @@ has since done the setup and the first M1 step.
   the forced include was passed unquoted. Fixed in commit
   `405a0ea` ("Sim: build from a checkout path that contains a space"), merged into
   `lrt/main`. It is not being offered upstream; its branch is deleted.
-- **M1 steps 1 to 3 are done** and merged into `lrt/main`:
+- **M1 steps 1 to 4 are done** and merged into `lrt/main`:
   1. `FluidNCClient` reports to a `FluidNCClientListener`; the classic UI registers
      `ClassicClientListener`.
   2. UI mode: NVS `lrt/ui_mode`, default `app`. `main.cpp` starts `LrtApp` or the classic
@@ -28,6 +28,9 @@ has since done the setup and the first M1 step.
      connection logic) and the `src/app` frame: tabs, status bar with STOP, alarm banner
      with Unlock, connecting / connection-lost banner with Reconnect, no-machine banner,
      five placeholder screens.
+  4. The S2 draw test screen (Settings > "Draw test (spike S2)"), with a synthetic job
+     of the reference job's size. Runs in the simulator; its numbers only mean something
+     on the device.
 - **Tested in the simulator** against the fake FluidNC: classic connect, drop and reconnect
   unchanged (screenshots identical before and after the listener change); UI mode round
   trip; frame connecting, online, tab switching, STOP sends `!`, alarm banner and Unlock,
@@ -50,12 +53,13 @@ has since done the setup and the first M1 step.
 
 1. Continue M1 ([08](08-milestones.md)), in this order, each on its own
    `lrt/m1-<topic>` branch:
-   1. Hidden test screen for spike S2 (free PSRAM, canvas draw timing).
-   2. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
+   1. Fake FluidNC: job playback, `SD:` progress, `M0` hold, `G38` probe, HTTP
       download/upload, `$sim/drop`. Then exercise the probe-result event and the
       "job continues" banner line.
-   3. `build:` commit adding a CI workflow for `lrt/**`.
-2. Flash the M1 build and go through the device points in §1.
+   2. `build:` commit adding a CI workflow for `lrt/**`.
+2. Flash the M1 build and go through the device points in §1. Run spike S2 from
+   Settings > "Draw test (spike S2)" and fill in the table in
+   [06](06-test-and-spikes.md#s2-procedure).
 3. Ask Jeffrey to run the device-side spikes (S1 to S5) when the machine is on; write the
    results into [06](06-test-and-spikes.md).
 
