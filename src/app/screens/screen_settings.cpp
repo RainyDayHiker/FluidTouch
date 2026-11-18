@@ -6,6 +6,7 @@
 #include "app/screens/draw_test.h"
 #include "config.h"
 #include "core/power_manager.h"
+#include "services/position_log.h"
 #include "services/machine_service.h"
 #include "services/settings_service.h"
 #include "ui/ui_theme.h"
@@ -523,6 +524,36 @@ void createDisplayPage(lv_obj_t *page) {
 lv_obj_t *aboutText;
 uint32_t aboutAtMs = 0;
 
+// Position log (D62): Off / On, and how the last recording went
+bool posLogDraft = false;
+lv_obj_t *posLogButtons[2];
+lv_obj_t *posLogStatus;
+
+void showPosLog() {
+    setButtonColor(posLogButtons[0], posLogDraft ? UITheme::BG_BUTTON : UITheme::ACCENT_PRIMARY);
+    setButtonColor(posLogButtons[1], posLogDraft ? UITheme::ACCENT_PRIMARY : UITheme::BG_BUTTON);
+    char buf[256];
+    const char *file = PositionLog::lastFile();
+    const char *error = PositionLog::error();
+    if (PositionLog::recording()) {
+        snprintf(buf, sizeof(buf), "Recording to %s, %lu rows", file, (unsigned long)PositionLog::rows());
+    } else if (file[0]) {
+        snprintf(buf, sizeof(buf), "Last: %s, %lu rows%s%s", file, (unsigned long)PositionLog::rows(),
+                 error[0] ? ". " : "", error);
+    } else if (error[0]) {
+        snprintf(buf, sizeof(buf), "Last job not recorded: %s", error);
+    } else {
+        snprintf(buf, sizeof(buf), "Records every job to /logs on the display SD.");
+    }
+    setText(posLogStatus, buf);
+    setTextColor(posLogStatus, error[0] ? UITheme::STATE_ALARM : UITheme::TEXT_MEDIUM);
+}
+
+void onPosLog(lv_event_t *e) {
+    posLogDraft = (intptr_t)lv_event_get_user_data(e) != 0;
+    showPosLog();
+}
+
 void saveAll();
 
 void onRestartClassic(lv_event_t *) {
@@ -542,8 +573,16 @@ void createToolsPage(lv_obj_t *page) {
     button(page, 292, 0, 132, 56, "Restart", FONT_MID, onRestart);
     // Spike S2 (specs/06-test-and-spikes.md); goes away with the real preview
     button(page, 436, 0, 160, 56, "Draw test", FONT_MID, onDrawTest);
-    section(page, 76, "About");
-    aboutText = label(page, 0, 106, FONT_MID, UITheme::TEXT_LIGHT, "");
+
+    section(page, 76, "Position log");
+    posLogButtons[0] = button(page, 0, 106, 100, 52, "Off", FONT_MID, onPosLog, (void *)0);
+    posLogButtons[1] = button(page, 108, 106, 100, 52, "On", FONT_MID, onPosLog, (void *)1);
+    posLogStatus = label(page, 224, 122, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_width(posLogStatus, CONTENT_W - 224);
+    lv_label_set_long_mode(posLogStatus, LV_LABEL_LONG_DOT);
+
+    section(page, 178, "About");
+    aboutText = label(page, 0, 208, FONT_MID, UITheme::TEXT_LIGHT, "");
     lv_obj_set_width(aboutText, CONTENT_W);
     lv_obj_set_style_text_line_space(aboutText, 6, 0);
 }
@@ -611,6 +650,7 @@ void loadDrafts() {
     laserY = o.y;
     displayDraft = SettingsService::display();
     displayDraft.dimBrightness = dimFor(displayDraft.brightness);  // D58
+    posLogDraft = SettingsService::positionLog();
 }
 
 void loadMachines() {
@@ -652,6 +692,7 @@ void saveAll() {
     if (SettingsService::saveLaserOffset({laserX, laserY})) wrote = true;
     bool rotateChanged = displayDraft.rotate180 != SettingsService::display().rotate180;
     if (SettingsService::saveDisplay(displayDraft)) wrote = true;
+    if (SettingsService::savePositionLog(posLogDraft)) wrote = true;
 
     if (wrote) {
         Frame::notice(rotateChanged ? "Settings saved. The rotation changes after a restart." : "Settings saved.");
@@ -673,6 +714,7 @@ void showPage(int page) {
     }
     if (page == PAGE_TOOLS) {
         showAbout();
+        showPosLog();
         aboutAtMs = millis();
     }
 }
@@ -742,5 +784,6 @@ void SettingsScreen::update() {
     if (pageShown == PAGE_TOOLS && millis() - aboutAtMs >= 1000) {
         aboutAtMs = millis();
         showAbout();
+        showPosLog();
     }
 }

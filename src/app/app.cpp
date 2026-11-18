@@ -10,6 +10,7 @@
 #include "services/job_service.h"
 #include "services/machine_service.h"
 #include "services/macro_service.h"
+#include "services/position_log.h"
 
 bool LrtApp::running = false;
 
@@ -31,6 +32,7 @@ void LrtApp::loop() {
     FileService::poll();
     JobService::poll();
     MacroService::poll();
+    PositionLog::poll();
 
     uint32_t now = millis();
 
