@@ -95,6 +95,8 @@ public:
     // --- Jobs (specs/03-screens.md section 4) ---------------------------------
     // $SD/Run=<path>, when idle with no job (canZero())
     static bool runFile(const char *path);
+    // One line as it is (a command macro, D60), when idle with no job (canZero())
+    static bool sendLine(const char *line);
     // Feed hold (!) and cycle start (~): Pause, Resume, Continue
     static void hold();
     static void resume();

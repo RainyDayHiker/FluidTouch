@@ -249,6 +249,14 @@ bool MachineService::runFile(const char *path) {
     return true;
 }
 
+bool MachineService::sendLine(const char *line) {
+    if (!canZero() || !line[0]) return false;
+    char cmd[240];
+    snprintf(cmd, sizeof(cmd), "%s\n", line);
+    FluidNCClient::sendCommand(cmd);
+    return true;
+}
+
 void MachineService::hold() {
     if (!online()) return;
     userHold = true;
