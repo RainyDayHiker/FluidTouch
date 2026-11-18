@@ -62,6 +62,9 @@
 | D56 | Numbers are entered on a keypad pop-up, text on a keyboard pop-up (2026-11-17) | +/- nudges beside the values | Settings are set once and rarely; exact values matter more than speed |
 | D57 | A temporary machine picker on Settings > Machine: the new UI uses the classic slot chosen there (`lrt` key `machine_slot`, default 0) instead of always slot 0 (2026-11-17) | Slot 0 only (D5) | During development the display switches between the real machine and the fake FluidNC. To be removed at the end, going back to D5 |
 | D58 | Settings review: Jog & Probe only chooses the start steps (the step lists are not edited); jog feeds get -/+ 100 buttons beside the keypad value; brightness is a slider (25 to 100%), and the dimmed level is no longer a setting: a quarter of the brightness, at least 5% (2026-11-17) | Editable step lists; keypad only (D56); four brightness choices and a dimmed-brightness choice | The step lists don't need changing; feeds are nudged more than typed; fewer settings |
+| D59 | The new UI keeps its own list of 12 macros in the `lrt` namespace, one list (not per machine slot), starting empty (2026-11-17) | Share classic's 9-slot list (`m<slot>_macros`); copy classic's once | 12 slots and command macros don't fit classic's record; Jeffrey sets the few up again |
+| D60 | A macro is a file in the macros folder or one command line | Files only | Short things such as `$H` or a G0 to a park position need no file |
+| D61 | A running macro stays on Macros (strip with progress, last message, Resume at a hold, Stop as a soft reset); Run does not take macro files as jobs. Edit mode: tap a slot for a pop-up (name, file or command, colour, move left/right, clear), saved on Done or leaving | Treat a macro as a job on Run; classic's list editor with up/down/edit/delete per row | A macro is short and run from Macros; Run stays the job's |
 
 ## Open questions
 

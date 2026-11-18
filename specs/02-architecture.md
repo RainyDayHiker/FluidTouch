@@ -95,7 +95,12 @@ answering and back to `WiFi` when the network goes.
 - The service records whether a file was running when the connection dropped, for the banner.
 
 `SettingsService` reads classic slot 0 and reports "not configured" or "not a WiFi machine"
-(D4). The Macro service arrives with the Macros screen.
+(D4).
+
+`MacroService` (M3) keeps the 12 slots in RAM, read once from the `lrt` key `macros` (one
+blob with a version byte) and written back only when the list changed. It runs a macro
+(`$SD/Run` or the command line) and follows it: starting, running, held, done or stopped,
+with the reason. `JobService` leaves files under `/fluidtouch/macros/` to it (D61).
 
 `FileService` (M3) lists a folder on either card, deletes a file, and uploads a display SD
 file. Controller listings are `$Files/ListGcode` replies collected through

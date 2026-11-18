@@ -210,10 +210,54 @@ Notes:
 
 ## 5. Macros
 
-A 4 x 3 grid of buttons (name, colour), as in the classic UI but with 12 slots. A macro is
-a file in `/sd/fluidtouch/macros/` (same folder as now, so both UIs share them) or a single
-command line. Edit mode: name, file or command, colour, order. A running macro shows its
-last message and a Stop.
+A 4 x 3 grid of 12 slots, each a button with a name and one of the classic UI's 8 macro
+colours. A macro is either a file in `/sd/fluidtouch/macros/` on the controller's SD (the
+classic folder, so both UIs use the same files, D13) or one command line such as `$H` or
+`G0 X0 Y0` (D60). The new UI keeps its own list; it starts empty and does not read or
+change classic's (D59).
+
+```
++--------------------------------------------------------------------------------+
+| Laser offset: running            [=========-------]  42%     [Resume] [ Stop ] |  strip
++-------------------+-------------------+-------------------+--------------------+
+|   Laser offset    |   Park            |   Home XY         |                    |
++-------------------+-------------------+-------------------+--------------------+
+|   ...             |                   |                   |                    |
++-------------------+-------------------+-------------------+--------------------+
+|                   |                   |                   |                    |
++-------------------+-------------------+-------------------+--------------------+
+```
+
+**Strip** (top). With nothing running: a hint ("Tap a macro to run it." or, with no
+macros, "No macros yet. Tap Edit to add one.") and Edit on the right. While a macro runs:
+its name, "running", the controller's last message, a progress bar for a file (from the
+`SD:` percent), Resume while the controller holds (an M0 in the macro, or a feed hold), and
+Stop. Afterwards "done" or the reason it stopped, until the next macro runs or 10 s pass.
+
+**Running** (D61). A tap runs the macro when the machine is idle with no job (as Zero). A
+file runs with `$SD/Run=/sd/fluidtouch/macros/<file>`; a command is sent as it is. The
+macro stays on Macros: Run does not take a macro file as a job, also one started by the
+classic UI or FluidNC's web UI (any file under `/fluidtouch/macros/`). While it runs the
+other macros, Run's start and the moves on Setup are locked, as during a job, and the run
+dot shows. Stop is a soft reset (as Abort; the controller is in alarm afterwards if it was
+moving). A command counts as running while the controller is not idle after it, and done
+once it is idle again (or has stayed idle for 1.5 s).
+
+**Edit mode.** Edit turns the strip's button into Done and shows every slot, the empty ones
+with a "+". Macros don't run in edit mode. Tapping a slot opens a pop-up:
+
+- Name (keyboard pop-up, up to 23 characters).
+- File or Command. File: a button with the file's name, which opens the list of files in
+  `/sd/fluidtouch/macros/` (the name is filled in from the file name when it is empty).
+  Command: the line (keyboard pop-up, up to 95 characters).
+- Colour: the 8 swatches.
+- Move left and Move right: swap with the neighbouring slot (also across rows), so the
+  order can be changed.
+- Clear empties the slot; Close shuts the pop-up.
+
+Changes show at once and are written to flash, as one record, when Done is tapped or
+Macros is left, and only if something changed (D44). Editing is possible offline; the file
+list then says the controller is not connected.
 
 ## 6. Settings
 
