@@ -66,9 +66,9 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
    (D54 to D58: Machine with a temporary slot picker, Jog & Probe, Display, Tools; saved
    on leaving Settings) are checked on the device by Jeffrey (2026-11-17, "all good") and
    merged into `lrt/main`. Layout tweaks to Job and Run wait for the preview. Macros
-   (D59 to D61) is built on `lrt/m3-macros` and run in the simulator only (the fake
-   FluidNC has sample macros in `/sd/fluidtouch/macros`, one holding at an M0); next is
-   Jeffrey's review and a device check, then the position log, S3 and S4. Review each
+   (D59 to D61) is checked on the device by Jeffrey (2026-11-17, "all good") and merged
+   (the fake FluidNC has sample macros in `/sd/fluidtouch/macros`, one holding at an M0).
+   Next: the position log, S3 and S4. Review each
    screen's control list with Jeffrey before building it.
 2. The temporary machine picker (D57) is to be removed at the end of development.
 3. Small things still open from the device: S1 while a job runs, and the value of
