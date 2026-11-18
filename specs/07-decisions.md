@@ -66,6 +66,7 @@
 | D60 | A macro is a file in the macros folder or one command line | Files only | Short things such as `$H` or a G0 to a park position need no file |
 | D61 | A running macro stays on Macros (strip with progress, last message, Resume at a hold, Stop as a soft reset); Run does not take macro files as jobs. Edit mode: tap a slot for a pop-up (name, file or command, colour, move left/right, clear), saved on Done or leaving | Treat a macro as a job on Run; classic's list editor with up/down/edit/delete per row | A macro is short and run from Macros; Run stays the job's |
 | D62 | Position log: a switch on Settings > Tools (Off by default); when on, every job's status reports (every 250 ms: time, state, `SD:` percent, work position, feed, new messages) go to a CSV in `/logs` on the display SD. Kept as a diagnostic after S3 (2026-11-17) | Record every job always; a record button per job on Run; a faster report rate while recording; a throwaway for S3 | Off unless needed; the connection stays as it is; small enough to keep |
+| D63 | Spike jobs: S3 runs `specs/spikes/s3_air_cut.gcode` (a 5-minute air cut made for it: arcs, five announced operations, prompts, a dwell, a circle of 720 short lines); S4 uploads 5 MB and 9.5 MB files, and classic's 10 MB upload limit is left as it is (2026-11-17) | The reference job (needs the probe, an hour long); raising the limit to 32 MB for a 20 MB test | Short, safe and repeatable; no change to upstream code |
 
 ## Open questions
 

@@ -70,8 +70,9 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
    (the fake FluidNC has sample macros in `/sd/fluidtouch/macros`, one holding at an M0).
    The position log (D62, Settings > Tools, CSV in `/logs` on the display SD) is built on
    `lrt/m3-position-log` and run in the simulator only. Next: Jeffrey's device check, then
-   S3 (it needs the log switched on and a job with arcs, a few operations and an M0) and S4. Review each
-   screen's control list with Jeffrey before building it.
+   S3 (`specs/spikes/s3_air_cut.gcode` with the log on) and S4 (5 and 9.5 MB uploads); both
+   procedures are in [06](06-test-and-spikes.md) (D63). Review each screen's control list
+   with Jeffrey before building it.
 2. The temporary machine picker (D57) is to be removed at the end of development.
 3. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.

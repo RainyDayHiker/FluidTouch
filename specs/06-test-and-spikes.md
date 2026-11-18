@@ -53,8 +53,8 @@ job is first started and a file first uploaded from the new UI; S5 before M8.
 |---|----------|-----|---------|
 | S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. See the notes below | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
-| S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
-| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures. `UploadManager` refuses files over 10 MB, so the 20 MB file needs that limit raised first (classic code) | G8's 32 MB figure; whether a size confirm (S6) is enough |
+| S3 | How does `SD:` percent relate to the line being cut? | Run `specs/spikes/s3_air_cut.gcode` (an air cut, D63) with the position log on; see the S3 procedure below. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
+| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 9.5 MB file from the display SD with Job > Use this job (UploadManager); note time and failures. `UploadManager` refuses files over 10 MB and is left so (D63); larger files are not tested. See the S4 procedure below | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time. **The sketch has not been written**; it also needs an app registration with Microsoft (a client ID) before it can sign in | Inbox option B |
 
 ### S1 result (2026-11-16, Jeffrey, browser on the PC)
@@ -85,9 +85,10 @@ points are confirmed by the result above. The fake FluidNC follows this.
 ### S3: what it needs, and what the reference job does
 
 S3 **drives the machine**: it runs a job from FluidNC's SD card while the display records
-time, `SD:` percent and position. Two things are not there yet:
+time, `SD:` percent and position. It needs:
 
 - The recording: the position log (M3, D62), switched on in Settings > Tools.
+- The job: `specs/spikes/s3_air_cut.gcode` (D63), below.
 
 #### Position log
 
@@ -112,8 +113,40 @@ recorded.
 - Rows are kept in RAM and written every 2 s or 4 KB, and at the end. A missing card or a
   failed write ends that recording; Settings > Tools shows why.
 - The switch is the `lrt` key `pos_log` (Off by default), saved with the other settings.
-- A decision on which job. S3 does not need the reference job; any job with arcs, a few
-  operations and an `M0` answers the question, and a short one is easier to repeat.
+
+#### The S3 job
+
+`specs/spikes/s3_air_cut.gcode`, made by `specs/spikes/make_spike_jobs.py` (run it again
+after changing the script). 884 lines, about 5.5 minutes at the programmed feeds plus the
+prompts. It answers the question without the reference job's probe step, and is short
+enough to repeat:
+
+| Operation | What | Why |
+|-----------|------|-----|
+| Start | `G10 L20 P0 X0 Y0 Z0`, up to Z 10, `M0` | Zero where the tool is; a prompt before anything moves |
+| 1 Circles | Four 40 mm circles, three passes each (Z 6, 4, 2), full-circle `G2`, F800; then `G4 P1.5` | Arcs; a dwell (Idle with `SD:` still there) |
+| 2 Zigzag | 60 x 55 mm of straight lines 2.5 mm apart at Z 2, F1200; then `M0` | Long lines; a prompt halfway |
+| 3 Rounded zigzag | Straight lines joined by 2.5 mm half circles (`G2`/`G3`) at Z 3, F1000 | Mixed short arcs and lines |
+| 4 Circle of short lines | A 50 mm circle as 720 `G1` lines of 0.22 mm at Z 1, F1500 | Many short lines: the percent should race ahead of the tool here |
+| 5 Spiral | Growing half circles, `G2` only, at Z 1.5, F900 | Arcs of changing radius |
+| End | Up to Z 10, back to X0 Y0, `M0`, `M2` | Final prompt |
+
+Every move stays at Z 1 or above the start point and inside X 0..175, Y 0..115 of it (arc
+bulges included). Each operation starts with `(MSG Operation n of 5: ...)`, so the log's
+message column marks when FluidNC *read* each one, which can be compared with the position
+at that moment. Played on the fake FluidNC on 2026-11-17: the message for operation 4 was
+logged while the tool was still in operation 3.
+
+#### S3 procedure (on the machine, router off)
+
+1. Copy `s3_air_cut.gcode` to the controller's SD (Job > Display SD > Use this job uploads
+   it, or FluidNC's web UI).
+2. Settings > Tools: Position log On, then leave Settings so it is saved.
+3. Jog to a start point with at least 175 x 115 mm clear in +X and +Y and the tool at
+   least 15 mm above anything; the job zeroes there.
+4. Run it from Run, Continue at each prompt. Settings > Tools then shows the log's name
+   and rows (`/logs/s3_air_cut-NNN.csv` on the display SD).
+5. Bring the CSV back (display SD to the PC) for the offline comparison.
 
 What `Spoilboard_DogHoles.gcode` does, read from the file (2026-11-16), for setting the
 machine up if it is used:
@@ -140,6 +173,18 @@ the router left off or unplugged.
 
 The fake FluidNC does not model two things this job uses: the `P` word on `G38.2` (it
 ignores it) and `$HZ` inside a file (it skips `$` lines).
+
+### S4 procedure
+
+1. `python specs/spikes/make_spike_jobs.py --s4 <folder>` writes `s4_5mb.gcode` and
+   `s4_9_5mb.gcode` there (not kept in the repository). They are a harmless path at Z 10
+   that starts with `M0 (MSG ... do not run it ...)`; they are for uploading only.
+2. Copy both to the display SD.
+3. For each: Job > Display SD > the file > Use this job. Time the upload (it shows
+   progress and checks the size afterwards, S6), and note any failure and its message.
+   Do it at least twice per file, and once with the display a few metres further from the
+   router's WiFi.
+4. Delete them from the controller's `uploads` folder afterwards (Job picker, trash).
 
 ### S2 procedure
 
