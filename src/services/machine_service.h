@@ -63,8 +63,11 @@ public:
     static const FluidNCStatus &status() { return FluidNCClient::getStatus(); }
 
     // A file is running on the controller (also true during a G4 dwell,
-    // when FluidNC reports Idle)
-    static bool jobActive() { return online() && status().is_sd_printing; }
+    // when FluidNC reports Idle), or JobService still counts its job as
+    // running: FluidNC drops the SD: field once it has read the last line
+    static bool jobActive() { return online() && (status().is_sd_printing || jobSession); }
+    // Set by JobService while its job runs, is held or waits at a prompt
+    static void setJobSession(bool active) { jobSession = active; }
 
     static const ProbeResult &lastProbe() { return probe; }
 
@@ -88,6 +91,19 @@ public:
     static void stop();
     // Jog cancel (0x85): ends the joystick's jog when it is let go
     static void cancelJog();
+
+    // --- Jobs (specs/03-screens.md section 4) ---------------------------------
+    // $SD/Run=<path>, when idle with no job (canZero())
+    static bool runFile(const char *path);
+    // Feed hold (!) and cycle start (~): Pause, Resume, Continue
+    static void hold();
+    static void resume();
+    // The current hold was asked for here (Pause, STOP), not by an M0
+    static bool heldByUser() { return userHold; }
+    // Feed override: +10 / -10 percent, or back to 100; rapid: 100, 50 or 25
+    enum FeedOverride { FEED_PLUS_10, FEED_MINUS_10, FEED_RESET };
+    static void feedOverride(FeedOverride change);
+    static void rapidOverride(int percent);
     // Clear an alarm ($X)
     static void unlock();
     // Soft reset (0x18)
@@ -129,6 +145,8 @@ private:
     static bool jobAtDrop;
     static bool lastJobActive;
     static bool networkServicesStarted;
+    static bool jobSession;
+    static bool userHold;
     static bool connectPending;      // connectController() is due at connectAtMs
     static int retryCount;           // retries scheduled since the last success or Reconnect
     static bool retriesStopped;      // back-off used up; waiting for Reconnect

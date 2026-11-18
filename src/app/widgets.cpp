@@ -1,5 +1,6 @@
 #include "app/widgets.h"
 #include "ui/ui_theme.h"
+#include <stdio.h>
 #include <string.h>
 
 namespace Widgets {
@@ -85,6 +86,63 @@ lv_obj_t *addIcon(lv_obj_t *btn, const lv_image_dsc_t *icon, bool before) {
     lv_obj_set_style_image_recolor(img, lv_obj_get_style_text_color(btn, LV_PART_MAIN), 0);
     if (before) lv_obj_move_to_index(img, 0);
     return img;
+}
+
+lv_obj_t *dialog(lv_obj_t *parent, int w, int h) {
+    lv_obj_t *layer = lv_obj_create(parent);
+    lv_obj_set_pos(layer, 0, 0);
+    lv_obj_set_size(layer, lv_pct(100), lv_pct(100));
+    lv_obj_set_style_bg_color(layer, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(layer, LV_OPA_60, 0);
+    lv_obj_set_style_border_width(layer, 0, 0);
+    lv_obj_set_style_radius(layer, 0, 0);
+    lv_obj_set_style_pad_all(layer, 0, 0);
+    lv_obj_clear_flag(layer, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t *panel = lv_obj_create(layer);
+    lv_obj_set_size(panel, w, h);
+    lv_obj_center(panel);
+    lv_obj_set_style_bg_color(panel, UITheme::BG_MEDIUM, 0);
+    lv_obj_set_style_border_color(panel, UITheme::BORDER_LIGHT, 0);
+    lv_obj_set_style_border_width(panel, 1, 0);
+    lv_obj_set_style_radius(panel, 8, 0);
+    lv_obj_set_style_pad_all(panel, 0, 0);
+    lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_add_flag(layer, LV_OBJ_FLAG_HIDDEN);
+    return panel;
+}
+
+void showDialog(lv_obj_t *panel, bool show) {
+    lv_obj_t *layer = lv_obj_get_parent(panel);
+    if (show) {
+        lv_obj_move_foreground(layer);
+        lv_obj_clear_flag(layer, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(layer, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void formatSize(char *out, int outLen, int32_t bytes) {
+    if (bytes < 0) {
+        snprintf(out, outLen, "-");
+    } else if (bytes < 1024) {
+        snprintf(out, outLen, "%ld B", (long)bytes);
+    } else if (bytes < 1024 * 1024) {
+        snprintf(out, outLen, "%ld KB", (long)((bytes + 512) / 1024));
+    } else {
+        snprintf(out, outLen, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
+}
+
+void formatDuration(char *out, int outLen, uint32_t ms) {
+    uint32_t s = ms / 1000;
+    if (s >= 3600) {
+        snprintf(out, outLen, "%lu:%02lu:%02lu", (unsigned long)(s / 3600), (unsigned long)(s / 60 % 60),
+                 (unsigned long)(s % 60));
+    } else {
+        snprintf(out, outLen, "%lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
+    }
 }
 
 lv_obj_t *label(lv_obj_t *parent, int x, int y, const lv_font_t *font, lv_color_t color, const char *text) {

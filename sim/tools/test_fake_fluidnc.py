@@ -65,6 +65,12 @@ async def main():
     await asyncio.sleep(0.5)
     assert any(l.startswith("[PRB:") and l.endswith(":1]") for l in out), out
     assert abs(m.mpos[2] - (z - 6)) < 0.01 and m.absolute and not m.busy(), (m.mpos[2], m.absolute)
+    # $SD/Delete on the sample files: a file goes, a missing one is an error
+    out.clear(); session.handle_line("$SD/Delete=/sd/facing.nc")
+    assert out[-1] == "ok", out
+    session.handle_line("$Files/ListGcode=/sd/")
+    assert "facing.nc" not in out[-2] and "sign_v2.gcode" in out[-2], out
+    session.handle_line("$SD/Delete=/sd/facing.nc"); assert out[-1] == "error:65", out
     print("ALL CHECKS PASSED")
 asyncio.run(main())
 

@@ -34,16 +34,22 @@ public:
     void update() override;
 };
 
+// The chosen file, its file picker, and Use this job (specs/03-screens.md
+// section 3). Widgets and state live in screen_job.cpp.
 class JobScreen : public Screen {
 public:
     const char *title() const override { return "Job"; }
     void create(lv_obj_t *parent) override;
+    void update() override;
 };
 
+// Start panel, progress, prompts, pause, abort, overrides (specs/03-screens.md
+// section 4). Widgets and state live in screen_run.cpp.
 class RunScreen : public Screen {
 public:
     const char *title() const override { return "Run"; }
     void create(lv_obj_t *parent) override;
+    void update() override;
 };
 
 class MacrosScreen : public Screen {

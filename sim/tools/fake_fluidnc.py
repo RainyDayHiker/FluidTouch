@@ -9,8 +9,8 @@ Then add a machine in the simulator with URL 127.0.0.1 and port 81.
 It speaks just enough of the FluidNC websocket protocol for FluidTouch:
 status reports (polled "?" or $Report/Interval auto-reports), $G parser
 state, jogging ($J=), homing ($H/$HX..), zeroing (G10 L20), feed hold /
-resume / reset, overrides, unlock and $Files/ListGcode (serving the folder
-given with --sd, or a few sample files). Anything else gets "ok".
+resume / reset, overrides, unlock, $Files/ListGcode and $SD/Delete (on the
+folder given with --sd, or a few sample files). Anything else gets "ok".
 
 It also runs jobs: $SD/Run=<path> (or $LocalFS/Run=) plays a G-code file from
 the --sd folder, or a built-in sample job when no folder is given. The
@@ -470,6 +470,27 @@ def list_files(sd_root, path):
     return files, None
 
 
+def delete_file(sd_root, path):
+    """$SD/Delete=<path> (a file, not a folder) -> error text or None."""
+    if sd_root is None:
+        folder, _, name = path.rpartition("/")
+        entries = SAMPLE_FILES.get(folder + "/", [])
+        for entry in entries:
+            if entry[0] == name and entry[1] != -1:
+                entries.remove(entry)
+                return None
+        return "No such file"
+    rel = path[len("/sd/"):] if path.startswith("/sd/") else path.lstrip("/")
+    full = os.path.realpath(os.path.join(sd_root, rel))
+    if not full.startswith(os.path.realpath(sd_root)) or not os.path.isfile(full):
+        return "No such file"
+    try:
+        os.remove(full)
+    except OSError:
+        return "Delete failed"
+    return None
+
+
 class Session:
     """One client channel. `out` takes controller output bytes (newline-terminated lines)."""
 
@@ -592,6 +613,15 @@ class Session:
             reply = {"error": error} if error else {"files": files, "path": path}
             self.send("[JSON:" + json.dumps(reply, separators=(",", ":")) + "]")
             self.send("ok")
+        elif up.startswith("$SD/DELETE="):
+            path = line.split("=", 1)[1].strip()
+            error = delete_file(self.sd_root, path)
+            if error:
+                self.send("[MSG:ERR: " + error + " " + path + "]")
+                self.send("error:65" if error == "No such file" else "error:69")
+            else:
+                print(f"  deleted {path}")
+                self.send("ok")
         elif up.startswith("$SD/RUN=") or up.startswith("$LOCALFS/RUN="):
             path = line.split("=", 1)[1].strip()
             data = load_job_file(self.sd_root, path)

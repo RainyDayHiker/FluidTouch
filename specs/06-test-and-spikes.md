@@ -27,7 +27,8 @@ hold, reset, overrides, `$sim/speed`, `$sim/probemiss`, `$sim/drop`; details in
 session (for the `$sim/...` helpers, since the new UI has no terminal yet), and feed hold
 (`!`) behaves as on FluidNC: it ends a jog and is ignored when idle. G-code lines sent
 directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38.2` and
-`G90` back to back); before M2 a line that arrived while another ran was dropped.
+`G90` back to back); before M2 a line that arrived while another ran was dropped. `$SD/Delete`
+deletes a file from the served folder (M3).
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
 that the Run screen has to cope with; none has been measured on the controller, which is
@@ -53,7 +54,7 @@ job is first started and a file first uploaded from the new UI; S5 before M8.
 | S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. See the notes below | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
 | S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
-| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures | G8's 32 MB figure; whether a size confirm (S6) is enough |
+| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures. `UploadManager` refuses files over 10 MB, so the 20 MB file needs that limit raised first (classic code) | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time. **The sketch has not been written**; it also needs an app registration with Microsoft (a client ID) before it can sign in | Inbox option B |
 
 ### S1 result (2026-11-16, Jeffrey, browser on the PC)
