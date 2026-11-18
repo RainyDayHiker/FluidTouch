@@ -409,7 +409,7 @@ async def run_direct_lines(m):
 def load_job_file(sd_root, path):
     """-> file contents for $SD/Run, or None if there is no such file."""
     if sd_root is None:
-        return SAMPLE_JOB
+        return SAMPLE_MACROS.get(path, SAMPLE_JOB)
     rel = path[len("/sd/"):] if path.startswith("/sd/") else path.lstrip("/")
     full = os.path.realpath(os.path.join(sd_root, rel))
     if not full.startswith(os.path.realpath(sd_root)) or not os.path.isfile(full):
@@ -446,8 +446,18 @@ def make_frame(payload: bytes, opcode=0x2):
     return header + payload
 
 
-SAMPLE_FILES = {"/sd/": [("projects", -1), ("facing.nc", 18432), ("sign_v2.gcode", 254871)],
-                "/sd/projects/": [("bracket.nc", 9811), ("drawer_front.nc", 120334)]}
+# Macro files in the classic UI's folder, with their contents. wait_here.gcode
+# holds at an M0, to try Resume.
+SAMPLE_MACROS = {
+    "/sd/fluidtouch/macros/laser_offset.gcode": b"G91\nG0 X33.6 Y-28.2\nG90\n",
+    "/sd/fluidtouch/macros/park.gcode": b"G90\nG0 Z10\nG0 X0 Y0\n",
+    "/sd/fluidtouch/macros/wait_here.gcode": b"G91\nG0 X5\nM0 (MSG Check the bit, then Resume)\nG0 X-5\nG90\n",
+}
+
+SAMPLE_FILES = {"/sd/": [("fluidtouch", -1), ("projects", -1), ("facing.nc", 18432), ("sign_v2.gcode", 254871)],
+                "/sd/projects/": [("bracket.nc", 9811), ("drawer_front.nc", 120334)],
+                "/sd/fluidtouch/": [("macros", -1)],
+                "/sd/fluidtouch/macros/": [(p.rpartition("/")[2], len(d)) for p, d in SAMPLE_MACROS.items()]}
 
 
 def list_files(sd_root, path):
@@ -1384,6 +1394,10 @@ async def main():
         for name in ("facing.nc", "sign_v2.gcode", "projects/bracket.nc", "projects/drawer_front.nc"):
             with open(os.path.join(args.sd, name), "wb") as f:
                 f.write(SAMPLE_JOB)
+        os.makedirs(os.path.join(args.sd, "fluidtouch", "macros"))
+        for path, data in SAMPLE_MACROS.items():
+            with open(os.path.join(args.sd, path[len("/sd/"):]), "wb") as f:
+                f.write(data)
     localfs = os.path.join(scratch.name, "localfs")
     os.makedirs(localfs)
 

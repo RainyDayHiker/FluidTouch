@@ -57,10 +57,15 @@ public:
     void update() override;
 };
 
+// 12 macro buttons, the running macro, edit mode (specs/03-screens.md
+// section 5). Widgets and state live in screen_macros.cpp.
 class MacrosScreen : public Screen {
 public:
     const char *title() const override { return "Macros"; }
     void create(lv_obj_t *parent) override;
+    void update() override;
+    // Leaves edit mode, which saves the list if it changed
+    void onHide() override;
 };
 
 // Machine, Jog & Probe, Display, Tools pages (specs/03-screens.md section 6).

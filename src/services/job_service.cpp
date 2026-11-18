@@ -1,5 +1,6 @@
 #include "services/job_service.h"
 #include "services/machine_service.h"
+#include "services/macro_service.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -209,7 +210,8 @@ void JobService::poll() {
         case RUN_READY:
         case RUN_FINISHED:
         case RUN_ABORTED:
-            if (s.is_sd_printing) {
+            // A macro file is the Macros screen's, not a job (D61)
+            if (s.is_sd_printing && !MacroService::isMacroPath(s.sd_filename)) {
                 // Started elsewhere, or a START whose state change was missed
                 if (strcmp(baseName(s.sd_filename), job.name) != 0) {
                     copy(job.path, sizeof(job.path), s.sd_filename);
