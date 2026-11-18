@@ -76,7 +76,6 @@ struct Field {
     size_t maxLen;
     float min, max;
     int decimals;
-    bool zeroIsNone; // shows 0 as "-" (an empty step)
     lv_obj_t *button;
     void (*changed)(Field &);
 };
@@ -91,11 +90,7 @@ Field *nameField, *ssidField, *passwordField, *urlField, *portField;
 void showField(Field &f) {
     char buf[80];
     if (f.kind == Field::NUMBER) {
-        if (f.zeroIsNone && *f.number == 0) {
-            strcpy(buf, "-");
-        } else {
-            Entry::formatNumber(buf, sizeof(buf), *f.number, f.decimals);
-        }
+        Entry::formatNumber(buf, sizeof(buf), *f.number, f.decimals);
     } else if (!f.text[0]) {
         strcpy(buf, "(none)");
     } else if (f.kind == Field::PASSWORD) {
@@ -264,34 +259,35 @@ void setMachineLocked(bool locked) {
 
 // --- Jog & Probe page ------------------------------------------------------------
 
-Field *xyStepFields[STEPS], *zStepFields[STEPS];
-lv_obj_t *xyStartButtons[STEPS], *zStartButtons[STEPS];
+// The step lists themselves are not changed here; only the step Setup starts
+// with is chosen (D58)
+lv_obj_t *xyStepButtons[STEPS], *zStepButtons[STEPS];
 const int STEP_W = 112, STEP_GAP = 8;
 
 void showStarts() {
-    for (int i = 0; i < STEPS; i++) {
-        bool xy = i == jogDraft.xyStart, z = i == jogDraft.zStart;
-        setButtonColor(xyStartButtons[i], xy ? UITheme::ACCENT_PRIMARY : UITheme::BG_BUTTON);
-        setButtonColor(zStartButtons[i], z ? UITheme::ACCENT_PRIMARY : UITheme::BG_BUTTON);
-        setTextColor(xyStartButtons[i], xy ? lv_color_white() : UITheme::TEXT_MEDIUM);
-        setTextColor(zStartButtons[i], z ? lv_color_white() : UITheme::TEXT_MEDIUM);
-        setEnabled(xyStartButtons[i], jogDraft.xySteps[i] > 0);
-        setEnabled(zStartButtons[i], jogDraft.zSteps[i] > 0);
+    char text[12];
+    for (int axis = 0; axis < 2; axis++) {
+        lv_obj_t **buttons = axis ? zStepButtons : xyStepButtons;
+        const float *steps = axis ? jogDraft.zSteps : jogDraft.xySteps;
+        int start = axis ? jogDraft.zStart : jogDraft.xyStart;
+        for (int i = 0; i < STEPS; i++) {
+            if (steps[i] <= 0) {
+                lv_obj_add_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
+                continue;
+            }
+            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
+            snprintf(text, sizeof(text), "%g", steps[i]);
+            setText(lv_obj_get_child(buttons[i], 0), text);
+            setButtonColor(buttons[i], i == start ? UITheme::ACCENT_PRIMARY : UITheme::BG_BUTTON);
+        }
     }
 }
 
-// The start step must be one that is there
 int firstStep(const float *steps) {
     for (int i = 0; i < STEPS; i++) {
         if (steps[i] > 0) return i;
     }
     return 0;
-}
-
-void onStepChanged(Field &) {
-    if (jogDraft.xySteps[jogDraft.xyStart] <= 0) jogDraft.xyStart = firstStep(jogDraft.xySteps);
-    if (jogDraft.zSteps[jogDraft.zStart] <= 0) jogDraft.zStart = firstStep(jogDraft.zSteps);
-    showStarts();
 }
 
 void onStart(lv_event_t *e) {
@@ -304,34 +300,52 @@ void onStart(lv_event_t *e) {
     showStarts();
 }
 
-int stepRows(lv_obj_t *page, int y, const char *title, float *steps, Field **out, lv_obj_t **starts, int codeBase) {
+void stepRow(lv_obj_t *page, int y, const char *title, lv_obj_t **buttons, int codeBase) {
     section(page, y, title);
-    label(page, 300, y + 4, FONT_SMALL, UITheme::TEXT_MEDIUM, "0 removes a step");
     for (int i = 0; i < STEPS; i++) {
-        int x = i * (STEP_W + STEP_GAP);
-        Field &f = numberField(page, x, y + 28, STEP_W, 52, title, "mm", &steps[i], 0, 1000, 3);
-        f.zeroIsNone = true;
-        f.changed = onStepChanged;
-        out[i] = &f;
-        starts[i] = button(page, x, y + 84, STEP_W, 34, "Start", FONT_SMALL, onStart, (void *)(intptr_t)(codeBase + i));
+        buttons[i] = button(page, i * (STEP_W + STEP_GAP), y + 28, STEP_W, 52, "", FONT_MID, onStart,
+                            (void *)(intptr_t)(codeBase + i));
     }
-    return y + 130;
+}
+
+// Jog feeds: - and + change them by 100; the value itself opens the keypad (D58)
+const int FEED_STEP = 100;
+Field *feedFields[3];
+int feedFieldCount = 0;
+
+void onFeedStep(lv_event_t *e) {
+    int code = (int)(intptr_t)lv_event_get_user_data(e);
+    Field &f = *feedFields[code / 2];
+    float value = *f.number + (code % 2 ? FEED_STEP : -FEED_STEP);
+    if (value < f.min || value > f.max) return;
+    *f.number = value;
+    showField(f);
+}
+
+Field &feedRow(lv_obj_t *page, int y, const char *title, float *value, float max) {
+    rowLabel(page, y, title, nullptr, 224);
+    int i = feedFieldCount++;
+    button(page, VALUE_X - 64, y + 2, 56, 52, LV_SYMBOL_MINUS, FONT_MID, onFeedStep, (void *)(intptr_t)(i * 2));
+    Field &f = numberField(page, VALUE_X, y + 2, VALUE_W, 52, title, "mm/min", value, 1, max, 0);
+    button(page, VALUE_X + VALUE_W + 8, y + 2, 56, 52, LV_SYMBOL_PLUS, FONT_MID, onFeedStep,
+           (void *)(intptr_t)(i * 2 + 1));
+    feedFields[i] = &f;
+    return f;
 }
 
 Field *jogFields[16];
 int jogFieldCount = 0;
 
 void createJogPage(lv_obj_t *page) {
-    int y = stepRows(page, 0, "XY steps", jogDraft.xySteps, xyStepFields, xyStartButtons, 0);
-    y = stepRows(page, y, "Z steps", jogDraft.zSteps, zStepFields, zStartButtons, STEPS);
-    label(page, 0, y - 4, FONT_SMALL, UITheme::TEXT_MEDIUM, "Start: the step Setup starts with.");
+    stepRow(page, 0, "XY step at start", xyStepButtons, 0);
+    stepRow(page, 92, "Z step at start", zStepButtons, STEPS);
 
-    section(page, y += 24, "Jog feeds");
+    int y = 184;
+    section(page, y, "Jog feeds (mm/min)");
     y += 26;
-    jogFields[jogFieldCount++] = &numberRow(page, y, "XY jog feed", "mm/min", &jogDraft.xyFeed, 1, 20000, 0);
-    jogFields[jogFieldCount++] = &numberRow(page, y += ROW_H, "Z jog feed", "mm/min", &jogDraft.zFeed, 1, 10000, 0);
-    jogFields[jogFieldCount++] =
-        &numberRow(page, y += ROW_H, "Joystick full speed", "mm/min", &jogDraft.xyMaxFeed, 1, 20000, 0);
+    jogFields[jogFieldCount++] = &feedRow(page, y, "XY jog feed", &jogDraft.xyFeed, 20000);
+    jogFields[jogFieldCount++] = &feedRow(page, y += ROW_H, "Z jog feed", &jogDraft.zFeed, 10000);
+    jogFields[jogFieldCount++] = &feedRow(page, y += ROW_H, "Joystick full speed", &jogDraft.xyMaxFeed, 20000);
 
     section(page, y += ROW_H + 12, "Probe Z");
     y += 26;
@@ -347,10 +361,6 @@ void createJogPage(lv_obj_t *page) {
 }
 
 void showJogPage() {
-    for (int i = 0; i < STEPS; i++) {
-        showField(*xyStepFields[i]);
-        showField(*zStepFields[i]);
-    }
     for (int i = 0; i < jogFieldCount; i++) showField(*jogFields[i]);
     showStarts();
 }
@@ -366,10 +376,6 @@ struct Choice {
     lv_obj_t *buttons[8];
 };
 
-const uint32_t BRIGHT_VALUES[] = {25, 50, 75, 100};
-const char *const BRIGHT_NAMES[] = {"25%", "50%", "75%", "100%"};
-const uint32_t DIM_BRIGHT_VALUES[] = {5, 10, 25, 50};
-const char *const DIM_BRIGHT_NAMES[] = {"5%", "10%", "25%", "50%"};
 const uint32_t DIM_VALUES[] = {0, 15, 30, 45, 60, 90, 120, 300};
 const char *const DIM_NAMES[] = {"Off", "15 s", "30 s", "45 s", "1 min", "90 s", "2 min", "5 min"};
 const uint32_t OFF_VALUES[] = {0, 60, 120, 300, 600, 900, 1800, 3600};
@@ -379,10 +385,8 @@ const char *const DEEP_NAMES[] = {"Off", "5 min", "10 min", "15 min", "30 min", 
 const uint32_t ROTATE_VALUES[] = {0, 1};
 const char *const ROTATE_NAMES[] = {"Off", "On"};
 
-enum ChoiceId { CH_BRIGHT, CH_DIM_BRIGHT, CH_DIM, CH_OFF, CH_DEEP, CH_ROTATE, CH_COUNT };
+enum ChoiceId { CH_DIM, CH_OFF, CH_DEEP, CH_ROTATE, CH_COUNT };
 Choice choices[CH_COUNT] = {
-    {"Brightness", BRIGHT_VALUES, BRIGHT_NAMES, 4, {}},
-    {"Dimmed brightness", DIM_BRIGHT_VALUES, DIM_BRIGHT_NAMES, 4, {}},
     {"Dim after", DIM_VALUES, DIM_NAMES, 8, {}},
     {"Screen off after", OFF_VALUES, OFF_NAMES, 8, {}},
     {"Deep sleep after", DEEP_VALUES, DEEP_NAMES, 7, {}},
@@ -392,8 +396,6 @@ Choice choices[CH_COUNT] = {
 uint32_t choiceValue(int id) {
     const SettingsService::Display &d = displayDraft;
     switch (id) {
-        case CH_BRIGHT: return d.brightness;
-        case CH_DIM_BRIGHT: return d.dimBrightness;
         case CH_DIM: return d.dimAfter;
         case CH_OFF: return d.offAfter;
         case CH_DEEP: return d.deepSleepAfter;
@@ -446,11 +448,6 @@ void onChoice(lv_event_t *e) {
     uint32_t v = choices[id].values[index];
     SettingsService::Display &d = displayDraft;
     switch (id) {
-        case CH_BRIGHT:
-            d.brightness = (uint8_t)v;
-            PowerManager::setNormalBrightness(d.brightness);  // seen at once; stored on leaving
-            break;
-        case CH_DIM_BRIGHT: d.dimBrightness = (uint8_t)v; break;
         case CH_DIM: d.dimAfter = v; break;
         case CH_OFF: d.offAfter = v; break;
         case CH_DEEP: d.deepSleepAfter = v; break;
@@ -460,8 +457,49 @@ void onChoice(lv_event_t *e) {
     showChoices();
 }
 
+// Brightness: a slider from 25 to 100% in steps of 5. Dimming goes to a
+// quarter of it, at least 5% (D58).
+const int BRIGHT_MIN = 25, BRIGHT_MAX = 100;
+lv_obj_t *brightSlider;
+lv_obj_t *brightValue;
+
+uint8_t dimFor(int brightness) { return brightness / 4 < 5 ? 5 : brightness / 4; }
+
+void showBrightness() {
+    int b = displayDraft.brightness < BRIGHT_MIN ? BRIGHT_MIN : displayDraft.brightness;
+    lv_slider_set_value(brightSlider, b, LV_ANIM_OFF);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%d%%", displayDraft.brightness);
+    setText(brightValue, buf);
+}
+
+void onBrightness(lv_event_t *) {
+    int v = (lv_slider_get_value(brightSlider) + 2) / 5 * 5;
+    if (v < BRIGHT_MIN) v = BRIGHT_MIN;
+    if (v > BRIGHT_MAX) v = BRIGHT_MAX;
+    if (v == displayDraft.brightness) return;
+    displayDraft.brightness = (uint8_t)v;
+    displayDraft.dimBrightness = dimFor(v);
+    PowerManager::setNormalBrightness(displayDraft.brightness);  // seen at once; stored on leaving
+    showBrightness();
+}
+
 void createDisplayPage(lv_obj_t *page) {
-    int y = 0;
+    label(page, 0, 0, FONT_MID, UITheme::TEXT_LIGHT, "Brightness");
+    label(page, 150, 2, FONT_SMALL, UITheme::TEXT_MEDIUM, "Dims to a quarter of this, at least 5%.");
+    brightSlider = lv_slider_create(page);
+    lv_obj_set_pos(brightSlider, 12, 46);
+    lv_obj_set_size(brightSlider, 460, 14);
+    lv_slider_set_range(brightSlider, BRIGHT_MIN, BRIGHT_MAX);
+    lv_obj_set_style_bg_color(brightSlider, UITheme::BG_BUTTON, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(brightSlider, UITheme::ACCENT_PRIMARY, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(brightSlider, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_pad_all(brightSlider, 10, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(brightSlider, 20);
+    lv_obj_add_event_cb(brightSlider, onBrightness, LV_EVENT_VALUE_CHANGED, nullptr);
+    brightValue = label(page, 500, 40, FONT_BIG, UITheme::TEXT_LIGHT, "");
+
+    int y = 90;
     for (int id = 0; id < CH_COUNT; id++) {
         Choice &c = choices[id];
         lv_obj_t *t = label(page, 0, y, FONT_MID, UITheme::TEXT_LIGHT, c.title);
@@ -572,6 +610,7 @@ void loadDrafts() {
     laserX = o.x;
     laserY = o.y;
     displayDraft = SettingsService::display();
+    displayDraft.dimBrightness = dimFor(displayDraft.brightness);  // D58
 }
 
 void loadMachines() {
@@ -580,15 +619,6 @@ void loadMachines() {
         slotEdited[i] = false;
     }
     draftSlot = SettingsService::machineSlot();
-}
-
-// The steps closed up: {100, 0, 10, 1, 0} -> {100, 10, 1}
-int closeUp(const float *in, float *out) {
-    int n = 0;
-    for (int i = 0; i < STEPS; i++) {
-        if (in[i] > 0) out[n++] = in[i];
-    }
-    return n;
 }
 
 void saveAll() {
@@ -612,16 +642,12 @@ void saveAll() {
     if (reconnect || nameOnly) MachineService::useMachine(reconnect);
 
     SettingsService::Jog j = SettingsService::jog();
-    j.xyStepCount = closeUp(jogDraft.xySteps, j.xySteps);
-    j.zStepCount = closeUp(jogDraft.zSteps, j.zSteps);
-    if (j.xyStepCount && j.zStepCount) {  // at least one step each, or nothing changes
-        j.xyStep = jogDraft.xySteps[jogDraft.xyStart];
-        j.zStep = jogDraft.zSteps[jogDraft.zStart];
-        j.xyFeed = (int)jogDraft.xyFeed;
-        j.zFeed = (int)jogDraft.zFeed;
-        j.xyMaxFeed = (int)jogDraft.xyMaxFeed;
-        if (SettingsService::saveJog(j)) wrote = true;
-    }
+    j.xyStep = jogDraft.xySteps[jogDraft.xyStart];
+    j.zStep = jogDraft.zSteps[jogDraft.zStart];
+    j.xyFeed = (int)jogDraft.xyFeed;
+    j.zFeed = (int)jogDraft.zFeed;
+    j.xyMaxFeed = (int)jogDraft.xyMaxFeed;
+    if (SettingsService::saveJog(j)) wrote = true;
     if (SettingsService::saveProbe({(int)probeFeed, (int)probeDistance, probeBack})) wrote = true;
     if (SettingsService::saveLaserOffset({laserX, laserY})) wrote = true;
     bool rotateChanged = displayDraft.rotate180 != SettingsService::display().rotate180;
@@ -695,6 +721,7 @@ void SettingsScreen::create(lv_obj_t *parent) {
     showMachine();
     showJogPage();
     showChoices();
+    showBrightness();
     showPage(PAGE_MACHINE);
 }
 
@@ -704,6 +731,7 @@ void SettingsScreen::onShow() {
     showMachine();
     showJogPage();
     showChoices();
+    showBrightness();
     showPage(pageShown);
 }
 

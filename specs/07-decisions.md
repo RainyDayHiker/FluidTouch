@@ -61,6 +61,7 @@
 | D55 | Settings saves when it is left (another tab, or a restart from Tools), writing only the keys that changed; no Save button (2026-11-17) | Save/Revert per page; one Save button | Fewest presses. Flash writes flicker the panel (D44), so nothing is written per tap |
 | D56 | Numbers are entered on a keypad pop-up, text on a keyboard pop-up (2026-11-17) | +/- nudges beside the values | Settings are set once and rarely; exact values matter more than speed |
 | D57 | A temporary machine picker on Settings > Machine: the new UI uses the classic slot chosen there (`lrt` key `machine_slot`, default 0) instead of always slot 0 (2026-11-17) | Slot 0 only (D5) | During development the display switches between the real machine and the fake FluidNC. To be removed at the end, going back to D5 |
+| D58 | Settings review: Jog & Probe only chooses the start steps (the step lists are not edited); jog feeds get -/+ 100 buttons beside the keypad value; brightness is a slider (25 to 100%), and the dimmed level is no longer a setting: a quarter of the brightness, at least 5% (2026-11-17) | Editable step lists; keypad only (D56); four brightness choices and a dimmed-brightness choice | The step lists don't need changing; feeds are nudged more than typed; fewer settings |
 
 ## Open questions
 
