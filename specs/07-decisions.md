@@ -65,6 +65,7 @@
 | D59 | The new UI keeps its own list of 12 macros in the `lrt` namespace, one list (not per machine slot), starting empty (2026-11-17) | Share classic's 9-slot list (`m<slot>_macros`); copy classic's once | 12 slots and command macros don't fit classic's record; Jeffrey sets the few up again |
 | D60 | A macro is a file in the macros folder or one command line | Files only | Short things such as `$H` or a G0 to a park position need no file |
 | D61 | A running macro stays on Macros (strip with progress, last message, Resume at a hold, Stop as a soft reset); Run does not take macro files as jobs. Edit mode: tap a slot for a pop-up (name, file or command, colour, move left/right, clear), saved on Done or leaving | Treat a macro as a job on Run; classic's list editor with up/down/edit/delete per row | A macro is short and run from Macros; Run stays the job's |
+| D62 | Position log: a switch on Settings > Tools (Off by default); when on, every job's status reports (every 250 ms: time, state, `SD:` percent, work position, feed, new messages) go to a CSV in `/logs` on the display SD. Kept as a diagnostic after S3 (2026-11-17) | Record every job always; a record button per job on Run; a faster report rate while recording; a throwaway for S3 | Off unless needed; the connection stays as it is; small enough to keep |
 
 ## Open questions
 

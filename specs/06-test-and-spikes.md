@@ -87,8 +87,31 @@ points are confirmed by the result above. The fake FluidNC follows this.
 S3 **drives the machine**: it runs a job from FluidNC's SD card while the display records
 time, `SD:` percent and position. Two things are not there yet:
 
-- The recording. Nothing in the M1 build writes a log to the display SD. It has to be added
-  (a few lines per status report to a file) before S3 can be run.
+- The recording: the position log (M3, D62), switched on in Settings > Tools.
+
+#### Position log
+
+While it is on, every job is recorded to the display SD, from Run's start (or a job started
+elsewhere being seen) to its end (finished or aborted). Macros are not jobs and are not
+recorded.
+
+- File: `/logs/<job name without extension>-NNN.csv`, NNN the first unused number from
+  001; the folder is made when missing.
+- One row per status report (every 250 ms), none while the connection is down (the gap
+  shows in `ms`):
+
+  ```
+  ms,state,percent,wx,wy,wz,feed,message
+  0,Run,0.00,0.000,0.000,5.000,0,
+  250,Run,0.41,1.204,0.000,5.000,1200,"Operation 1 of 2: Pocket"
+  ```
+
+  `ms` since the start of the recording; `state` as FluidNC names it; `percent` the `SD:`
+  field (empty when there is none); work position; feed rate; `message` only when it
+  changed since the row before, quoted.
+- Rows are kept in RAM and written every 2 s or 4 KB, and at the end. A missing card or a
+  failed write ends that recording; Settings > Tools shows why.
+- The switch is the `lrt` key `pos_log` (Off by default), saved with the other settings.
 - A decision on which job. S3 does not need the reference job; any job with arcs, a few
   operations and an `M0` answers the question, and a short one is easier to repeat.
 
