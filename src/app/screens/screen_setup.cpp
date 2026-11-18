@@ -54,6 +54,9 @@ lv_obj_t *unlockButton;
 lv_obj_t *resetButton;
 lv_obj_t *xyStepButtons[SettingsService::MAX_STEPS];
 lv_obj_t *zStepButtons[SettingsService::MAX_STEPS];
+lv_obj_t *xyFeedValue;
+lv_obj_t *zFeedValue;
+uint32_t settingsGeneration;
 int xyStepIndex = 0;
 int zStepIndex = 0;
 
@@ -109,23 +112,38 @@ void showSteps() {
     }
 }
 
-// Steps that touch each other, like one control
+// The step values on their buttons; buttons past count are hidden
+void labelSteps(lv_obj_t **buttons, const float *steps, int count) {
+    char text[12];
+    for (int i = 0; i < SettingsService::MAX_STEPS; i++) {
+        if (i < count) {
+            snprintf(text, sizeof(text), "%g", steps[i]);
+            setText(lv_obj_get_child(buttons[i], 0), text);
+            lv_obj_clear_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(buttons[i], LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+// Steps that touch each other, like one control. There are always
+// MAX_STEPS buttons, so new step lists from Settings fit (labelSteps).
 void makeSteps(lv_obj_t *parent, int x, int y, int w, int h, bool vertical, const float *steps, int count,
                lv_obj_t **out, lv_event_cb_t onClick) {
-    char text[12];
-    for (int i = 0; i < count; i++) {
-        snprintf(text, sizeof(text), "%g", steps[i]);
-        lv_obj_t *b = button(parent, vertical ? x : x + i * w, vertical ? y + i * h : y, w, h, text, FONT_MID,
+    for (int i = 0; i < SettingsService::MAX_STEPS; i++) {
+        lv_obj_t *b = button(parent, vertical ? x : x + i * w, vertical ? y + i * h : y, w, h, "", FONT_MID,
                              onClick, (void *)(intptr_t)i);
         lv_obj_set_style_radius(b, 0, 0);
         lv_obj_set_style_border_width(b, 1, 0);
         lv_obj_set_style_border_color(b, UITheme::BG_DARKER, 0);
         out[i] = b;
     }
+    labelSteps(out, steps, count);
 }
 
-// The jog feed, centred in a box: the value, "mm/min" under it
-void feedLabel(lv_obj_t *parent, int x, int y, int w, int h, int feed) {
+// The jog feed, centred in a box: the value, "mm/min" under it. Returns
+// the value's label.
+lv_obj_t *feedLabel(lv_obj_t *parent, int x, int y, int w, int h, int feed) {
     char buf[16];
     snprintf(buf, sizeof(buf), "%d", feed);
     lv_obj_t *value = label(parent, x, y + h / 2 - 22, FONT_MID, UITheme::TEXT_LIGHT, buf);
@@ -134,6 +152,7 @@ void feedLabel(lv_obj_t *parent, int x, int y, int w, int h, int feed) {
         lv_obj_set_width(l, w);
         lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     }
+    return value;
 }
 
 // A button showing a large icon, optionally turned (in 0.1 degree), with a
@@ -440,7 +459,7 @@ void createXY(lv_obj_t *parent) {
             int x = col * (PAD_CELL + PAD_GAP);
             int y = row * (PAD_CELL + PAD_GAP);
             if (!icons[row][col]) {
-                feedLabel(padGroup, x, y, PAD_CELL, PAD_CELL, jog.xyFeed);
+                xyFeedValue = feedLabel(padGroup, x, y, PAD_CELL, PAD_CELL, jog.xyFeed);
                 continue;
             }
             int dx = col - 1;
@@ -456,11 +475,11 @@ void createZ(lv_obj_t *parent) {
     // Z+ and Z- with the Z jog feed between them
     const int h = 108, gap = 280 - 2 * h;
     other(iconButton(parent, Z_X, LOWER_Y, Z_W, h, LV_SYMBOL_UP, 0, "Z+", UITheme::AXIS_Z, onZ, (void *)1));
-    feedLabel(parent, Z_X, LOWER_Y + h, Z_W, gap, jog.zFeed);
+    zFeedValue = feedLabel(parent, Z_X, LOWER_Y + h, Z_W, gap, jog.zFeed);
     other(iconButton(parent, Z_X, LOWER_Y + h + gap, Z_W, h, LV_SYMBOL_DOWN, 0, "Z-", UITheme::AXIS_Z, onZ,
                      (void *)(intptr_t)-1));
     makeSteps(parent, Z_STEP_X, LOWER_Y, STEP_W, STEP_H, true, jog.zSteps, jog.zStepCount, zStepButtons, onZStep);
-    for (int i = 0; i < jog.zStepCount; i++) other(zStepButtons[i]);
+    for (lv_obj_t *b : zStepButtons) other(b);
 }
 
 void createRight(lv_obj_t *parent) {
@@ -549,6 +568,7 @@ void updateProbePopup(bool usable) {
 
 void SetupScreen::create(lv_obj_t *parent) {
     jog = SettingsService::jog();
+    settingsGeneration = SettingsService::generation();
     xyStepIndex = nearestIndex(jog.xySteps, jog.xyStepCount, jog.xyStep);
     zStepIndex = nearestIndex(jog.zSteps, jog.zStepCount, jog.zStep);
 
@@ -562,6 +582,25 @@ void SetupScreen::create(lv_obj_t *parent) {
     createProbePopup(parent);
     showSteps();
     showXYMode();
+}
+
+void SetupScreen::onShow() {
+    if (settingsGeneration == SettingsService::generation()) return;
+    // Settings saved: new steps, feeds or offsets. The step chosen here goes
+    // back to the start step (specs/03-screens.md section 6).
+    settingsGeneration = SettingsService::generation();
+    if (stickJogging) stopStick();
+    jog = SettingsService::jog();
+    xyStepIndex = nearestIndex(jog.xySteps, jog.xyStepCount, jog.xyStep);
+    zStepIndex = nearestIndex(jog.zSteps, jog.zStepCount, jog.zStep);
+    labelSteps(xyStepButtons, jog.xySteps, jog.xyStepCount);
+    labelSteps(zStepButtons, jog.zSteps, jog.zStepCount);
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", jog.xyFeed);
+    setText(xyFeedValue, buf);
+    snprintf(buf, sizeof(buf), "%d", jog.zFeed);
+    setText(zFeedValue, buf);
+    showSteps();
 }
 
 void SetupScreen::update() {
