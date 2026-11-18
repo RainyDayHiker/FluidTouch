@@ -62,13 +62,14 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
 
 ## 2. Next steps
 
-1. **Start M3** ([08](08-milestones.md)): Job list from the controller's and the display's
-   SD (no preview), start panel, Run screen (Prompt state for `M0`, pause, abort, overrides,
-   progress, times), Macros, Settings pages, upload from the display SD; S3 and S4. Review
-   each screen's control list with Jeffrey before building it, as was done for Setup.
-2. Settings (M3) takes over from classic Settings > Jog and Probe for: jog step lists and
-   default steps, XY and Z jog feeds, joystick Max XY feed, probe feed and distance, laser
-   offset, probe back-off. Save on an explicit action, changed keys only (D44, D45).
+1. **M3 in progress** ([08](08-milestones.md)). Built and run in the simulator only, not
+   yet on the device or merged: Job and Run (branch `lrt/m3-job-run`, D47 to D53), then
+   Settings on `lrt/m3-settings`, branched from it (D54 to D57: Machine with a temporary
+   slot picker, Jog & Probe, Display, Tools; saved on leaving Settings). Jeffrey reviewed
+   Job and Run from screenshots ("good to move forward"; layout tweaks wait for the
+   preview). Next: device check of both, merge, then Macros, the position log, S3 and S4.
+   Review each screen's control list with Jeffrey before building it.
+2. The temporary machine picker (D57) is to be removed at the end of development.
 3. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.
 

@@ -8,7 +8,7 @@
 | D2 | Stay mergeable with upstream for platform code; edits to kept files are minimal and listed in [02 §2](02-architecture.md#2-changes-to-kept-code) | Diverging freely | Upstream fixes to drivers and client are wanted |
 | D3 | The classic UI stays in the firmware, selected at boot | Deleting it once the new screens exist | A fallback for controls not yet carried over; also keeps `src/ui` unmodified, which helps D2 |
 | D4 | WiFi only in the new UI | ESP-NOW or wired | Preview, transforms and uploads need file transfer; ESP-NOW has none |
-| D5 | One machine; connection settings shared with classic slot 0 | Separate settings | No re-entry when switching UI |
+| D5 | One machine; connection settings shared with classic slot 0 (a temporary slot picker for development, D57) | Separate settings | No re-entry when switching UI |
 | D6 | G-code logic is a C++ port of the CNC-Tools core, proven equal by golden cases exported from the TypeScript | Running the TypeScript on device; making C++ the single source for both | A JS engine does not fit the memory and speed budget; rewriting a working desktop app is out of scope |
 | D7 | The library streams; no whole-file model | Porting the document model | 8 MB PSRAM shared with display and code |
 | D8 | The display SD holds the working copy; FluidNC's SD holds what runs | Working in PSRAM; transforming on the controller's card | File size is then not limited by RAM; originals stay untouched |
@@ -57,6 +57,10 @@
 | D51 | "Use this job" opens Run's start panel: file and a large START, nothing else until M5. Until the preview exists, Run's preview area shows the file and the current message in large type; time left is estimated from the `SD:` percent, marked ~ (2026-11-17) | Starting from Job; a full-width Run layout until M5; elapsed time only | Starting stays on Run; the layout doesn't change when the preview arrives |
 | D52 | Run: the final `M0` is a Prompt like the others, and CONTINUE then Finished ends the job (was Q18). Feed override in 10% steps only (was Q19) (2026-11-17) | Finished at the last `M0`; 1% steps as well | |
 | D53 | Uploaded and generated jobs go to `/sd/fluidtouch/uploads/` on the controller (was Q7) (2026-11-17) | `/sd/lrt/`; the SD root | The classic UI's upload already uses it: one place for both UIs |
+| D54 | Settings pages for M3: Machine, Jog & Probe (the Laser page folded in), Display, Tools (2026-11-17) | The six pages of the first spec | The Job picker already covers listing and deleting files; travel, terminal, backup and the inbox wait for the features that use them |
+| D55 | Settings saves when it is left (another tab, or a restart from Tools), writing only the keys that changed; no Save button (2026-11-17) | Save/Revert per page; one Save button | Fewest presses. Flash writes flicker the panel (D44), so nothing is written per tap |
+| D56 | Numbers are entered on a keypad pop-up, text on a keyboard pop-up (2026-11-17) | +/- nudges beside the values | Settings are set once and rarely; exact values matter more than speed |
+| D57 | A temporary machine picker on Settings > Machine: the new UI uses the classic slot chosen there (`lrt` key `machine_slot`, default 0) instead of always slot 0 (2026-11-17) | Slot 0 only (D5) | During development the display switches between the real machine and the fake FluidNC. To be removed at the end, going back to D5 |
 
 ## Open questions
 
