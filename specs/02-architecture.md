@@ -53,8 +53,13 @@ Every flash access, read or write, briefly stops the RGB panel from reading its 
 PSRAM, which shows as a flicker (seen on the device, 2026-11-17). SettingsService therefore
 reads slot 0 and the `lrt` values once and keeps them, and the working screens never write
 (D44, D45). Settings is the one place that saves, on an explicit action, not per press (M3).
-Classic's `saveMachine()` rewrites every key of every machine; the new Settings should
-write only the keys that changed.
+Classic's `saveMachine()` rewrites every key of every machine, so the new Settings writes
+only the keys that changed, itself, with the classic key names (`m<slot>_ssid`, `m<slot>_jxy_fd`
+and so on, `pm_*` and `display_rot`), and then marks classic's machine cache stale. Which
+slot is used comes from `lrt` `machine_slot` (D57; 0 when not set). After a save,
+`SettingsService::generation()` changes, so screens that copied values (Setup) take them
+again when next shown, and `MachineService::useMachine()` reconnects when the slot or the
+connection changed.
 
 ## 4. Services
 

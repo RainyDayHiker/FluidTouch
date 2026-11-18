@@ -22,6 +22,7 @@ bool MachineService::jobAtDrop = false;
 bool MachineService::lastJobActive = false;
 bool MachineService::networkServicesStarted = false;
 bool MachineService::connectPending = false;
+bool MachineService::reloadPending = false;
 bool MachineService::jobSession = false;
 bool MachineService::userHold = false;
 int MachineService::retryCount = 0;
@@ -62,7 +63,8 @@ void MachineService::begin(DisplayDriver *displayDriver) {
 
     machineState = SettingsService::machine(config);
     if (machineState != SettingsService::MACHINE_OK) {
-        Serial.printf("MachineService: no usable machine in classic slot 0 (status %d)\n", (int)machineState);
+        Serial.printf("MachineService: no usable machine in slot %d (status %d)\n", SettingsService::machineSlot() + 1,
+                      (int)machineState);
         linkState = LINK_NO_MACHINE;
         return;
     }
@@ -129,6 +131,10 @@ void MachineService::poll() {
         connectRunning = false;
         stateSinceMs = millis();       // the wait for the first status report starts here
         if (!connectOk) scheduleRetry();
+        if (reloadPending) {
+            reloadPending = false;
+            useMachine(true);
+        }
     }
     FluidNCClient::loop();
 
@@ -397,6 +403,49 @@ void MachineService::probeZ(int maxDistance, int feed, float backOff) {
     }
     probing = true;
     restoreG90 = !wasG91;  // sent when the result arrives
+}
+
+void MachineService::useMachine(bool reconnectNow) {
+    MachineConfig old = config;
+    SettingsService::MachineStatus oldState = machineState;
+    if (!reconnectNow) {
+        // Only the name may have changed
+        MachineConfig fresh;
+        if (SettingsService::machine(fresh) == SettingsService::MACHINE_OK) strcpy(config.name, fresh.name);
+        return;
+    }
+    if (connectRunning) {
+        reloadPending = true;  // the connect task is using config
+        return;
+    }
+    machineState = SettingsService::machine(config);
+    if (machineState == SettingsService::MACHINE_OK) {
+        Serial.printf("MachineService: machine '%s' at %s:%d, WiFi '%s' (from Settings)\n", config.name,
+                      config.fluidnc_url, config.websocket_port, config.ssid);
+    } else {
+        Serial.printf("MachineService: no usable machine in slot %d (status %d)\n",
+                      SettingsService::machineSlot() + 1, (int)machineState);
+    }
+    if (linkState == LINK_ONLINE || linkState == LINK_CONTROLLER) FluidNCClient::disconnect();
+    wasOnline = false;
+    jobAtDrop = false;
+    probing = false;
+    homeYStage = HOME_Y_NONE;
+    retryCount = 0;
+    retriesStopped = false;
+    connectPending = false;
+    if (machineState != SettingsService::MACHINE_OK) {
+        linkState = LINK_NO_MACHINE;
+        return;
+    }
+    bool wifiChanged = oldState != SettingsService::MACHINE_OK || strcmp(old.ssid, config.ssid) != 0 ||
+                       strcmp(old.password, config.password) != 0;
+    if (wifiChanged || WiFi.status() != WL_CONNECTED) {
+        WiFi.disconnect();
+        startWifi();
+    } else {
+        retryControllerIn(FIRST_CONNECT_DELAY_MS);
+    }
 }
 
 void MachineService::reconnect() {

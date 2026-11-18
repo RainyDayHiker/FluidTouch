@@ -20,6 +20,9 @@ public:
 
     // Called when the screen becomes the visible one
     virtual void onShow() {}
+
+    // Called when another screen is about to become the visible one
+    virtual void onHide() {}
 };
 
 // A centred title and a line of text, for screens that are not built yet
@@ -32,6 +35,8 @@ public:
     const char *title() const override { return "Setup"; }
     void create(lv_obj_t *parent) override;
     void update() override;
+    // Takes the jog values again after Settings saved new ones
+    void onShow() override;
 };
 
 // The chosen file, its file picker, and Use this job (specs/03-screens.md
@@ -58,10 +63,16 @@ public:
     void create(lv_obj_t *parent) override;
 };
 
+// Machine, Jog & Probe, Display, Tools pages (specs/03-screens.md section 6).
+// Values are edited in place and saved when the screen is left (D55).
+// Widgets and state live in screen_settings.cpp.
 class SettingsScreen : public Screen {
 public:
     const char *title() const override { return "Settings"; }
     void create(lv_obj_t *parent) override;
+    void update() override;
+    void onShow() override;
+    void onHide() override;
 };
 
 #endif // LRT_SCREENS_H

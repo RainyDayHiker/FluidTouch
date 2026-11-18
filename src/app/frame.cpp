@@ -219,6 +219,10 @@ void Frame::createBanner(lv_obj_t *root) {
 }
 
 void Frame::show(ScreenId id) {
+    static bool shownOnce = false;
+    // Settings saves when it is left (D55)
+    if (shownOnce && id != currentId) screens[currentId]->onHide();
+    shownOnce = true;
     currentId = id;
     for (int i = 0; i < SCREEN_COUNT; i++) {
         bool selected = i == id;
@@ -312,11 +316,12 @@ void Frame::updateBanner() {
         case MachineService::LINK_NO_MACHINE:
             kind = BANNER_NO_MACHINE;
             if (MachineService::machineStatus() == SettingsService::MACHINE_NOT_WIFI) {
-                snprintf(text, sizeof(text), "Machine 1 is not a WiFi machine. Change it in the classic UI.");
+                snprintf(text, sizeof(text), "Machine %d is not a WiFi machine. Choose or set up one in Settings.",
+                         SettingsService::machineSlot() + 1);
             } else {
-                snprintf(text, sizeof(text), "No machine is set up. Add one (WiFi) in the classic UI.");
+                snprintf(text, sizeof(text), "No machine is set up. Add one (WiFi) in Settings.");
             }
-            button = "Classic UI";
+            button = "Settings";
             break;
         case MachineService::LINK_WIFI:
             kind = BANNER_LINK;
@@ -410,7 +415,7 @@ void Frame::onBannerButtonClicked(lv_event_t *e) {
     switch (bannerKind) {
         case BANNER_ALARM:      MachineService::unlock(); break;
         case BANNER_LINK:       MachineService::reconnect(); break;
-        case BANNER_NO_MACHINE: UiMode::restartInto(UiMode::CLASSIC); break;
+        case BANNER_NO_MACHINE: show(SCREEN_SETTINGS); break;
         default: break;
     }
 }

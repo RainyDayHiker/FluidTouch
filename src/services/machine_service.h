@@ -123,6 +123,11 @@ public:
     // Retry the connection now instead of waiting for the next attempt.
     // Does nothing while an attempt is under way.
     static void reconnect();
+    // Settings > Machine saved: take the machine from settings again. With
+    // reconnect, drops the connection and connects to it (WiFi too when that
+    // changed); without, only the name is taken. Waits for an attempt that is
+    // under way to finish.
+    static void useMachine(bool reconnect);
 
 private:
     class Listener : public FluidNCClientListener {
@@ -148,6 +153,7 @@ private:
     static bool jobSession;
     static bool userHold;
     static bool connectPending;      // connectController() is due at connectAtMs
+    static bool reloadPending;       // useMachine() is due once the connect task has finished
     static int retryCount;           // retries scheduled since the last success or Reconnect
     static bool retriesStopped;      // back-off used up; waiting for Reconnect
     // A connection attempt runs on its own task because FluidNCClient::connect()
