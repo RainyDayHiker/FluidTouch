@@ -58,6 +58,7 @@ bool currentConfigured = false;
 
 struct LrtValues {
     float laserX, laserY, probeBack;
+    bool positionLog;
 };
 LrtValues lrt;
 bool lrtLoaded = false;
@@ -95,6 +96,7 @@ const LrtValues &loadLrt() {
         lrt.laserX = prefs.getFloat("laser_x", 33.6f);
         lrt.laserY = prefs.getFloat("laser_y", -28.2f);
         lrt.probeBack = prefs.getFloat("probe_back", 10.0f);
+        lrt.positionLog = prefs.getBool("pos_log", false);
         prefs.end();
     }
     return lrt;
@@ -189,6 +191,8 @@ SettingsService::Probe SettingsService::probe() {
     }
     return p;
 }
+
+bool SettingsService::positionLog() { return loadLrt().positionLog; }
 
 SettingsService::LaserOffset SettingsService::laserOffset() {
     const LrtValues &v = loadLrt();
@@ -391,6 +395,16 @@ bool SettingsService::saveLaserOffset(const LaserOffset &o) {
     }
     if (w.wrote()) gen++;
     return w.wrote();
+}
+
+bool SettingsService::savePositionLog(bool on) {
+    loadLrt();
+    if (lrt.positionLog == on) return false;
+    Writer w(LRT_PREFS_NAMESPACE);
+    w.p().putBool("pos_log", on);
+    lrt.positionLog = on;
+    gen++;
+    return true;
 }
 
 bool SettingsService::saveDisplay(const Display &d) {

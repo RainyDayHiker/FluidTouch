@@ -80,6 +80,11 @@ public:
     // Call from the main loop
     static void poll();
 
+    // Is the display SD there? Mounts it if it was not at boot.
+    static bool displayCardReady();
+    // An upload task is reading the display SD; others keep off it
+    static bool displayCardBusy();
+
 private:
     enum Request { REQUEST_NONE, REQUEST_LIST, REQUEST_CHECK, REQUEST_VERIFY };
 
@@ -89,7 +94,6 @@ private:
     static void finishRequest(bool ok, const char *error);
     static int parseListing(const char *json, Entry *out, int max, bool &truncated, char *error, int errorLen);
     static void sortEntries();
-    static bool displayCardReady();
     static bool findInListing(const char *name, int32_t &size);
 
     static Entry *entries;
