@@ -9,6 +9,7 @@
 #include "services/file_service.h"
 #include "services/job_service.h"
 #include "services/machine_service.h"
+#include "services/macro_service.h"
 
 bool LrtApp::running = false;
 
@@ -29,6 +30,7 @@ void LrtApp::loop() {
     MachineService::poll();  // also runs FluidNCClient::loop()
     FileService::poll();
     JobService::poll();
+    MacroService::poll();
 
     uint32_t now = millis();
 
