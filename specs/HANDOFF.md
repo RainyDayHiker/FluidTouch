@@ -62,13 +62,12 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
 
 ## 2. Next steps
 
-1. **M3 in progress** ([08](08-milestones.md)). Built and run in the simulator only, not
-   yet on the device or merged: Job and Run (branch `lrt/m3-job-run`, D47 to D53), then
-   Settings on `lrt/m3-settings`, branched from it (D54 to D57: Machine with a temporary
-   slot picker, Jog & Probe, Display, Tools; saved on leaving Settings). Jeffrey reviewed
-   Job and Run from screenshots ("good to move forward"; layout tweaks wait for the
-   preview). Next: device check of both, merge, then Macros, the position log, S3 and S4.
-   Review each screen's control list with Jeffrey before building it.
+1. **M3 in progress** ([08](08-milestones.md)). Job and Run (D47 to D53) and Settings
+   (D54 to D58: Machine with a temporary slot picker, Jog & Probe, Display, Tools; saved
+   on leaving Settings) are checked on the device by Jeffrey (2026-11-17, "all good") and
+   merged into `lrt/main`. Layout tweaks to Job and Run wait for the preview. Next: Macros,
+   the position log, S3 and S4. Review each screen's control list with Jeffrey before
+   building it.
 2. The temporary machine picker (D57) is to be removed at the end of development.
 3. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.
