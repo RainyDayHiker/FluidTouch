@@ -233,6 +233,7 @@ macros, "No macros yet. Tap Edit to add one.") and Edit on the right. While a ma
 its name, "running", the controller's last message, a progress bar for a file (from the
 `SD:` percent), Resume while the controller holds (an M0 in the macro, or a feed hold), and
 Stop. Afterwards "done" or the reason it stopped, until the next macro runs or 10 s pass.
+Edit is there whenever Stop is not, also beside "done" or "stopped".
 
 **Running** (D61). A tap runs the macro when the machine is idle with no job (as Zero). A
 file runs with `$SD/Run=/sd/fluidtouch/macros/<file>`; a command is sent as it is. The

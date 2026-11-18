@@ -189,6 +189,8 @@ void updateStrip() {
     bool running = !editing && st != MacroService::RUN_NONE;
     show(hintGroup, !running);
     show(runGroup, running);
+    // Edit (or Done) whenever Stop is not there
+    show(editButton, editing || !MacroService::active());
     if (!running) {
         const char *hint;
         if (editing) {
@@ -490,7 +492,8 @@ void MacrosScreen::create(lv_obj_t *parent) {
 
     hintGroup = group(strip, 0, 0, 784, STRIP_H);
     hintLabel = label(hintGroup, 14, 16, FONT_MID, UITheme::TEXT_MEDIUM, "");
-    editButton = button(hintGroup, 784 - 4 - 140, 4, 140, 48, LV_SYMBOL_EDIT "  Edit", FONT_MID, onEditClicked);
+    // On the strip itself: also shown beside "done" or "stopped"
+    editButton = button(strip, 784 - 4 - 140, 4, 140, 48, LV_SYMBOL_EDIT "  Edit", FONT_MID, onEditClicked);
     setButtonColor(editButton, UITheme::ACCENT_SECONDARY);
 
     runGroup = group(strip, 0, 0, 784, STRIP_H);
@@ -513,6 +516,7 @@ void MacrosScreen::create(lv_obj_t *parent) {
     stopButton = button(runGroup, 784 - 4 - 120, 4, 120, 48, LV_SYMBOL_STOP " Stop", FONT_MID, onStopClicked);
     setButtonColor(stopButton, UITheme::STATE_ALARM);
     lv_obj_add_flag(runGroup, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(editButton);  // above runGroup, which covers the strip
 
     // Grid
     for (int i = 0; i < SLOTS; i++) {
