@@ -82,3 +82,7 @@ Answered ones move into the log above.
 | Q15 | Preview colours: by depth, or by operation/tool? | Depth |
 | Q16 | Move: typed values only, or nudge buttons too? | Typed |
 | Q20 | Move producing negative coordinates: block or warn? (Your jobs keep all moves positive.) | Warn |
+| Q22 | Run preview (M5): show the tool's place by snapping its position to the nearest move at or up to about 64 lines before the line read (S3), never going back; draw lines read but not yet cut as queued? | Yes |
+| Q23 | Time left before M5 has a file estimate: keep the percent formula (S3 showed 25 min for a 6 min job), hide it, or show elapsed only? | Keep until M5 |
+| Q24 | Current operation and message on Run: show them when FluidNC reads them (up to 50 s early, S3), or, once the preview snaps to the tool, when the tool reaches that line? | When the tool reaches it, from M5 |
+| Q25 | G8 says transforms work on files up to 32 MB, but uploads from the display SD stop at 10 MB (classic's `UploadManager`, D63). Raise the limit (upstream code; about 4 min for 32 MB at S4's rate), or leave large files to the controller's own upload? | Leave it until a file needs it |

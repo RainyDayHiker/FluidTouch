@@ -58,7 +58,7 @@ Known gaps, deliberately left:
   the device; the classic UI's upload against the fake FluidNC's HTTP.
 - The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
 
-Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
+Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), open questions Q22 to Q25); S5 before M8 (D32).
 
 ## 2. Next steps
 
@@ -69,10 +69,11 @@ Spikes: S1 mostly done, S2 done; S3 and S4 come with M3, S5 before M8 (D32).
    (D59 to D61) is checked on the device by Jeffrey (2026-11-17, "all good") and merged
    (the fake FluidNC has sample macros in `/sd/fluidtouch/macros`, one holding at an M0).
    The position log (D62, Settings > Tools, CSV in `/logs` on the display SD) is built on
-   `lrt/m3-position-log` and run in the simulator only. Next: Jeffrey's device check, then
-   S3 (`specs/spikes/s3_air_cut.gcode` with the log on) and S4 (5 and 9.5 MB uploads); both
-   procedures are in [06](06-test-and-spikes.md) (D63). Review each screen's control list
-   with Jeffrey before building it.
+   `lrt/m3-position-log`. On the device it recorded the S3 run (2026-11-18): 1,322 rows,
+   every message, no write error; not reported yet: the Tools status, and whether SD writes
+   flicker the panel. S3 and S4 are done and written up in [06](06-test-and-spikes.md);
+   their open questions are Q22 to Q25. Next: Jeffrey's word on merging the branch. Review
+   each screen's control list with Jeffrey before building it.
 2. The temporary machine picker (D57) is to be removed at the end of development.
 3. Small things still open from the device: S1 while a job runs, and the value of
    `$HTTP/BlockDuringMotion` on the controller.
@@ -176,8 +177,7 @@ operation does not exist there yet.
 - That FluidNC serves SD files at `http://<address>/sd/<path>` (spike S1). Only indirect
   evidence was found.
 - Free PSRAM and canvas drawing speed on the device (S2).
-- How closely `SD:` percent tracks the line being cut (S3).
-- Upload reliability for multi-MB files (S4).
+- Uploads over 10 MB (S4 tested 5 and 9.5 MB; the limit is classic's, D63).
 - OneDrive sign-in from the ESP32. Microsoft documents the device authorization grant as
   working with personal accounts; nothing was tried (S5).
 

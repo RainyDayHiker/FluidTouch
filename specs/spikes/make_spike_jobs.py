@@ -5,10 +5,11 @@
     python specs/spikes/make_spike_jobs.py --s4 <dir> # also s4_5mb.gcode and s4_9_5mb.gcode in <dir>
 
 S3 air cut: zeroes X, Y and Z where the tool is when it starts, and then stays
-at Z 0 or above and inside X 0..175, Y 0..115. Five operations announced with
+at Z 1 or above and inside X 0..175, Y 0..115. Five operations announced with
 (MSG ...): full circles in three passes (G2), a zigzag of straight lines, a
-zigzag with arc turns (G2/G3), a circle of 720 short G1 lines, and a spiral of
-growing half circles. Prompts (M0) at the start, halfway and the end; a G4
+zigzag with arc turns (G2/G3), a circle of 720 short G1 lines, and half
+circles making growing circles that drift right (meant as a spiral; kept as run in S3, see
+specs/06). Prompts (M0) at the start, halfway and the end; a G4
 dwell between the first two operations. These are the lines FluidNC treats
 differently when it reports the SD: percent (M0, G4, G10 wait for motion).
 
@@ -154,7 +155,8 @@ def s3_job():
         j.line(x=cx + rr * math.cos(a), y=cy + rr * math.sin(a), f=1500 if k == 1 else None)
     j.rapid(z=SAFE_Z)
 
-    # 5: spiral of growing half circles around (145, 32.5), G2 only
+    # 5: half circles, G2 only. Meant as a spiral about (145, 32.5), but the left end stays
+    # at X 144: each pair is a circle 1.5 mm wider, drifting right. Kept as run in S3.
     j.add("(MSG Operation 5 of 5: Spiral)")
     cx, cy, step = 145.0, 32.5, 1.5
     j.rapid(x=cx + 1.0, y=cy)

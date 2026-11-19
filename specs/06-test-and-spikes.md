@@ -31,8 +31,9 @@ directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38
 deletes a file from the served folder (M3).
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
-that the Run screen has to cope with; none has been measured on the controller, which is
-what spike S3 is for:
+that the Run screen has to cope with. S3 measured them on the controller (2026-11-18,
+[S3 result](#s3-result-2026-11-18-jeffrey-on-the-machine-router-off-compared-offline)):
+the queue is up to about 40 lines, not 15, and a prompt's text came 50 s before its Hold:
 
 - `SD:` percent is the position *read* in the file, ahead of the cut by the planner's
   queue (modelled as 15 lines), and it stops at lines that wait for motion (`M0`, `G4`,
@@ -45,16 +46,15 @@ what spike S3 is for:
 
 ## 2. Spikes
 
-S1 (partly) and S2 were run on 2026-11-16; results are below the table. S3 to S5 have not
-been run and are deferred until their answers are needed (D32): S3 and S4 with M3, when a
-job is first started and a file first uploaded from the new UI; S5 before M8.
+S1 (partly) and S2 were run on 2026-11-16, S3 and S4 on 2026-11-18; results are below the
+table. S5 has not been run; it is deferred until its answer is needed, before M8 (D32).
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|
 | S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. See the notes below | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
 | S3 | How does `SD:` percent relate to the line being cut? | Run `specs/spikes/s3_air_cut.gcode` (an air cut, D63) with the position log on; see the S3 procedure below. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
-| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 9.5 MB file from the display SD with Job > Use this job (UploadManager); note time and failures. `UploadManager` refuses files over 10 MB and is left so (D63); larger files are not tested. See the S4 procedure below | G8's 32 MB figure; whether a size confirm (S6) is enough |
+| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 9.5 MB file from the display SD with Job > Use this job (UploadManager); note time and failures. `UploadManager` refuses files over 10 MB and is left so (D63); larger files are not tested. See the S4 result below | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time. **The sketch has not been written**; it also needs an app registration with Microsoft (a client ID) before it can sign in | Inbox option B |
 
 ### S1 result (2026-11-16, Jeffrey, browser on the PC)
@@ -128,7 +128,7 @@ enough to repeat:
 | 2 Zigzag | 60 x 55 mm of straight lines 2.5 mm apart at Z 2, F1200; then `M0` | Long lines; a prompt halfway |
 | 3 Rounded zigzag | Straight lines joined by 2.5 mm half circles (`G2`/`G3`) at Z 3, F1000 | Mixed short arcs and lines |
 | 4 Circle of short lines | A 50 mm circle as 720 `G1` lines of 0.22 mm at Z 1, F1500 | Many short lines: the percent should race ahead of the tool here |
-| 5 Spiral | Growing half circles, `G2` only, at Z 1.5, F900 | Arcs of changing radius |
+| 5 Drifting circles | Half circles, `G2` only, at Z 1.5, F900. Each pair makes a circle 1.5 mm wider than the last, all touching X 144, so they drift right to X 174.5. Meant as a spiral (a slip in the script, kept as run; its message still says "Spiral") | Arcs of changing radius |
 | End | Up to Z 10, back to X0 Y0, `M0`, `M2` | Final prompt |
 
 Every move stays at Z 1 or above the start point and inside X 0..175, Y 0..115 of it (arc
@@ -147,6 +147,58 @@ logged while the tool was still in operation 3.
 4. Run it from Run, Continue at each prompt. Settings > Tools then shows the log's name
    and rows (`/logs/s3_air_cut-NNN.csv` on the display SD).
 5. Bring the CSV back (display SD to the PC) for the offline comparison.
+
+### S3 result (2026-11-18, Jeffrey on the machine, router off; compared offline)
+
+The log `s3_air_cut-001.csv`: 1,322 rows over 346 s, every message there, no write error.
+Compared with the moves in the file by `specs/spikes/s3_compare.py` (`python
+specs/spikes/s3_compare.py specs/spikes/s3_air_cut.gcode <log.csv>`), which finds for each
+row the move the tool is on. Every row lies within 1 mm of a move of the file.
+
+- **Percent is exact.** It is the byte offset at the end of the last line read, divided by
+  the file size, to two decimals (in this 17,807-byte file 0.01% is about 2 bytes, shorter
+  than any line). Percent gives the last line read exactly.
+- **FluidNC stops reading at `M0`**: the percent stays at the end of the `M0` line until
+  Continue.
+- **The tool runs behind the line read**, by the planner's queue:
+
+  | Operation | Lines behind (median / max) | Seconds before the tool reached a line it had read (median / max) |
+  |-----------|-----------------------------|-------------------------------------------------------------------|
+  | 1 Circles (full `G2`) | 0 / 5 | 1.8 / 13.1 |
+  | 2 Zigzag (60 mm lines) | 24 / 32 | 32 / 52 |
+  | 3 Rounded zigzag | 1 / 33 | 3.5 / 5.9 |
+  | 4 Circle of 720 short lines | 42 / 43 | 0.3 / 7.2 |
+  | 5 Drifting circles (`G2`) | 1 / 3 | 1.0 / 4.2 |
+
+  So about 40 lines at most when the lines are short. Long straight lines are fewer lines
+  but much more time (up to 52 s). Arcs take few lines, because FluidNC cuts each arc into
+  many planner blocks. The fake FluidNC models this as 15 lines.
+- **Messages arrive when their line is read.** "Halfway - Continue" (`M0`) arrived at
+  163 s, with the tool 31 lines back in the zigzag; Hold came at 213 s, **50 s later**. The
+  final prompt arrived 3 s before its Hold. "Operation 5" arrived while the tool was 18
+  lines from the end of operation 4.
+- **Percent is not time.** Operation 4 is 75% of the file's bytes and 14 s of the run. At
+  half the run's time the percent was 10.4; at 90% of the time it was 97. Run's time left
+  (elapsed x (100 - percent) / percent, [03 §4](03-screens.md)) would have shown 23 to 33
+  minutes during the first four minutes of a six-minute job, then 49 s with 76 s to go.
+- **Reports**: FluidNC sent one every 250 ms while moving: on moves at constant feed, the
+  rows are equal distances apart. During a hold nothing changes and nothing is sent (5.6 s
+  at the first prompt). The display's `ms` is up to about 160 ms late on some rows: a
+  400 ms gap followed by a 160 ms one, about every second in operation 1, less often later.
+  No report was missed.
+
+What this means for the parts S3 decides. **Not decided yet**: Q22 to Q24.
+
+- The Run preview cannot use the percent as the tool's place. It is an upper bound: the
+  tool is on a line at or before the one read, and here never more than 45 lines before.
+  Snapping to the move nearest the tool within that window, never going back, found the
+  tool's move in every row here (Q22).
+- Time left from the percent is unusable for files whose lines differ in length. 03 already
+  replaces it with an estimate from the file at M5 (Q23).
+- The current-operation text and Run's large message (D51) change when a line is read, up
+  to 50 s before the tool gets there (Q24).
+
+### The reference job
 
 What `Spoilboard_DogHoles.gcode` does, read from the file (2026-11-16), for setting the
 machine up if it is used:
@@ -174,17 +226,19 @@ the router left off or unplugged.
 The fake FluidNC does not model two things this job uses: the `P` word on `G38.2` (it
 ignores it) and `$HZ` inside a file (it skips `$` lines).
 
-### S4 procedure
+### S4 result (2026-11-18, Jeffrey)
 
-1. `python specs/spikes/make_spike_jobs.py --s4 <folder>` writes `s4_5mb.gcode` and
-   `s4_9_5mb.gcode` there (not kept in the repository). They are a harmless path at Z 10
-   that starts with `M0 (MSG ... do not run it ...)`; they are for uploading only.
-2. Copy both to the display SD.
-3. For each: Job > Display SD > the file > Use this job. Time the upload (it shows
-   progress and checks the size afterwards, S6), and note any failure and its message.
-   Do it at least twice per file, and once with the display a few metres further from the
-   router's WiFi.
-4. Delete them from the controller's `uploads` folder afterwards (Job picker, trash).
+Uploaded from the display SD with Job > Use this job:
+
+| File | Time | Rate |
+|------|------|------|
+| `s4_5mb.gcode` (5,000,000 bytes) | 40 s | 125 KB/s |
+| `s4_9_5mb.gcode` (9,500,000 bytes) | 65 s | 146 KB/s |
+
+No errors. At these rates a 32 MB file (G8) would take about 4 minutes, but `UploadManager`
+refuses files over 10 MB (D63), so G8's 32 MB cannot be uploaded from the display SD
+without changing classic code (Q25). The number of runs per file, and the distance to the
+router, were not noted.
 
 ### S2 procedure
 
