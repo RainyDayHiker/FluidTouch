@@ -80,7 +80,12 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    repo's part starts when C1's release is promoted (D69): the copy script from a named
    release version, `.gitattributes` for the copies, the test firmware running the device
    suite from the SD card (results in 06), the SD reader and arena, the fallback font.
-   **Library version in use: none yet.** Done ahead of C1: the fallback font and the
+   **Library version in use: 0.0.1-build.64 (C1, promoted 2026-11-19).** Integrated:
+   `tools/gcode_core.py` (fetch, check, data), `lib/gcode/` and `src/services/gcode_device/`
+   copied and checked in CI, the library in the firmware and simulator builds, the device
+   suite on Settings > Tools (D73). The suite passes on the PC (MinGW GCC, and in the
+   simulator); **its run on the device is next** (06, "Device test suite runs"); its `perf`
+   lines then set the display's budgets. Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.

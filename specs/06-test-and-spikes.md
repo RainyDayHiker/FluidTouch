@@ -254,7 +254,7 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
-| | | | None yet (first run in M4) |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | **PC only:** passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator. Not yet on the device |
 
 ### S2 procedure
 

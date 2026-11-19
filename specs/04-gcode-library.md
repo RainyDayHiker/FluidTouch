@@ -25,23 +25,24 @@ A release carries one archive, `gcode-core-<version>.zip`, with the library, its
 device test suite and the suite's data (15 §9). The library has the editor's version, e.g.
 `0.0.1-build.57`, so a version names one CNC-Tools commit.
 
-- **A script here** (written with the first copy, M4), run by a developer with access to
-  CNC-Tools, takes a version, downloads the archive from the release tagged `v<version>`,
-  checks it against its `SHA256SUMS`, and copies:
-  - `library/` into `lib/gcode/` (sources, headers with `version.h`, `library.json`,
-    `CMakeLists.txt`, `LICENSE`);
-  - the device suite's `runner/` and `manifest.json` into the test firmware's folder;
-  - `manifest.json` and `SHA256SUMS` beside each copy.
+- **`tools/gcode_core.py`**, run by a developer with access to CNC-Tools (the GitHub CLI,
+  signed in):
+  - `fetch <version>` downloads the archive from the release tagged `v<version>` (or takes
+    `--zip <file>`), checks every file against its `SHA256SUMS` and the manifest's version,
+    and copies `library/` into `lib/gcode/` and the runner's `runner.h` and `runner.cpp` into
+    `src/services/gcode_device/` (not `host_main.cpp`, CNC-Tools' host program), each with the
+    archive's `manifest.json` and a `SHA256SUMS` for exactly those files;
+  - `check` proves both copies match their `SHA256SUMS`, with nothing added (CI runs it);
+  - `data <version> <folder>` unpacks the suite's data, checked, for the display SD.
 
   It does not choose "the newest release": the version to use is written in HANDOFF, normally
   that of a promoted phase release.
 - **The suite's `data/`** (several MB: inputs, golden results, vectors) is never committed
   here. It goes onto the SD card used for the device suite, checked against `SHA256SUMS`.
-- **Never edit the copies.** CI here checks them against their `SHA256SUMS`. A change goes
-  into CNC-Tools (spec, TS, C++) and comes back with a later release.
-- `.gitattributes` gets `lib/gcode/** -text` (and the same for the runner's folder) with the
-  first copy: this PC checks out with `core.autocrlf=true`, which would change the files and
-  break the checksums.
+- **Never edit the copies.** CI here (`build-lrt.yml`) runs `tools/gcode_core.py check`. A
+  change goes into CNC-Tools (spec, TS, C++) and comes back with a later release.
+- `.gitattributes` marks `lib/gcode/**` and `src/services/gcode_device/**` `-text`: this PC
+  checks out with `core.autocrlf=true`, which would change the files and break the checksums.
 - The build flags the library needs (`-fno-exceptions -fno-rtti -ffp-contract=off`) are in its
   own `library.json` and `CMakeLists.txt`, so PlatformIO and the simulator's CMake
   (`add_subdirectory`) apply them to its sources only.
@@ -57,10 +58,18 @@ CNC-Tools' CI proves equality on 64-bit PCs only. On the ESP32-S3, doubles are c
 software and text-to-number conversion is newlib's, so the same cases are run on the device
 (15 §7.4, §9.4):
 
-- A **test firmware** (a separate PlatformIO environment) builds the suite's runner with an
-  SD implementation of its file interfaces, runs the groups the release has (`float`,
-  `parse`, `self`, `analyse`, then `transform` from C2 and `outline` from C3), and writes
-  `results.txt` to the SD card and to the serial port.
+- It runs from **Settings > Tools > Library tests > Run** in the normal firmware (D73):
+  `GcodeTests` (`src/services/gcode_tests.*`) gives the copied runner an SD implementation of
+  its file interfaces over `/gcode-tests/` on the display SD, a 1 MB arena from PSRAM (taken
+  only while it runs), and a background task, so the screen and the connection keep going.
+  It runs every group the release has (`float`, `parse`, `self`, `analyse`, `perf`, then
+  `transform` from C2 and `outline` from C3) and writes one line per case to
+  `/gcode-tests/results.txt` and the serial port; Tools shows the progress and the summary.
+  Not while a job runs.
+- **To run it:** `python tools/gcode_core.py data <version> <folder>`, copy the folder's
+  contents to `/gcode-tests/` on the display SD, Settings > Tools > Library tests > Run.
+- Cost of keeping it in the firmware: about 46 KB of flash, and about 28 KB of internal RAM
+  for the runner's static buffers (asked of CNC-Tools: take them from the arena).
 - The `perf` group measures time and peak memory per entry point for both reference jobs and
   the 5 MB fixture, and the SD card's read and write rate. **Those figures set the display's
   budgets** (how long an analysis or a Rotate may take, how big a job may be previewed), and
