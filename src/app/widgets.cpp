@@ -1,11 +1,19 @@
 #include "app/widgets.h"
+#include "app/text.h"
 #include "ui/ui_theme.h"
 #include <stdio.h>
 #include <string.h>
 
 namespace Widgets {
 
+namespace {
+// Text from files or the controller may not be valid UTF-8 (AppText). LVGL runs on one task.
+char displayBuf[512];
+const char *shown(const char *text) { return AppText::forDisplay(text, displayBuf, sizeof(displayBuf)); }
+}  // namespace
+
 void setText(lv_obj_t *label, const char *text) {
+    text = shown(text);
     if (strcmp(lv_label_get_text(label), text) != 0) {
         lv_label_set_text(label, text);
     }
@@ -26,7 +34,7 @@ lv_obj_t *button(lv_obj_t *parent, int x, int y, int w, int h, const char *text,
     if (onClick) lv_obj_add_event_cb(btn, onClick, LV_EVENT_CLICKED, userData);
 
     lv_obj_t *lbl = lv_label_create(btn);
-    lv_label_set_text(lbl, text);
+    lv_label_set_text(lbl, shown(text));
     lv_obj_set_style_text_font(lbl, font, 0);
     lv_obj_set_style_text_align(lbl, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(lbl);
@@ -147,7 +155,7 @@ void formatDuration(char *out, int outLen, uint32_t ms) {
 
 lv_obj_t *label(lv_obj_t *parent, int x, int y, const lv_font_t *font, lv_color_t color, const char *text) {
     lv_obj_t *lbl = lv_label_create(parent);
-    lv_label_set_text(lbl, text);
+    lv_label_set_text(lbl, shown(text));
     lv_obj_set_style_text_font(lbl, font, 0);
     lv_obj_set_style_text_color(lbl, color, 0);
     lv_obj_set_pos(lbl, x, y);

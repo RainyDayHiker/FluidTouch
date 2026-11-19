@@ -1,4 +1,5 @@
 #include "app/ui_mode.h"
+#include "app/fonts.h"
 #include "app/app_prefs.h"
 #include <Preferences.h>
 #include <lvgl.h>
@@ -26,7 +27,7 @@ void restartInto(Mode mode) {
 
     lv_obj_t *label = lv_label_create(lv_layer_top());
     lv_label_set_text(label, "Restarting...");
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_32, 0);
+    lv_obj_set_style_text_font(label, &lrt_font_32, 0);
     lv_obj_set_style_text_color(label, lv_color_white(), 0);
     lv_obj_set_style_bg_color(label, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(label, LV_OPA_COVER, 0);

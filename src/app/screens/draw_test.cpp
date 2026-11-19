@@ -1,4 +1,5 @@
 #include "app/screens/draw_test.h"
+#include "app/fonts.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 #include <math.h>
@@ -411,7 +412,7 @@ lv_obj_t *button(lv_obj_t *parent, int x, const char *text, lv_event_cb_t cb) {
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *label = lv_label_create(btn);
     lv_label_set_text(label, text);
-    lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(label, &lrt_font_16, 0);
     lv_obj_center(label);
     return btn;
 }
@@ -434,7 +435,7 @@ void DrawTest::open(lv_obj_t *parent) {
     resultLabel = lv_label_create(root);
     lv_obj_set_pos(resultLabel, 500, 6);
     lv_obj_set_width(resultLabel, 292);
-    lv_obj_set_style_text_font(resultLabel, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(resultLabel, &lrt_font_14, 0);
     lv_obj_set_style_text_color(resultLabel, UITheme::TEXT_LIGHT, 0);
     lv_label_set_text(resultLabel, "");
 

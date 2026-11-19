@@ -1,4 +1,5 @@
 #include "app/entry.h"
+#include "app/fonts.h"
 #include "app/widgets.h"
 #include "ui/ui_theme.h"
 #include <math.h>
@@ -10,11 +11,11 @@ using namespace Widgets;
 
 namespace {
 
-const lv_font_t *const FONT_TITLE = &lv_font_montserrat_20;
-const lv_font_t *const FONT_VALUE = &lv_font_montserrat_32;
-const lv_font_t *const FONT_KEY = &lv_font_montserrat_26;
-const lv_font_t *const FONT_MID = &lv_font_montserrat_18;
-const lv_font_t *const FONT_SMALL = &lv_font_montserrat_14;
+const lv_font_t *const FONT_TITLE = &lrt_font_20;
+const lv_font_t *const FONT_VALUE = &lrt_font_32;
+const lv_font_t *const FONT_KEY = &lrt_font_26;
+const lv_font_t *const FONT_MID = &lrt_font_18;
+const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
 // --- Keypad ------------------------------------------------------------------
 

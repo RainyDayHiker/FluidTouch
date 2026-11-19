@@ -1,4 +1,5 @@
 #include "app/screens/screens.h"
+#include "app/fonts.h"
 #include "app/frame.h"
 #include "app/widgets.h"
 #include "services/file_service.h"
@@ -20,10 +21,10 @@ using namespace Widgets;
 
 namespace {
 
-const lv_font_t *const FONT_LARGE = &lv_font_montserrat_24;
-const lv_font_t *const FONT_BIG = &lv_font_montserrat_20;
-const lv_font_t *const FONT_MID = &lv_font_montserrat_18;
-const lv_font_t *const FONT_SMALL = &lv_font_montserrat_14;
+const lv_font_t *const FONT_LARGE = &lrt_font_24;
+const lv_font_t *const FONT_BIG = &lrt_font_20;
+const lv_font_t *const FONT_MID = &lrt_font_18;
+const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
 const lv_color_t COLOR_DELETE = LV_COLOR_MAKE(0x8B, 0x1E, 0x1E);
 const int ROW_H = 52;
@@ -149,7 +150,7 @@ lv_obj_t *makeRow(int index, const FileService::Entry &entry, bool allowDelete) 
     snprintf(text, sizeof(text), "%s%s", entry.dir ? LV_SYMBOL_DIRECTORY "  " : "", entry.name);
     lv_obj_t *b = button(row, 0, 0, width, ROW_H, "", FONT_MID, onRowClicked, (void *)(intptr_t)index);
     lv_obj_t *name = lv_obj_get_child(b, 0);
-    lv_label_set_text(name, text);
+    setText(name, text);  // through AppText: names may not be valid UTF-8
     lv_obj_set_width(name, width - 140);
     lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_LEFT, 0);

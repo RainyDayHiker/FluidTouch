@@ -1,4 +1,5 @@
 #include "app/frame.h"
+#include "app/fonts.h"
 #include "app/screens/screens.h"
 #include "app/ui_mode.h"
 #include "app/widgets.h"
@@ -134,7 +135,7 @@ void Frame::createTabs(lv_obj_t *root) {
 
         lv_obj_t *label = lv_label_create(btn);
         lv_label_set_text(label, screens[i]->title());
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
+        lv_obj_set_style_text_font(label, &lrt_font_20, 0);
         lv_obj_center(label);
 
         tabButtons[i] = btn;
@@ -157,11 +158,11 @@ void Frame::createStatusBar(lv_obj_t *root) {
     lv_obj_set_style_border_width(statusBar, 1, 0);
     lv_obj_set_style_border_color(statusBar, UITheme::BORDER_MEDIUM, 0);
 
-    stateLabel = textAt(statusBar, 10, &lv_font_montserrat_22, UITheme::STATE_UNKNOWN, "");
+    stateLabel = textAt(statusBar, 10, &lrt_font_22, UITheme::STATE_UNKNOWN, "");
 
     // First row: work position, then machine position; fixed columns so
     // digits don't shift the rest
-    const lv_font_t *font = &lv_font_montserrat_16;
+    const lv_font_t *font = &lrt_font_16;
     static const lv_color_t axisColors[3] = {UITheme::AXIS_X, UITheme::AXIS_Y, UITheme::AXIS_Z};
     Widgets::label(statusBar, 108, 8, font, UITheme::POS_WORK, "W");
     Widgets::label(statusBar, 384, 8, font, UITheme::POS_MACHINE, "M");
@@ -175,7 +176,7 @@ void Frame::createStatusBar(lv_obj_t *root) {
     lv_obj_set_width(messageLabel, 540);
     lv_label_set_long_mode(messageLabel, LV_LABEL_LONG_DOT);
 
-    wifiLabel = textAt(statusBar, 664, &lv_font_montserrat_18, UITheme::STATE_ALARM, LV_SYMBOL_WIFI);
+    wifiLabel = textAt(statusBar, 664, &lrt_font_18, UITheme::STATE_ALARM, LV_SYMBOL_WIFI);
 
     // STOP: feed hold, or jog cancel while jogging (S1). The bar is lower than
     // the 56 px touch target, so the touch area extends beyond the button.
@@ -188,7 +189,7 @@ void Frame::createStatusBar(lv_obj_t *root) {
     lv_obj_add_event_cb(stop, onStopClicked, LV_EVENT_CLICKED, nullptr);
     lv_obj_t *stopLabel = lv_label_create(stop);
     lv_label_set_text(stopLabel, "STOP");
-    lv_obj_set_style_text_font(stopLabel, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_font(stopLabel, &lrt_font_20, 0);
     lv_obj_center(stopLabel);
 }
 
@@ -197,7 +198,7 @@ void Frame::createBanner(lv_obj_t *root) {
 
     bannerText = lv_label_create(banner);
     lv_label_set_text(bannerText, "");
-    lv_obj_set_style_text_font(bannerText, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(bannerText, &lrt_font_16, 0);
     lv_obj_set_style_text_color(bannerText, lv_color_white(), 0);
     lv_label_set_long_mode(bannerText, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(bannerText, 630);  // two lines of this font fit the bar
@@ -212,7 +213,7 @@ void Frame::createBanner(lv_obj_t *root) {
     lv_obj_add_event_cb(bannerButton, onBannerButtonClicked, LV_EVENT_CLICKED, nullptr);
     bannerButtonLabel = lv_label_create(bannerButton);
     lv_label_set_text(bannerButtonLabel, "");
-    lv_obj_set_style_text_font(bannerButtonLabel, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(bannerButtonLabel, &lrt_font_18, 0);
     lv_obj_center(bannerButtonLabel);
 
     lv_obj_add_flag(banner, LV_OBJ_FLAG_HIDDEN);
