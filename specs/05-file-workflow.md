@@ -21,9 +21,23 @@ A **file source** is anything that can list files and fetch one. Three are plann
 
 | Source | List | Fetch | Needs |
 |--------|------|-------|-------|
-| Controller SD | `$Files/ListGcode` (as now) | HTTP GET `http://<address>/sd/<path>` (works, S1; not yet tried during a job) | Machine on |
+| Controller SD | `$Files/ListGcode` (as now) | HTTP GET `http://<address>/sd/<path>` (works, also during a job, S1) | Machine on |
 | Display SD | Local | Local | Card carried from the PC |
 | Inbox | See §3 | See §3 | See §3 |
+
+**Fetching a Controller SD file for the preview (M5, D72).** The file is downloaded into the
+working folder when it is chosen on Job, before any job starts, and Run uses that copy
+(matched by name and size). If a job is running and there is no copy (the display
+restarted, the UI was switched, or the job was started from FluidNC's web UI), Run's
+preview area offers the download with a confirm, since reading the card during a cut takes
+controller time that FluidNC's own comments say motion may need:
+
+> "Download <name> (<size>) now, while the machine is cutting? The controller reads its SD
+> card for the download as well as for the job. It worked on a small file (S1); a large
+> one has not been tried." [Download] [Not now]
+
+"Not now" leaves the preview area as it was before M5 (file name and current message); the
+offer stays there until the job ends. No confirm when no job is running.
 
 ## 3. Inbox options
 
