@@ -178,9 +178,12 @@ reference job, short of the "at least 5x" in G8. The options were (Q21, decided 
 **A is chosen (D30)**, with B as the fallback for jobs that still do not fit (preview
 "simplified, and says so", G8). C is not planned.
 
-The outline grids (2 x 1 bit per cell) get whatever is free while tracing: with the canvases
-released and a reference-sized job loaded that is about 1.5 MB, enough for the 4 M cells
-(1 MB) planned. For larger jobs the grid gets coarser.
+The outline grid (4 bits per cell, CNC-Tools 15 §6.3.1) gets whatever is free while
+tracing: with the canvases released and a reference-sized job loaded that is about 1.5 MB.
+At 1 MB that is about 2 M cells; for larger jobs the cells get coarser and the outline's
+tolerance with them. The outline's other memory is bounded by a design note at the start
+of CNC-Tools' C3. The library's own working memory comes from an arena sized from its
+`arena.md` and the device suite's `perf` results ([04](04-gcode-library.md)).
 
 ## 7. Threads
 

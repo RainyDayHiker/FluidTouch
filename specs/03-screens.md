@@ -113,7 +113,7 @@ previews that file, transforms it, and hands it to Run (D48).
 |                                                                                |
 |--------------------------------------------------------------------------------|
 | 520 x 864 mm  Z -19..15  T2  90 ops  ~2h10                               (M5)  |
-| [Rot L][Rot R][Flip H][Flip V][Move] [Outline] [Fit] [Undo]  (M6) [Use this job >]|
+| [Rot L][Rot R][Flip H][Flip V] [Outline] [Fit] [Undo]  (M6)    [Use this job >]|
 +--------------------------------------------------------------------------------+
 ```
 
@@ -124,15 +124,15 @@ previews that file, transforms it, and hands it to Run (D48).
 | Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job |
 | Info line (M5) | Extents, Z range, tools, operation count, time estimate from feeds, warnings (tap for the list) |
 | Rot L / Rot R (M6) | Rotate 90 CCW / CW per CNC-Tools spec 06 |
-| Flip H / Flip V (M6) | Mirror per CNC-Tools spec 12. First version: "flip only", with the climb/conventional warning. Reverse-cuts later |
-| Move (M6) | Enter X and Y shift in mm. Preview shows the result against the stock box |
+| Flip H / Flip V (M6) | Mirror per CNC-Tools spec 12. "Flip only", with the climb/conventional warning (W-FLIP) shown and confirmed (D70). "Flip and reverse cuts" once CNC-Tools ports it (its C4) |
+| Move (later, D70) | Enter X and Y shift in mm. Preview shows the result against the stock box. Comes once Move is a G-code Editor feature with a device contract |
 | Blocked (M6) | If a transform can't be done faithfully: a list of line numbers and reasons; nothing changes |
 | Undo (M6) | Steps back one transform (each step is a file in the working folder) |
 | Outline (M7) | Switches the preview to the outline: outer edge of the cut, one loop per separate part. Shows "Run outline" in place of "Use this job" |
 | Run outline (M7) | Uploads the generated outline file and opens Run's start panel for it, marked as an outline check: rapids only, no Z, raise the bit first. After it finishes, the real job is still selected |
 
 With transforms (M6), "Use this job" uploads the working copy under a new name
-(`name.r90.gcode`, `name.fh.gcode`, `name.m10x-5y.gcode`) into the same uploads folder.
+(`name.r90.gcode`, `name.fh.gcode`; Move's later) into the same uploads folder.
 Until M5 the preview area shows the file line's details in large type.
 
 ### File picker
