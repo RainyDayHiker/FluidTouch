@@ -84,10 +84,14 @@ software and text-to-number conversion is newlib's, so the same cases are run on
   gives each line's tokens and state, at the file's final precision.
 - Showing a report: the library keeps each issue's line offset, and `reportLineText` reads the
   line back when the list is shown.
-- **Text the fonts can't show**: summaries use `·`, `–` and `°`, and names from Latin-1 files
-  may have other bytes; LVGL's Montserrat fonts are ASCII only. A small fallback font with
-  those glyphs is added to the fonts used for library text (LVGL 9.5 font fallback), and
-  bytes that are not valid UTF-8 are shown as `?`.
+- **Text the fonts can't show** (built, D71): LVGL's Montserrat fonts hold ASCII plus a few
+  symbols (`°` and `•` among them). The new UI uses them with a fallback font of the same
+  face (`src/app/fonts/`, made by `make_extra_fonts.py`) holding Latin-1 (U+00A0..U+00FF),
+  `–`, `—`, curly quotes and `…`, which covers the library's summaries (`·`, `–`, `°`).
+  Text from outside (file names, FluidNC messages, later the library's names) goes through
+  `AppText::forDisplay`: valid UTF-8 is shown as it is; anything else is read as Latin-1, as
+  the G-code Editor reads such a file (CNC-Tools 04 §2), with the C1 controls shown as `?`.
+  Characters outside these sets show LVGL's placeholder box.
 - The outline's cell cap: the algorithm needs 4 bits per cell, so the 1 MB the display can
   spare holds about 2 M cells; its tolerance is coarser than the editor's for large jobs and
   the generated file says so. C3 starts with a design note, reviewed here, that bounds the
