@@ -199,14 +199,15 @@ States of the right-hand panel:
 
 Notes:
 
-- The current operation text is the last `[MSG:...]` received; "op N of M" comes from the file's operation list.
+- The current operation text is the last `[MSG:...]` received; "op N of M" comes from the file's operation list. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); from M5 the text follows the tool's line instead (D65).
 - The router is switched by hand; the display does not show spindle speed or spindle override.
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
 - Until the preview exists (M5), the preview area shows the file name and the current
   FluidNC message in large type (D51).
 - Time left: "~1:35 left" = elapsed x (100 - percent) / percent, from the controller's
   `SD:` percent (by file position, so rough). Hidden for the first minute and below 2%
-  (D51). Replaced by an estimate from the file once M5 has one.
+  (D51). Replaced by an estimate from the file once M5 has one (D64; S3 showed how rough
+  it is).
 
 ## 5. Macros
 

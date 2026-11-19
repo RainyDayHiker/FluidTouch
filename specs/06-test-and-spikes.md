@@ -187,16 +187,18 @@ row the move the tool is on. Every row lies within 1 mm of a move of the file.
   400 ms gap followed by a 160 ms one, about every second in operation 1, less often later.
   No report was missed.
 
-What this means for the parts S3 decides. **Not decided yet**: Q22 to Q24.
+What this means for the parts S3 decides (Q22 open; D64, D65):
 
 - The Run preview cannot use the percent as the tool's place. It is an upper bound: the
   tool is on a line at or before the one read, and here never more than 45 lines before.
-  Snapping to the move nearest the tool within that window, never going back, found the
-  tool's move in every row here (Q22).
-- Time left from the percent is unusable for files whose lines differ in length. 03 already
-  replaces it with an estimate from the file at M5 (Q23).
+  Matching the position to the moves between the last match and the line read found the
+  tool's move in every row here. FluidNC can also report the executing line itself
+  (`Ln:`, if `use_line_numbers` is on and the lines carry N words; read from FluidNC's
+  `Report.cpp`, not tried). Which to use is Q22, left for M5.
+- Time left from the percent is unusable for files whose lines differ in length. It stays
+  until M5 replaces it with an estimate from the file (D64).
 - The current-operation text and Run's large message (D51) change when a line is read, up
-  to 50 s before the tool gets there (Q24).
+  to 50 s before the tool gets there; from M5 they follow the tool (D65).
 
 ### The reference job
 
@@ -235,9 +237,8 @@ Uploaded from the display SD with Job > Use this job:
 | `s4_5mb.gcode` (5,000,000 bytes) | 40 s | 125 KB/s |
 | `s4_9_5mb.gcode` (9,500,000 bytes) | 65 s | 146 KB/s |
 
-No errors. At these rates a 32 MB file (G8) would take about 4 minutes, but `UploadManager`
-refuses files over 10 MB (D63), so G8's 32 MB cannot be uploaded from the display SD
-without changing classic code (Q25). The number of runs per file, and the distance to the
+No errors. `UploadManager` refuses files over 10 MB, and that stays (D66): larger files
+go to the controller's SD another way. The number of runs per file, and the distance to the
 router, were not noted.
 
 ### S2 procedure

@@ -71,6 +71,8 @@ OneDrive exists, so option A is the fallback if spike S5 shows B is not practica
 - Generated and uploaded jobs go to `/sd/fluidtouch/uploads/`, the folder the classic UI's
   upload already uses (D53).
 - Uploading a name that exists overwrites it after a confirm.
+- Uploads are limited to 10 MB (classic's `UploadManager`, D66); S4 measured 5 MB in 40 s
+  and 9.5 MB in 65 s.
 - **Q6** Should the display offer to delete old uploaded jobs, e.g. keep the newest 20?
 
 ## 6. PC side
