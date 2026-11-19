@@ -254,7 +254,21 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
-| 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | **PC only:** passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator. Not yet on the device |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device (Jeffrey, CrowPanel Advance):** passed 57, failed 0, skipped 0 in 1:51. The first attempt rebooted after `float` (the task watchdog: the test task never yielded); fixed by yielding every 50 ms in the SD reader |
+
+`perf` on the device, 0.0.1-build.64 (times include the 50 ms yield, about 2%):
+
+| Job | Size | Lines | Read through the SD reader | `analyse()` (two passes) | Arena (32-bit) | On the PC (MSVC, CNC-Tools' arena.md) |
+|-----|------|-------|----------------------------|--------------------------|----------------|----------------------------------------|
+| `Spoilboard_DogHoles.gcode` | 789 KB | 14,189 | 2.15 s (about 360 KB/s) | 8.4 s | 69,104 B | 10.7 ms, 85,784 B |
+| `CNC_EscapeWheel.gcode` | 157 KB | 2,993 | 0.44 s | 1.65 s | 11,072 B | 2.3 ms |
+| 5 MB perf fixture | 5.0 MB | 204,387 | 14.7 s (about 340 KB/s) | 44.5 s | 2,304 B | 77 ms |
+
+SD write: 256 KB in about 785 ms (about 330 KB/s). The device is roughly 600 to 800 times slower
+than the PC here. Reading is about half of `analyse()`'s time (it reads the file twice); the
+reader takes one byte at a time (`SdReader::get`), which is the first thing to speed up before
+budgets are set (HANDOFF).
 
 ### S2 procedure
 

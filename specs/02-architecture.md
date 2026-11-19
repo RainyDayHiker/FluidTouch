@@ -195,3 +195,9 @@ of CNC-Tools' C3. The library's own working memory comes from an arena sized fro
 | Connect task (core 0), short-lived | one `FluidNCClient::connect()` attempt ([§4](#4-services)) |
 
 Worker results are handed over by a flag the main loop checks; no LVGL calls from the worker.
+
+**A task doing long work yields regularly** (`delay(1)` at least every 50 ms; the G-code
+library's line reader is the natural place). The library and SD reads never block, and a
+task on core 0 that doesn't yield starves the idle task until the task watchdog reboots the
+device (seen with the library tests, 2026-11-19). The simulator runs tasks as threads and
+doesn't catch this; check it in review.
