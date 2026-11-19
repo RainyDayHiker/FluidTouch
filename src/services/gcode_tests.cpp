@@ -24,6 +24,19 @@ void *psram(size_t size) {
 
 void fullPath(char *out, size_t size, const char *rel) { snprintf(out, size, "%s/%s", DATA_FOLDER, rel); }
 
+// The library and the runner never wait, and the SD card's SPI reads are busy-waits, so without
+// this the task holds its core until the task watchdog reboots the device (seen on the device,
+// 2026-11-19). Every line read passes here: give the core away for a tick every 50 ms. That
+// lets the idle task and WiFi run, at about 2% of the perf group's times.
+uint32_t lastYieldMs = 0;
+void yieldNow() {
+    uint32_t now = ::millis();
+    if (now - lastYieldMs >= 50) {
+        delay(1);
+        lastYieldMs = ::millis();
+    }
+}
+
 // A file on the display SD, split into lines as the library expects (CNC-Tools guide.md §1):
 // \r\n, \n or \r ends a line; a last line may have no ending. A line longer than LINE_KEPT keeps
 // its first LINE_KEPT bytes but reports its real length, so the library reports LineTooLong.
@@ -42,6 +55,7 @@ public:
     bool ok() const { return chunk && line; }
 
     bool next(gcode::Line &out) override {
+        yieldNow();
         size_t n = 0;
         out.offset = offset;
         int c;
