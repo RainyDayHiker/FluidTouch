@@ -140,6 +140,10 @@ list(FILTER FT_SOURCES EXCLUDE REGEX ".*/src/network/screenshot_server\\.cpp$")
 
 file(GLOB SIM_SOURCES CONFIGURE_DEPENDS "${SIM_DIR}/src/*.cpp")
 
+# G-code library: a copy of a CNC-Tools release (specs/04 §1). Its CMakeLists sets its own
+# flags (no exceptions, no RTTI, no contracted floating point) for its own sources only.
+add_subdirectory("${FT_ROOT}/lib/gcode" "${CMAKE_BINARY_DIR}/gcode_core")
+
 add_executable(fluidtouch_sim ${FT_SOURCES} ${SIM_SOURCES})
 target_include_directories(fluidtouch_sim PRIVATE ${FT_INCLUDE_DIRS})
 target_compile_definitions(fluidtouch_sim PRIVATE
@@ -150,7 +154,7 @@ target_compile_options(fluidtouch_sim PRIVATE
     -Wall -Wno-unused-variable -Wno-unused-function -Wno-format
     -Wno-unused-but-set-variable -Wno-missing-field-initializers
     "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${FT_CXX_FORCE_INCLUDE}>")
-target_link_libraries(fluidtouch_sim PRIVATE lvgl arduinowebsockets mbedcrypto SDL2::SDL2)
+target_link_libraries(fluidtouch_sim PRIVATE lvgl arduinowebsockets mbedcrypto SDL2::SDL2 gcode_core)
 
 # ESP-NOW link test against sim/tools/fake_fluidnc.py (see sim/test/espnow_link_test.cpp)
 add_executable(espnow_link_test
