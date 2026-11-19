@@ -5,7 +5,7 @@
 ```
 src/app/        screens, tabs, status bar               new   depends on services
 src/services/   machine, job, files, macros, settings   new   depends on lib/gcode, platform
-lib/gcode/      tokenizer, simulator, ops, outline      new   plain C++17, no Arduino/LVGL
+lib/gcode/      tokenizer, simulator, ops, outline      copy  from CNC-Tools (D67); C++17, no Arduino/LVGL
 src/core/       display, touch, power                   kept
 src/network/    FluidNCClient, upload                   kept, small edits
 src/ui/         classic UI                              kept, untouched where possible

@@ -50,13 +50,10 @@ stays X then Y (D37); `$H` homes XY in one cycle as the machine's config sets it
 
 Known gaps, deliberately left:
 
-- `MachineService::jobActive()` follows the `SD:` field, which FluidNC drops once it has
-  read the last line of the file; to be solved with the Run screen (M3).
 - Settings are read once at boot: values changed in classic Settings show after a restart
   into the new UI, which is how the UI switch works anyway.
 - Not tested: loss of WiFi (the simulator's WiFi is always up); STOP pressed during a jog on
-  the device; the classic UI's upload against the fake FluidNC's HTTP.
-- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
+  the device; the classic UI's upload against the fake FluidNC's HTTP.- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
 
 Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), D64 to D66, Q22 open); S5 before M8 (D32).
 
@@ -69,15 +66,20 @@ Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in 
    (D59 to D61) is checked on the device by Jeffrey (2026-11-17, "all good") and merged
    (the fake FluidNC has sample macros in `/sd/fluidtouch/macros`, one holding at an M0).
    The position log (D62, Settings > Tools, CSV in `/logs` on the display SD) is built on
-   `lrt/m3-position-log`. On the device it recorded the S3 run (2026-11-18): 1,322 rows,
-   every message, no write error; Tools showed the status and no flicker was noticed
-   (Jeffrey). S3 and S4 are done and written up in [06](06-test-and-spikes.md); D64 to D66
-   follow from them, and Q22 (how Run finds the tool's line) is left open for M5. Next:
-   Jeffrey's word on merging the branch. Review
+   merged. On the device it recorded the S3 run (2026-11-18): 1,322 rows, every message,
+   no write error; Tools showed the status and no flicker was noticed (Jeffrey). S3 and S4
+   are done and written up in [06](06-test-and-spikes.md); D64 to D66 follow from them, and
+   Q22 (how Run finds the tool's line) is left open for M5. **M3's exit check is met**: a
+   real job ran from the new UI with no fallback to classic (Jeffrey, 2026-11-18). Review
    each screen's control list with Jeffrey before building it.
-2. The temporary machine picker (D57) is to be removed at the end of development.
-3. Small things still open from the device: S1 while a job runs, and the value of
-   `$HTTP/BlockDuringMotion` on the controller.
+2. **M4: the G-code library is built in CNC-Tools** (D67, [04](04-gcode-library.md)). Its
+   spec, [outgoing/cnc-tools-15-cpp-core.md](outgoing/cnc-tools-15-cpp-core.md), goes to
+   CNC-Tools as `gcode-editor/specs/15-cpp-core.md`, where Jeffrey has it implemented. This
+   repo's part waits for phase C1: the copy script, the SD reader and the arena.
+3. The temporary machine picker (D57) is to be removed at the end of development.
+4. Small things still open from the device, for the next machine session: S1 while a job
+   runs, the value of `$HTTP/BlockDuringMotion` on the controller, STOP pressed during a
+   jog, and loss of WiFi.
 
 How this session worked: topic branches merged locally into `lrt/main` with a merge commit
 and deleted; `sim:` commits kept separate from new code; every change built for the
