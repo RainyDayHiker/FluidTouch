@@ -52,10 +52,11 @@ Known gaps, deliberately left:
 
 - Settings are read once at boot: values changed in classic Settings show after a restart
   into the new UI, which is how the UI switch works anyway.
-- Not tested: loss of WiFi (the simulator's WiFi is always up); STOP pressed during a jog on
-  the device; the classic UI's upload against the fake FluidNC's HTTP.- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
+- Not tested: loss of WiFi (the simulator's WiFi is always up; left until it shows up as a
+  bug); the classic UI's upload against the fake FluidNC's HTTP.
+- The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
 
-Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), D64 to D66, Q22 open); S5 before M8 (D32).
+Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), D64 to D66, Q22 open); S5 before M8 (D32).
 
 ## 2. Next steps
 
@@ -84,9 +85,10 @@ Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in 
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.
 3. The temporary machine picker (D57) is to be removed at the end of development.
-4. Small things still open from the device, for the next machine session: S1 while a job
-   runs, the value of `$HTTP/BlockDuringMotion` on the controller, STOP pressed during a
-   jog, and loss of WiFi.
+4. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
+   (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the
+   setting is On), and STOP during a jog works. Loss of WiFi is not tested and left until it
+   shows up as a bug.
 
 How this session worked: topic branches merged locally into `lrt/main` with a merge commit
 and deleted; `sim:` commits kept separate from new code; every change built for the

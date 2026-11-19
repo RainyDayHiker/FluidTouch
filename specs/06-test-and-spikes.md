@@ -46,7 +46,7 @@ the queue is up to about 40 lines, not 15, and a prompt's text came 50 s before 
 
 ## 2. Spikes
 
-S1 (partly) and S2 were run on 2026-11-16, S3 and S4 on 2026-11-18; results are below the
+S1 and S2 were run on 2026-11-16 (S1 during a job on 2026-11-18), S3 and S4 on 2026-11-18; results are below the
 table. S5 has not been run; it is deferred until its answer is needed, before M8 (D32).
 
 | # | Question | How | Decides |
@@ -61,21 +61,26 @@ table. S5 has not been run; it is deferred until its answer is needed, before M8
 
 - `http://<address>/sd/<path>` downloads the file. **Controller SD can be previewed.**
 - `GET /upload?path=<folder>` returns the folder listing as JSON.
-- Not done yet: the same download while a job is running, the value of
-  `$HTTP/BlockDuringMotion`, and how long the reference job takes to download.
+- **During a job** (2026-11-18, Jeffrey): the download works while the machine is cutting,
+  with `$HTTP/BlockDuringMotion` **On** (FluidNC's default). The source explains it (below):
+  `/sd/...` is served by FluidNC's WebDAV handler, which doesn't check that setting.
+- Not done: how long the reference job takes to download, and whether a download during a
+  cut affects the motion (nothing was noticed; not measured).
 
 ### S1: what FluidNC's source says
 
-Read from `WebUIServer.cpp` on FluidNC's main branch (2026-11-16). The first and third
-points are confirmed by the result above. The fake FluidNC follows this.
+Read from `WebUIServer.cpp` on FluidNC's main branch (2026-11-16; the first two points
+corrected 2026-11-18 from `WebUIServer.cpp` and `WebDAV.cpp`). The result above confirms
+them. The fake FluidNC serves `/sd/...` at any time by default, which matches;
+`$sim/httpblock=1` makes it refuse downloads with 503 while moving, for testing a failed fetch.
 
-- There is no handler for `/sd/...`. A GET for any unregistered path goes to the not-found
-  handler, which tries to send the file with that path as a download; a path that starts
-  with `/sd/` is a file on the SD card. So `http://<address>/sd/<path>` should work.
-- With the setting `HTTP/BlockDuringMotion` on, such a request is answered with **503**
-  while the machine is moving. S1 should note that setting's value (`$HTTP/BlockDuringMotion`)
-  and what the browser gets during a job. If it is on, the Controller SD file can only be
-  fetched for preview before the job starts, which is when it is needed.
+- `/sd/...` and `/flash/...` are served by FluidNC's WebDAV handlers (`WebDAV("/sd",
+  SDVolume)`), registered before the not-found handler. A GET downloads the file.
+- `HTTP/BlockDuringMotion` (On by default) is checked only when serving the web UI's own
+  files from flash (answered with a 503 page, "Cannot load WebUI while GCode Program is
+  Running") and for commands sent over HTTP (`/command`). The WebDAV handler doesn't check
+  it, so a Controller SD file can be fetched during a job. FluidNC's comments give the
+  reason for the setting: serving files costs CPU time that motion may need.
 - `GET /upload?path=<folder>` returns the folder as JSON (`files` with `name`, `size`, -1
   for folders; `path`, `total`, `used`, `occupation`, `status`), and takes
   `action=createdir|delete|deletedir|rename`. This is an alternative to `$Files/ListGcode`

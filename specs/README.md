@@ -14,7 +14,7 @@ questions; the list is in [07-decisions.md](07-decisions.md#open-questions).
 | 03 | [Screens](03-screens.md) | First draft; control lists need review screen by screen |
 | 04 | [G-code library](04-gcode-library.md) | Built in CNC-Tools (D67, its spec 15), taken from its releases with a device test suite (D69) |
 | 05 | [File workflow](05-file-workflow.md) | Draft; inbox is OneDrive direct, pending spike S5 |
-| 06 | [Testing and spikes](06-test-and-spikes.md) | S1 (partly), S2, S3 and S4 run; S5 not yet |
+| 06 | [Testing and spikes](06-test-and-spikes.md) | S1, S2, S3 and S4 run; S5 not yet |
 | 07 | [Decisions and open questions](07-decisions.md) | Living log |
 | 08 | [Milestones](08-milestones.md) | Draft |
 | 09 | [Git workflow](09-git-workflow.md) | Draft |
