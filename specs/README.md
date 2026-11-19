@@ -12,7 +12,7 @@ questions; the list is in [07-decisions.md](07-decisions.md#open-questions).
 | 01 | [Requirements](01-requirements.md) | Draft, mostly settled |
 | 02 | [Architecture](02-architecture.md) | Draft; memory budget measured (S2) |
 | 03 | [Screens](03-screens.md) | First draft; control lists need review screen by screen |
-| 04 | [G-code library](04-gcode-library.md) | Built in CNC-Tools (D67); its spec is in [outgoing/](outgoing/cnc-tools-15-cpp-core.md) until it moves there |
+| 04 | [G-code library](04-gcode-library.md) | Built in CNC-Tools (D67, its spec 15), taken from its releases with a device test suite (D69) |
 | 05 | [File workflow](05-file-workflow.md) | Draft; inbox is OneDrive direct, pending spike S5 |
 | 06 | [Testing and spikes](06-test-and-spikes.md) | S1 (partly), S2, S3 and S4 run; S5 not yet |
 | 07 | [Decisions and open questions](07-decisions.md) | Living log |

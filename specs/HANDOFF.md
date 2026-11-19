@@ -73,9 +73,13 @@ Spikes: S1 mostly done, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in 
    real job ran from the new UI with no fallback to classic (Jeffrey, 2026-11-18). Review
    each screen's control list with Jeffrey before building it.
 2. **M4: the G-code library is built in CNC-Tools** (D67, [04](04-gcode-library.md)). Its
-   spec, [outgoing/cnc-tools-15-cpp-core.md](outgoing/cnc-tools-15-cpp-core.md), goes to
-   CNC-Tools as `gcode-editor/specs/15-cpp-core.md`, where Jeffrey has it implemented. This
-   repo's part waits for phase C1: the copy script, the SD reader and the arena.
+   spec is CNC-Tools `gcode-editor/specs/15-cpp-core.md`, revision 5 (2026-11-18, reviewed
+   by both sides, no open questions; branch `spec/cpp-core` there). Phases: C0 (TS prep),
+   C1 (read), C2 (Rotate, Flip only), C3 (outline); Move waits for the editor (D70). This
+   repo's part starts when C1's release is promoted (D69): the copy script from a named
+   release version, `.gitattributes` for the copies, the test firmware running the device
+   suite from the SD card (results in 06), the SD reader and arena, the fallback font.
+   **Library version in use: none yet.**
 3. The temporary machine picker (D57) is to be removed at the end of development.
 4. Small things still open from the device, for the next machine session: S1 while a job
    runs, the value of `$HTTP/BlockDuringMotion` on the controller, STOP pressed during a

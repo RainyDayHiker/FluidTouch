@@ -4,7 +4,7 @@
 
 | Level | What | Where |
 |-------|------|-------|
-| Library | `lib/gcode` against golden cases from CNC-Tools ([04 §7](04-gcode-library.md#7-proving-equality-with-the-typescript-core)); unit tests for segments and move | PC runner, CI |
+| Library | Proven equal to the TS core in CNC-Tools' CI; here, its device suite on the device for each release ([04 §2](04-gcode-library.md#2-the-device-test-suite)); unit tests for segment packing | Test firmware on the device; PC |
 | Services | MachineService and JobService against the fake FluidNC, scripted | Simulator, headless |
 | Screens | Each screen driven in the simulator with `--script`, screenshots compared by eye at review | Simulator |
 | Device | Checklist per milestone on the CrowPanel and the LowRider | By hand |
@@ -240,6 +240,16 @@ Uploaded from the display SD with Job > Use this job:
 No errors. `UploadManager` refuses files over 10 MB, and that stays (D66): larger files
 go to the controller's SD another way. The number of runs per file, and the distance to the
 router, were not noted.
+
+## Device test suite runs
+
+The G-code library's device suite (D69, [04 §2](04-gcode-library.md#2-the-device-test-suite))
+is run on the device for every library release before the display uses it. One row per
+run; the `perf` figures below the table.
+
+| Date | Library version | Groups | Result |
+|------|-----------------|--------|--------|
+| | | | None yet (first run in M4) |
 
 ### S2 procedure
 

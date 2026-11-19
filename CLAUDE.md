@@ -13,7 +13,7 @@ A new workflow-ordered interface is being built on top of the existing platform 
 
 - **Specs lead.** Behaviour changes go into `specs/` (and a row in `07-decisions.md`) in the same commit as the code. If a spec is unclear or missing, ask Jeffrey rather than assume; he prefers clarifying questions to assumptions.
 - **Keep upstream-owned code mergeable.** `src/core`, `src/network`, `src/ui`, `sim/`, `platformio.ini`, `main.cpp` belong to upstream FluidTouch. Change them only as listed in `specs/02-architecture.md` §2, in small commits separate from new code (`platform:` prefix).
-- **New code lives in** `src/app/` and `src/services/`. `lib/gcode/` is a copy of CNC-Tools' `gcode-editor/packages/core-cpp` (D67): never edit it here; changes go into CNC-Tools and come back with the next copy.
+- **New code lives in** `src/app/` and `src/services/`. `lib/gcode/` is copied from a CNC-Tools release (`library/` of `gcode-core-<version>.zip`, D67, D69): never edit it here; changes go into CNC-Tools and come back with a later release.
 - **The classic UI must keep working** (boot-selectable). Don't delete or restructure `src/ui`.
 - **Simulator first.** Build and exercise every change in the desktop simulator before flashing.
 - **Never claim device behaviour that was only run in the simulator.** Say which was tested.

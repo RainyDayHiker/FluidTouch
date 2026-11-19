@@ -3,7 +3,7 @@
 Each milestone ends with a build that runs in the simulator and on the CrowPanel, and a
 short device checklist. M4 can proceed alongside M2 and M3. Features added to the G-code Editor
 later get a milestone of their own, or a place in one, when Jeffrey wants them on the display
-([04 §3](04-gcode-library.md#3-new-features-from-the-editor), D68).
+([04 §4](04-gcode-library.md#4-new-features-from-the-editor), D68).
 
 | # | Milestone | Depends on | Delivers | Done when |
 |---|-----------|-----------|----------|-----------|
@@ -11,10 +11,10 @@ later get a milestone of their own, or a place in one, when Jeffrey wants them o
 | M1 | Chassis | M0 | Branch `lrt/main`; listener interface in `FluidNCClient`; UI mode switch with classic UI intact; services skeleton; frame (tabs, status bar, banners) with empty screens; SettingsService on classic slot 0; fake FluidNC job playback and HTTP; CI; spikes S1 and S2 run and recorded | Device boots into the new frame, connects, shows state and position; can restart into classic and back; S1 and S2 results in [06](06-test-and-spikes.md). **Done 2026-11-16**; reconnect fix confirmed on the device 2026-11-17 |
 | M2 | Setup | M1 | Setup screen complete, including laser move and alarm/offline banners | A real job is prepared without leaving Setup. **Setup done and checked on the device 2026-11-17** (D33 to D45). Choosing and starting the job moved to the Job tab (D33), so the job part of this check is met with M3's Job screen |
 | M3 | Run and basic Job | M2 | Job list from Controller SD and Display SD (no preview); start panel; Run with Prompt state, pause, abort, overrides, progress bar, times; Macros; Settings pages; upload from display SD; position log and spikes S3 and S4 | A full real job including bit prompts runs from the new UI; you stop needing classic for normal work |
-| M4 | G-code library, read side | M0 | In CNC-Tools (D67): phase C1 of its spec 15 (tokenizer, fixed, simulator, analysis, segments, golden parity in its CI). Here: the copy script and checksum check, the SD reader, the arena, `lib/gcode` in the firmware and simulator builds | C1 done in CNC-Tools; the reference job analyses on the device, time and memory recorded |
+| M4 | G-code library, read side | M0 | In CNC-Tools (D67): phases C0 and C1 of its spec 15, ending in a promoted release. Here (D69): the copy script from a release with the checksum check and `.gitattributes`; the test firmware running the device suite (`float`, `parse`, `self`, `analyse`, `perf`) from the SD card; the SD reader and the arena; `lib/gcode` in the firmware and simulator builds; the fallback font for `·`, `–`, `°` | The device suite passes on the device for the C1 release; its `perf` results (SD speed, analysis time and memory of the reference jobs) recorded in 06 and the display's budgets set from them |
 | M5 | Preview | M3, M4 | Working folder on display SD; fetch from sources; preview, info line and "fits from here" on Job; progress layer and tool marker on Run; operation N of M | Preview of real jobs matches the G-code Editor's top view; progress follows a real cut |
-| M6 | Transforms | M5 | classify, rotate, flip (flip only), move (phase C2 in CNC-Tools, including the Move spec and TS implementation); blocked dialog; undo; upload-and-select | Byte-identical to the G-code Editor on the golden set; a rotated job cuts correctly |
-| M7 | Outline | M6 | Outline view; generated outline file (phase C3 in CNC-Tools); Run outline | Loops match the editor's within tolerance; outline run checked on the machine with Z raised |
+| M6 | Transforms | M5 | Rotate, Flip ("Flip only" with the W-FLIP confirm) from phase C2 in CNC-Tools; device suite `transform` group passes; blocked dialog; undo; upload-and-select. Move later, once it is an editor feature (D70) | Byte-identical to the G-code Editor on the golden set; a rotated job cuts correctly |
+| M7 | Outline | M6 | Outline view; generated outline file (phase C3 in CNC-Tools, after its memory design note is reviewed here); device suite `outline` group passes; Run outline | Loops match the editor's within tolerance; outline run checked on the machine with Z raised |
 | M8 | Inbox and polish | M5 | Spike S5 first; inbox source: OneDrive direct, or the PC folder server if S5 failed (D17); "Save to CNC inbox" in the G-code Editor; flip with reverse cuts; settings backup; user doc | A file saved at the PC is cut later with no PC in the workshop |
 
 ## M0 exit checklist
