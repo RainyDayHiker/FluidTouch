@@ -31,7 +31,8 @@ proves on every push that both give the same results (§7).
 
 **Not ported:** the document model as a whole-file structure, `DocumentSession` and undo,
 text decoding (§4.3), Arrange and enabled forms, the Surfacing generator, the operation
-catalog. If a later device feature needs one of these, it is added here as a new phase.
+catalog. Features added later, and these, follow §12: each feature spec says whether it is
+ported, portable or not, and a portable one carries what the display needs to use it.
 
 ## 3. Package
 
@@ -324,9 +325,11 @@ So, for this package:
 |------|--------|
 | README | Row 15 "C++ core", and a line in the key decisions: a C++17 port for the LowRider Touch display, checked against TS in CI |
 | 02 §2 | `packages/core-cpp/` in the layout; the dependency rule covers it |
+| 05 | Every operation (and export or generator) spec has a **Device** section (§12.1); the portability rules of §12.2 apply to features marked Portable or Ported |
 | 08 §1, §3 | Build: CMake and a C++ compiler for `core-cpp` (developers only). Test strategy: a row for golden parity (§7) and one for the ESP32-S3 compile |
 | 09 | Decision: "A C++17 port of the core (read side, Rotate, Flip, Move, Outline Check) lives in `packages/core-cpp` for the LowRider Touch display. The TS core stays the reference; CI proves on every push that the C++ gives the same bytes, numbers and reports." Alternatives: the port in the display's repo with a vendored golden set (it drifts unnoticed); a shared C++ core used by both (rewrites the desktop app's core). Rationale: one owner for behaviour; a TS change can't leave the C++ behind |
-| 10 | A milestone per phase (C1 to C3); C1 doesn't depend on any app milestone; C2's Move needs the Move spec and TS implementation first |
+| 10 | A milestone per phase (C1 to C3); C1 doesn't depend on any app milestone; C2's Move needs the Move spec and TS implementation first. A later ported feature is part of its own milestone (§12.1), not a new C phase |
+| 06, 11, 12, 13, 14 | A Device section each, when next changed or when the display asks for the feature (§12.4) |
 
 ## 11. Done when
 
@@ -335,3 +338,91 @@ So, for this package:
 | C1 | Every golden case's analysis and per-line states match. The reference job `Spoilboard_DogHoles.gcode` (789 KB) analyses on the host in one call within a fixed arena, and its arena need is stated in the README. The ESP32-S3 compile passes |
 | C2 | Every golden transform case matches byte for byte, blocked cases with identical reports. Move is specified, implemented in TS, and in the golden set |
 | C3 | Every outline case matches with the TS cell cap; with a 4 M-cell cap the reference job's outline is within the stated tolerance of the TS outline, with the same number of loops |
+
+## 12. New features and the device
+
+The phases above cover what exists today. Features added to the editor later follow this
+section, so that each one is either built to be ported or says why not, and a ported one
+comes with everything the display needs to use it.
+
+### 12.1 Every feature spec has a Device section
+
+Every new feature spec (an operation, an export, a generator, an analysis), and every change
+to an existing one, has a section **Device** that states one of:
+
+| Status | Meaning |
+|--------|---------|
+| **Ported** (phase Cn) | Implemented in `core-cpp` and in the golden set, in the same change as the TS or in the named phase |
+| **Portable** | The TS follows the rules of §12.2 and the spec has the contract of §12.3; nobody has ported it yet |
+| **Not portable** | Why (e.g. needs the whole document in memory, needs the viewer), and what would make it portable |
+
+The status is decided with Jeffrey when the feature is specified. A feature spec without
+it is not finished. A change to a Ported feature changes the C++ in the same pull request
+(CI enforces that, §7.3).
+
+### 12.2 Rules for portable TS code
+
+So that a port is translation, not redesign:
+
+1. **In `core`**, with no UI, viewer or platform code in the logic. The UI only collects
+   parameters and shows results.
+2. **Passes over the lines in order.** Looking ahead is bounded (a fixed number of lines or
+   until a stated event) or done as an extra pass. No random access to `doc.lines` or
+   per-line arrays without saying in the spec how it streams.
+3. **Memory grows with the job's structure** (operations, tool changes, issues), not with its
+   lines. Anything larger (a grid, a buffer) has a size cap as a parameter and says what
+   happens at the cap, as the Outline Check's cell cap does.
+4. **Numbers:** values written to a file are fixed-point (04 §9); floating point goes through
+   the shared helpers, and rounding to fixed point happens in one stated place.
+5. **Bytes:** only ASCII is interpreted; output is deterministic (no time, random numbers or
+   locale), and lines not changed are copied byte for byte.
+6. **Parameters as data:** each parameter has a name, unit, default, limits and validation
+   messages exported from `core` as data, as `SURFACING_FIELDS`, `SURFACING_LIMITS` and
+   `surfacingErrors` do, so a UI can build its form without knowing the feature.
+7. **Results as data:** reports (rule id, severity, line, message), the summary text, and the
+   output file's suggested name. Messages are plain sentences with values filled in, no
+   markup.
+8. **Cancel and progress** at `CHECKPOINT_LINES`.
+9. **Fixtures** under `packages/core/test/fixtures/`, and the feature listed in
+   `tools/export-golden.mjs`, so its golden cases exist before anyone ports it.
+
+### 12.3 The device contract
+
+A Portable or Ported feature's spec states, for each entry point, enough to build its screen
+on the display without reading the TS:
+
+| Item | What to state |
+|------|---------------|
+| Input | A file, parameters, or both; which parameters (by the data of §12.2 rule 6) |
+| Preconditions | What the input must be (e.g. passes Rotate's rules), and what blocks |
+| Output | A new file and its name, or results only; what in the job changes, so the preview knows to refresh |
+| Report | Rule ids and messages that can occur; which are warnings the user should confirm |
+| Choices | Any decision the user makes beyond the parameters (e.g. "flip with reverse cuts") |
+| Memory | The arena it needs: fixed, per operation, per cap unit |
+| Passes and time | Number of passes over the file; time on the host for the 5 MB perf fixture |
+| Cancel | What is left behind when cancelled (nothing, or a partial file the caller deletes) |
+| C++ entry point | Name and parameters, once Ported |
+
+### 12.4 Features today
+
+| Feature | Spec | Status |
+|---------|------|--------|
+| Read: tokenise, simulate, extents, stock, structure | 04, 06 §4, 11 | Ported in C1 |
+| Rotate 90° CW/CCW | 06 | Ported in C2 |
+| Flip H/V | 12 | Ported in C2 (reverse cuts: C4) |
+| Move | to be written (§8) | Ported in C2 |
+| Outline Check | 13 | Ported in C3 |
+| Arrange operations | 11 | Not assessed; not wanted on the display for now |
+| New Surfacing Job | 14 | Not assessed. It takes parameters and writes a file, with parameters already exported as data, so it looks Portable; to be confirmed when its Device section is written |
+| Session, undo | 05 | Not portable, not needed: the display keeps the previous file instead |
+
+Each existing spec gets its Device section when it is next changed, or when the display
+asks for the feature.
+
+### 12.5 Checklist for a new feature
+
+- [ ] Device status decided and written (§12.1)
+- [ ] If Portable or Ported: the TS follows §12.2, and the spec has the contract of §12.3
+- [ ] Fixtures added and the feature in `export-golden.mjs`
+- [ ] If Ported: C++ in the same pull request, golden cases pass, ESP32-S3 compile passes,
+      `core-cpp/README.md` lists the new entry point

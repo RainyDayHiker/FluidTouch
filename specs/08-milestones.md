@@ -1,7 +1,9 @@
 # 08 — Milestones
 
 Each milestone ends with a build that runs in the simulator and on the CrowPanel, and a
-short device checklist. M4 can proceed alongside M2 and M3.
+short device checklist. M4 can proceed alongside M2 and M3. Features added to the G-code Editor
+later get a milestone of their own, or a place in one, when Jeffrey wants them on the display
+([04 §3](04-gcode-library.md#3-new-features-from-the-editor), D68).
 
 | # | Milestone | Depends on | Delivers | Done when |
 |---|-----------|-----------|----------|-----------|

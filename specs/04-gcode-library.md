@@ -40,7 +40,26 @@ TypeScript core it reproduces (D67). This repo copies it and builds the UI aroun
   than the editor's for large jobs and the generated file says so.
 - Mapping `SD:` progress and the tool's position to segments on Run (Q22).
 
-## 3. Passes on the device
+## 3. New features from the editor
+
+Features added to the G-code Editor later reach the display this way (CNC-Tools spec 15
+§12):
+
+1. **In CNC-Tools:** the feature's spec has a Device section. If it is Portable or Ported,
+   it carries a device contract: input and parameters (as data: unit, default, limits,
+   messages), preconditions, output, report, choices, memory, passes, cancel. Ask for that
+   there, not here, if the display needs a feature that lacks it.
+2. **Here, when Jeffrey wants it on the display:** a decision row in 07, the screen in
+   [03](03-screens.md) (where it lives, built from the contract: a form from the parameter
+   data, the report, confirms for its warnings), and a milestone or a place in one in 08.
+3. **Port and copy:** if the feature is only Portable, it is ported in CNC-Tools first.
+   Then `lib/gcode/` is copied at that commit.
+4. **Build:** the UI only collects parameters, calls the entry point, and shows the
+   results. An output file goes to the display SD, and from there to the controller like
+   any job (10 MB limit, D66). The device never re-implements G-code logic. A gap in the
+   contract is fixed in CNC-Tools' spec, not worked around here.
+
+## 4. Passes on the device
 
 Every job gets one analysis when selected: reading the 789 KB reference job is one or two
 sequential reads of the card. A transform is a validate pass and a rewrite pass to a new
