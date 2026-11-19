@@ -23,4 +23,4 @@ later get a milestone of their own, or a place in one, when Jeffrey wants them o
 - [x] Specs 01 to 08 drafted
 - [ ] Screens reviewed one by one (Setup first). Setup done 2026-11-17 (D33 to D45)
 - [x] Inbox direction decided (D17)
-- [x] S1 tried from a browser (works; during a job still to try)
+- [x] S1 tried from a browser (works, also during a job, 2026-11-18)

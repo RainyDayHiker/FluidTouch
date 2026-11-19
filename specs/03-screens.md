@@ -195,7 +195,7 @@ States of the right-hand panel:
 | ABORT | soft reset (0x18), then the alarm banner offers Unlock | Single press. Placed apart from PAUSE |
 | Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
 | Rapid override | realtime override commands | |
-| Preview | | Cut so far in a bright colour, the rest dim, marker at the work position. Follows the tool when zoomed in |
+| Preview | | Cut so far in a bright colour, the rest dim, marker at the work position. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
 
 Notes:
 
