@@ -127,3 +127,8 @@ jobs:
 
       - name: Job playback and HTTP
         run: python sim/tools/test_fake_fluidnc.py
+
+      # lib/gcode and src/services/gcode_device are copies of a CNC-Tools release
+      # (specs/04 §1): never edited here, so they must still match its SHA256SUMS
+      - name: G-code library copies match their release
+        run: python tools/gcode_core.py check
