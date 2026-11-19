@@ -14,7 +14,7 @@ namespace GcodeTests {
 namespace {
 
 constexpr size_t ARENA_SIZE = 1024 * 1024;  // the display's budget (CNC-Tools docs/arena.md)
-constexpr size_t CHUNK = 4096;               // SD reads
+constexpr size_t CHUNK = 16384;              // SD reads (several sectors per read)
 constexpr size_t LINE_KEPT = 2048;            // longest line kept whole; the data's lines are under 400
 
 void *psram(size_t size) {
@@ -54,22 +54,36 @@ public:
     }
     bool ok() const { return chunk && line; }
 
+    // Scans the chunk for the next line end and copies the bytes before it in one go. Reading a
+    // byte at a time made reading about half of analyse()'s time on the device (06, "Device test
+    // suite runs").
     bool next(gcode::Line &out) override {
         yieldNow();
         size_t n = 0;
         out.offset = offset;
-        int c;
-        while ((c = get()) >= 0 && c != '\n' && c != '\r') {
-            if (n < LINE_KEPT) line[n] = (char)c;
-            n++;
+        int end = -1;  // the byte that ended the line, or -1 at the end of the file
+        while (fill()) {
+            const uint8_t *p = chunk + at;
+            size_t avail = have - at, i = 0;
+            while (i < avail && p[i] != '\n' && p[i] != '\r') i++;
+            if (n < LINE_KEPT) memcpy(line + n, p, i < LINE_KEPT - n ? i : LINE_KEPT - n);
+            n += i;
+            at += i;
+            offset += i;
+            if (i < avail) {
+                end = chunk[at++];
+                offset++;
+                break;
+            }
         }
-        if (c < 0 && n == 0) return false;
-        if (c < 0) {
+        if (end < 0 && n == 0) return false;
+        if (end < 0) {
             out.ending = gcode::Ending::None;
-        } else if (c == '\n') {
+        } else if (end == '\n') {
             out.ending = gcode::Ending::LF;
-        } else if (peek() == '\n') {
-            get();
+        } else if (fill() && chunk[at] == '\n') {
+            at++;
+            offset++;
             out.ending = gcode::Ending::CRLF;
         } else {
             out.ending = gcode::Ending::CR;
@@ -98,13 +112,6 @@ private:
         if (have == 0) readError = true;  // short of the end: an SD error
         return have > 0;
     }
-    int get() {
-        if (!fill()) return -1;
-        offset++;
-        return chunk[at++];
-    }
-    int peek() { return fill() ? chunk[at] : -1; }
-
     File file;
     uint8_t *chunk = nullptr;
     char *line = nullptr;
