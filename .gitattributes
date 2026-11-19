@@ -2,3 +2,7 @@
 *.FCStd binary
 *.3mf binary
 *.stl binary
+
+# Copies from CNC-Tools releases (specs/04 §1, D69): byte-exact, checked against SHA256SUMS
+lib/gcode/** -text
+src/services/gcode_device/** -text
