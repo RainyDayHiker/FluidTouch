@@ -31,8 +31,9 @@ directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38
 deletes a file from the served folder (M3).
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
-that the Run screen has to cope with; none has been measured on the controller, which is
-what spike S3 is for:
+that the Run screen has to cope with. S3 measured them on the controller (2026-11-18,
+[S3 result](#s3-result-2026-11-18-jeffrey-on-the-machine-router-off-compared-offline)):
+the queue is up to about 40 lines, not 15, and a prompt's text came 50 s before its Hold:
 
 - `SD:` percent is the position *read* in the file, ahead of the cut by the planner's
   queue (modelled as 15 lines), and it stops at lines that wait for motion (`M0`, `G4`,
@@ -45,16 +46,15 @@ what spike S3 is for:
 
 ## 2. Spikes
 
-S1 (partly) and S2 were run on 2026-11-16; results are below the table. S3 to S5 have not
-been run and are deferred until their answers are needed (D32): S3 and S4 with M3, when a
-job is first started and a file first uploaded from the new UI; S5 before M8.
+S1 (partly) and S2 were run on 2026-11-16, S3 and S4 on 2026-11-18; results are below the
+table. S5 has not been run; it is deferred until its answer is needed, before M8 (D32).
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|
 | S1 | Does FluidNC serve SD files over HTTP, and at what URL and speed? | With the machine on, open `http://<fluidnc address>/sd/<a file on the card>` in a browser on the PC. Note whether it downloads and how long the reference job takes. Then repeat while a job is running. See the notes below | Whether "Controller SD" can be previewed, and whether that is allowed mid-job |
 | S2 | How much PSRAM is free, and how fast is drawing? | Settings > "Draw test (spike S2)" in the M1 build; see below | Memory budgets in [02 §6](02-architecture.md#6-memory); whether the progress layer can be redrawn or must be incremental |
-| S3 | How does `SD:` percent relate to the line being cut? | Run the reference job (air cut is fine) with the M1 build logging time, percent and work position to the display SD. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
-| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 20 MB file with the existing UploadManager; note time and failures. `UploadManager` refuses files over 10 MB, so the 20 MB file needs that limit raised first (classic code) | G8's 32 MB figure; whether a size confirm (S6) is enough |
+| S3 | How does `SD:` percent relate to the line being cut? | Run `specs/spikes/s3_air_cut.gcode` (an air cut, D63) with the position log on; see the S3 procedure below. Compare offline with positions computed from the file | How the Run preview maps progress; whether to snap to the nearest segment to the tool |
+| S4 | Is HTTP upload to FluidNC reliable for multi-MB files? | Upload a 5 MB and a 9.5 MB file from the display SD with Job > Use this job (UploadManager); note time and failures. `UploadManager` refuses files over 10 MB and is left so (D63); larger files are not tested. See the S4 result below | G8's 32 MB figure; whether a size confirm (S6) is enough |
 | S5 | Is OneDrive sign-in and download practical on the ESP32-S3? | A throwaway sketch doing device sign-in, listing one folder, downloading the reference job; note memory use and time. **The sketch has not been written**; it also needs an app registration with Microsoft (a client ID) before it can sign in | Inbox option B |
 
 ### S1 result (2026-11-16, Jeffrey, browser on the PC)
@@ -85,12 +85,122 @@ points are confirmed by the result above. The fake FluidNC follows this.
 ### S3: what it needs, and what the reference job does
 
 S3 **drives the machine**: it runs a job from FluidNC's SD card while the display records
-time, `SD:` percent and position. Two things are not there yet:
+time, `SD:` percent and position. It needs:
 
-- The recording. Nothing in the M1 build writes a log to the display SD. It has to be added
-  (a few lines per status report to a file) before S3 can be run.
-- A decision on which job. S3 does not need the reference job; any job with arcs, a few
-  operations and an `M0` answers the question, and a short one is easier to repeat.
+- The recording: the position log (M3, D62), switched on in Settings > Tools.
+- The job: `specs/spikes/s3_air_cut.gcode` (D63), below.
+
+#### Position log
+
+While it is on, every job is recorded to the display SD, from Run's start (or a job started
+elsewhere being seen) to its end (finished or aborted). Macros are not jobs and are not
+recorded.
+
+- File: `/logs/<job name without extension>-NNN.csv`, NNN the first unused number from
+  001; the folder is made when missing.
+- One row per status report (every 250 ms), none while the connection is down (the gap
+  shows in `ms`):
+
+  ```
+  ms,state,percent,wx,wy,wz,feed,message
+  0,Run,0.00,0.000,0.000,5.000,0,
+  250,Run,0.41,1.204,0.000,5.000,1200,"Operation 1 of 2: Pocket"
+  ```
+
+  `ms` since the start of the recording; `state` as FluidNC names it; `percent` the `SD:`
+  field (empty when there is none); work position; feed rate; `message` only when it
+  changed since the row before, quoted.
+- Rows are kept in RAM and written every 2 s or 4 KB, and at the end. A missing card or a
+  failed write ends that recording; Settings > Tools shows why.
+- The switch is the `lrt` key `pos_log` (Off by default), saved with the other settings.
+
+#### The S3 job
+
+`specs/spikes/s3_air_cut.gcode`, made by `specs/spikes/make_spike_jobs.py` (run it again
+after changing the script). 884 lines, about 5.5 minutes at the programmed feeds plus the
+prompts. It answers the question without the reference job's probe step, and is short
+enough to repeat:
+
+| Operation | What | Why |
+|-----------|------|-----|
+| Start | `G10 L20 P0 X0 Y0 Z0`, up to Z 10, `M0` | Zero where the tool is; a prompt before anything moves |
+| 1 Circles | Four 40 mm circles, three passes each (Z 6, 4, 2), full-circle `G2`, F800; then `G4 P1.5` | Arcs; a dwell (Idle with `SD:` still there) |
+| 2 Zigzag | 60 x 55 mm of straight lines 2.5 mm apart at Z 2, F1200; then `M0` | Long lines; a prompt halfway |
+| 3 Rounded zigzag | Straight lines joined by 2.5 mm half circles (`G2`/`G3`) at Z 3, F1000 | Mixed short arcs and lines |
+| 4 Circle of short lines | A 50 mm circle as 720 `G1` lines of 0.22 mm at Z 1, F1500 | Many short lines: the percent should race ahead of the tool here |
+| 5 Drifting circles | Half circles, `G2` only, at Z 1.5, F900. Each pair makes a circle 1.5 mm wider than the last, all touching X 144, so they drift right to X 174.5. Meant as a spiral (a slip in the script, kept as run; its message still says "Spiral") | Arcs of changing radius |
+| End | Up to Z 10, back to X0 Y0, `M0`, `M2` | Final prompt |
+
+Every move stays at Z 1 or above the start point and inside X 0..175, Y 0..115 of it (arc
+bulges included). Each operation starts with `(MSG Operation n of 5: ...)`, so the log's
+message column marks when FluidNC *read* each one, which can be compared with the position
+at that moment. Played on the fake FluidNC on 2026-11-17: the message for operation 4 was
+logged while the tool was still in operation 3.
+
+#### S3 procedure (on the machine, router off)
+
+1. Copy `s3_air_cut.gcode` to the controller's SD (Job > Display SD > Use this job uploads
+   it, or FluidNC's web UI).
+2. Settings > Tools: Position log On, then leave Settings so it is saved.
+3. Jog to a start point with at least 175 x 115 mm clear in +X and +Y and the tool at
+   least 15 mm above anything; the job zeroes there.
+4. Run it from Run, Continue at each prompt. Settings > Tools then shows the log's name
+   and rows (`/logs/s3_air_cut-NNN.csv` on the display SD).
+5. Bring the CSV back (display SD to the PC) for the offline comparison.
+
+### S3 result (2026-11-18, Jeffrey on the machine, router off; compared offline)
+
+The log `s3_air_cut-001.csv`: 1,322 rows over 346 s, every message there, no write error.
+Compared with the moves in the file by `specs/spikes/s3_compare.py` (`python
+specs/spikes/s3_compare.py specs/spikes/s3_air_cut.gcode <log.csv>`), which finds for each
+row the move the tool is on. Every row lies within 1 mm of a move of the file.
+
+- **Percent is exact.** It is the byte offset at the end of the last line read, divided by
+  the file size, to two decimals (in this 17,807-byte file 0.01% is about 2 bytes, shorter
+  than any line). Percent gives the last line read exactly.
+- **FluidNC stops reading at `M0`**: the percent stays at the end of the `M0` line until
+  Continue.
+- **The tool runs behind the line read**, by the planner's queue:
+
+  | Operation | Lines behind (median / max) | Seconds before the tool reached a line it had read (median / max) |
+  |-----------|-----------------------------|-------------------------------------------------------------------|
+  | 1 Circles (full `G2`) | 0 / 5 | 1.8 / 13.1 |
+  | 2 Zigzag (60 mm lines) | 24 / 32 | 32 / 52 |
+  | 3 Rounded zigzag | 1 / 33 | 3.5 / 5.9 |
+  | 4 Circle of 720 short lines | 42 / 43 | 0.3 / 7.2 |
+  | 5 Drifting circles (`G2`) | 1 / 3 | 1.0 / 4.2 |
+
+  So about 40 lines at most when the lines are short. Long straight lines are fewer lines
+  but much more time (up to 52 s). Arcs take few lines, because FluidNC cuts each arc into
+  many planner blocks. The fake FluidNC models this as 15 lines.
+- **Messages arrive when their line is read.** "Halfway - Continue" (`M0`) arrived at
+  163 s, with the tool 31 lines back in the zigzag; Hold came at 213 s, **50 s later**. The
+  final prompt arrived 3 s before its Hold. "Operation 5" arrived while the tool was 18
+  lines from the end of operation 4.
+- **Percent is not time.** Operation 4 is 75% of the file's bytes and 14 s of the run. At
+  half the run's time the percent was 10.4; at 90% of the time it was 97. Run's time left
+  (elapsed x (100 - percent) / percent, [03 §4](03-screens.md)) would have shown 23 to 33
+  minutes during the first four minutes of a six-minute job, then 49 s with 76 s to go.
+- **Reports**: FluidNC sent one every 250 ms while moving: on moves at constant feed, the
+  rows are equal distances apart. During a hold nothing changes and nothing is sent (5.6 s
+  at the first prompt). The display's `ms` is up to about 160 ms late on some rows: a
+  400 ms gap followed by a 160 ms one, about every second in operation 1, less often later.
+  No report was missed.
+
+What this means for the parts S3 decides (Q22 open; D64, D65):
+
+- The Run preview cannot use the percent as the tool's place. It is an upper bound: the
+  tool is on a line at or before the one read, and here never more than 45 lines before.
+  Matching the position to the moves between the last match and the line read found the
+  tool's move in every row here. FluidNC can also report the executing line itself
+  (`Ln:`, if `use_line_numbers` is on and the lines carry N words; read from FluidNC's
+  `Report.cpp`, not tried). Which to use is Q22, left for M5.
+- Time left from the percent is unusable for files whose lines differ in length. It stays
+  until M5 replaces it with an estimate from the file (D64).
+- The current-operation text and Run's large message (D51) change when a line is read, up
+  to 50 s before the tool gets there; from M5 they follow the tool (D65).
+
+### The reference job
 
 What `Spoilboard_DogHoles.gcode` does, read from the file (2026-11-16), for setting the
 machine up if it is used:
@@ -117,6 +227,19 @@ the router left off or unplugged.
 
 The fake FluidNC does not model two things this job uses: the `P` word on `G38.2` (it
 ignores it) and `$HZ` inside a file (it skips `$` lines).
+
+### S4 result (2026-11-18, Jeffrey)
+
+Uploaded from the display SD with Job > Use this job:
+
+| File | Time | Rate |
+|------|------|------|
+| `s4_5mb.gcode` (5,000,000 bytes) | 40 s | 125 KB/s |
+| `s4_9_5mb.gcode` (9,500,000 bytes) | 65 s | 146 KB/s |
+
+No errors. `UploadManager` refuses files over 10 MB, and that stays (D66): larger files
+go to the controller's SD another way. The number of runs per file, and the distance to the
+router, were not noted.
 
 ### S2 procedure
 

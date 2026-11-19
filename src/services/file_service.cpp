@@ -130,6 +130,8 @@ bool FileService::displayCardReady() {
     return UploadManager::init();
 }
 
+bool FileService::displayCardBusy() { return UploadManager::isUploading(); }
+
 void FileService::listDisplay(const char *folder) {
     if (UploadManager::isUploading()) {
         // The upload task reads the card; one user at a time

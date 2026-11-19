@@ -102,6 +102,9 @@ blob with a version byte) and written back only when the list changed. It runs a
 (`$SD/Run` or the command line) and follows it: starting, running, held, done or stopped,
 with the reason. `JobService` leaves files under `/fluidtouch/macros/` to it (D61).
 
+`PositionLog` (M3) records a running job's status reports to the display SD when Settings
+> Tools has it on ([06](06-test-and-spikes.md) S3, D62).
+
 `FileService` (M3) lists a folder on either card, deletes a file, and uploads a display SD
 file. Controller listings are `$Files/ListGcode` replies collected through
 `FluidNCClient::setMessageCallback` (one request at a time, 6 s timeout); deletes are

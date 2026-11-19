@@ -71,6 +71,8 @@ public:
     static Probe probe();
     static LaserOffset laserOffset();
     static Display display();
+    // Settings > Tools: record jobs to the display SD ("lrt" pos_log, D62)
+    static bool positionLog();
 
     // --- Saving (Settings screen only) -----------------------------------
     // Each writes only what differs from the stored values and returns true
@@ -87,6 +89,7 @@ public:
     static bool saveLaserOffset(const LaserOffset &o);
     // Also applies the brightness and timers to PowerManager
     static bool saveDisplay(const Display &d);
+    static bool savePositionLog(bool on);
 
     // Changes with every save, so screens that copied values know to take
     // them again
