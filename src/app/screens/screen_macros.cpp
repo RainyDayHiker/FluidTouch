@@ -1,4 +1,5 @@
 #include "app/screens/screens.h"
+#include "app/fonts.h"
 #include "app/entry.h"
 #include "app/frame.h"
 #include "app/widgets.h"
@@ -22,10 +23,10 @@ using namespace Widgets;
 
 namespace {
 
-const lv_font_t *const FONT_LARGE = &lv_font_montserrat_24;
-const lv_font_t *const FONT_BIG = &lv_font_montserrat_20;
-const lv_font_t *const FONT_MID = &lv_font_montserrat_18;
-const lv_font_t *const FONT_SMALL = &lv_font_montserrat_14;
+const lv_font_t *const FONT_LARGE = &lrt_font_24;
+const lv_font_t *const FONT_BIG = &lrt_font_20;
+const lv_font_t *const FONT_MID = &lrt_font_18;
+const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
 const int SLOTS = MacroService::SLOTS;
 const int COLS = 4;

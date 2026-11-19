@@ -1,4 +1,5 @@
 #include "app/screens/screens.h"
+#include "app/fonts.h"
 #include "app/entry.h"
 #include "app/frame.h"
 #include "app/ui_mode.h"
@@ -26,10 +27,10 @@ using namespace Widgets;
 
 namespace {
 
-const lv_font_t *const FONT_BIG = &lv_font_montserrat_20;
-const lv_font_t *const FONT_MID = &lv_font_montserrat_18;
-const lv_font_t *const FONT_CHOICE = &lv_font_montserrat_16;
-const lv_font_t *const FONT_SMALL = &lv_font_montserrat_14;
+const lv_font_t *const FONT_BIG = &lrt_font_20;
+const lv_font_t *const FONT_MID = &lrt_font_18;
+const lv_font_t *const FONT_CHOICE = &lrt_font_16;
+const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
 const int NAV_X = 8, NAV_W = 164, NAV_H = 64, NAV_GAP = 8;
 const int PAGE_X = 184, PAGE_W = 800 - PAGE_X;

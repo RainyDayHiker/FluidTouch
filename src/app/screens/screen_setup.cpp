@@ -1,4 +1,5 @@
 #include "app/screens/screens.h"
+#include "app/fonts.h"
 #include "app/frame.h"
 #include "app/widgets.h"
 #include "app/icons/icons.h"
@@ -22,10 +23,10 @@ using namespace Widgets;
 
 namespace {
 
-const lv_font_t *const FONT_ICON = &lv_font_montserrat_32;
-const lv_font_t *const FONT_BIG = &lv_font_montserrat_20;
-const lv_font_t *const FONT_MID = &lv_font_montserrat_18;
-const lv_font_t *const FONT_SMALL = &lv_font_montserrat_14;
+const lv_font_t *const FONT_ICON = &lrt_font_32;
+const lv_font_t *const FONT_BIG = &lrt_font_20;
+const lv_font_t *const FONT_MID = &lrt_font_18;
+const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
 // Home and zero each have a colour, so the two rows of pairs read at a glance
 const lv_color_t COLOR_HOME = LV_COLOR_MAKE(0x2E, 0x7D, 0x32);
