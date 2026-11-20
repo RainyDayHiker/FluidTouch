@@ -65,11 +65,14 @@ software and text-to-number conversion is newlib's, so the same cases are run on
   It runs every group the release has (`float`, `parse`, `self`, `analyse`, `perf`, then
   `transform` from C2 and `outline` from C3) and writes one line per case to
   `/gcode-tests/results.txt` and the serial port; Tools shows the progress and the summary.
-  Not while a job runs.
+  Not while a job runs. A transform case whose output differs leaves
+  `mismatch-<case>-<kind>.gcode` in `/gcode-tests/` to compare; the `perf` group's write
+  test file is removed.
 - **To run it:** `python tools/gcode_core.py data <version> <folder>`, copy the folder's
   contents to `/gcode-tests/` on the display SD, Settings > Tools > Library tests > Run.
-- Cost of keeping it in the firmware: about 46 KB of flash, and about 28 KB of internal RAM
-  for the runner's static buffers (asked of CNC-Tools: take them from the arena).
+- Cost of keeping it in the firmware: flash only (the firmware grew 46 KB with C1, 21 KB
+  more with C2). From C2 the runner keeps no static buffers: it takes about 17 KB from the
+  front of the arena while it runs.
 - The `perf` group measures time and peak memory per entry point for both reference jobs and
   the 5 MB fixture, and the SD card's read and write rate. **Those figures set the display's
   budgets** (how long an analysis or a Rotate may take, how big a job may be previewed), and

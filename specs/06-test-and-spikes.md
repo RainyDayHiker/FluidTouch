@@ -254,6 +254,7 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-20 | 0.1.0-build.70 (C2) | all (float, parse, self, analyse, transform, perf) | PC: passed 162, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (no warnings), and again from Settings > Tools in the simulator. Not yet on the device |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device, display SD at 20 MHz (D74):** passed 57, failed 0, skipped 0 in 0:58 |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device (Jeffrey, CrowPanel Advance):** passed 57, failed 0, skipped 0 in 1:51. The first attempt rebooted after `float` (the task watchdog: the test task never yielded); fixed by yielding every 50 ms in the SD reader |
