@@ -29,7 +29,7 @@ Kept deliberately small, to stay mergeable (G11):
 |------|--------|
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
-| `ui/upload_manager.*` | Used as is by `FileService`. A download function is added next to it (new file). |
+| `ui/upload_manager.*` | Used by `FileService`. A download function is added next to it (new file). `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
 | `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |

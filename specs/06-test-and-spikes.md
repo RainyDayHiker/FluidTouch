@@ -281,7 +281,7 @@ Write unchanged (783 ms). The per-byte handling wasn't the cost: the display SD 
 bus at **4 MHz** (`SD.begin(..., 4000000, ...)` in upstream's `UploadManager::init`), which caps
 transfers at 500 KB/s, and the card already gives about 380. Reading is still about half of
 `analyse()` (two passes of about 2 s for the reference job); the other half, about 3.7 s, is the
-library's own work.
+library's own work. Hence D74: the display SD at 20 MHz (device run pending).
 
 ### S2 procedure
 
