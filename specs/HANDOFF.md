@@ -88,10 +88,10 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    reference job takes 8.4 s on the device, about half of it reading the card. A reader
    that scans 16 KB chunks (`lrt/m4-sd-reader`) gained only 4 to 8% (7.8 s): the display SD's
    SPI clock is 4 MHz (upstream's `UploadManager::init`), which caps reads near 500 KB/s.
-   D74 raises it to 20 MHz, falling back to 4 MHz (built, simulator only: the simulator
-   ignores the clock). Next: the suite and its `perf` lines on the device at 20 MHz (the
-   serial log says which clock the card got), then the display's budgets (how long an
-   analysis may take, with progress shown). Done ahead of C1: the fallback font and the
+   D74 raises it to 20 MHz, falling back to 4 MHz: on the device the suite passes 57 of 57
+   at 20 MHz, reads at about 1 MB/s, and the reference job analyses in 5.0 s (06). Not yet
+   checked on the device at 20 MHz: an upload from the display SD in the classic UI, other
+   cards. Next: the display's budgets (how long an analysis may take, with progress shown). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.
