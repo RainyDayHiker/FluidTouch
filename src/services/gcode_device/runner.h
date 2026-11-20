@@ -35,9 +35,13 @@ struct Totals {
 };
 
 /**
- * Runs the suite. `arena` is the working memory for each analysis (reused case by case); a case
- * needing more is SKIPped with the reason. `groups` is a comma-separated filter ("float,analyse"),
- * or null for all groups.
+ * Runs the suite. The runner keeps no static buffers: it takes about 17 KB of scratch from the
+ * front of `arena`, and the rest is the working memory for each analysis (reused case by case);
+ * a case needing more is SKIPped with the reason. `groups` is a comma-separated filter
+ * ("float,analyse"), or null for all groups.
+ *
+ * The run never yields: the platform's LineReader should pause regularly on an RTOS (docs/guide.md
+ * §4).
  */
 Totals run(Platform& platform, gcode::Arena arena, const char* groups);
 

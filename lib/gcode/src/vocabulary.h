@@ -9,6 +9,8 @@ namespace vocab {
 
 /** Index of a recognized G-code in G_CODE_ORDER (the bit in a line's G masks), or -1. */
 int gIndex(int key);
+/** The code key at index `index` of G_CODE_ORDER, or -1. */
+int gKeyAt(int index);
 /** Index of a recognized M-code in M_CODE_ORDER, or -1. */
 int mIndex(int key);
 /** The modal group bit of a recognized G-code (vocabulary.ts GROUP_BIT), or 0. */

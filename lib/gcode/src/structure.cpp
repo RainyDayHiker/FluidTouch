@@ -533,4 +533,28 @@ void StructureFinder::finish(Structure& out) {
   out.labelCount = labelTools.size;
 }
 
+uint32_t offPrefixLength(const char* text, size_t length) {
+  const View v{text, length};
+  const Stripped s = stripOff(v);
+  return s.off ? static_cast<uint32_t>(s.text.p - text) : 0;
+}
+
+Str trimmedBlanks(const char* text, size_t length) {
+  const View t = trimBlanks(View{text, length});
+  return Str{t.p, static_cast<uint32_t>(t.n)};
+}
+
+LineMarker lineMarker(const char* text, size_t length, Str& name) {
+  const View t = trimBlanks(View{text, length});
+  if (t.startsWith(BEGIN_OP)) {
+    const View n = markerName(t, BEGIN_OP);
+    name = Str{n.p, static_cast<uint32_t>(n.n)};
+    return LineMarker::BeginOperation;
+  }
+  if (t.startsWith(FINISH_OP)) return LineMarker::FinishOperation;
+  size_t d = 0, e = 0;
+  if (t.startsWith(BEGIN_TC) || m6Match(t, d, e)) return LineMarker::ToolChange;
+  return LineMarker::None;
+}
+
 }  // namespace gcode

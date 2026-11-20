@@ -66,6 +66,9 @@ int indexIn(const int (&keys)[N], int key) {
 static_assert(sizeof(kGKeys) / sizeof(int) <= 64, "G masks are two 32-bit words");
 
 int gIndex(int key) { return key < 0 ? -1 : indexIn(kGKeys, key); }
+int gKeyAt(int index) {
+  return index >= 0 && index < static_cast<int>(sizeof(kGKeys) / sizeof(int)) ? kGKeys[index] : -1;
+}
 int mIndex(int key) { return key < 0 ? -1 : indexIn(kMKeys, key); }
 
 uint32_t groupBit(int key) {

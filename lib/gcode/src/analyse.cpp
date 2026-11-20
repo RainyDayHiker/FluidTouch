@@ -1,11 +1,12 @@
 // analyse() (specs/15 §5.2): two passes over the file.
 //   Pass 1: refusals and line limits, the simulator (precision, extents, units), the operation
-//           structure, stock comments, and the fixed positioning moves.
+//           structure, stock comments, the fixed positioning moves and the job extents.
 //   Pass 2: the simulator again, now with the final precision known: per-line states at the
-//           final P, job extents, segments, and the per-line hook.
+//           final P, segments, the per-line hook, and a transform's checks (analyse_internal.h).
 #include <cmath>
 #include <cstring>
 
+#include "analyse_internal.h"
 #include "arena.h"
 #include "gcode/analysis.h"
 #include "gcode/num.h"
@@ -133,11 +134,16 @@ class Passer {
 }  // namespace
 
 Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn, AnalysisSink* sink, Analysis& result) {
+  ArenaAlloc arena(arenaIn);
+  return analyseWith(reader, options, arena, sink, nullptr, result);
+}
+
+Status analyseWith(LineReader& reader, const AnalysisOptions& options, ArenaAlloc& arena, AnalysisSink* sink, FinalPass* finalPass,
+                   Analysis& result) {
   std::memset(&result, 0, sizeof result);
   result.status = Status::Ok;
   result.refusedMessage = "";
   result.firstXYMotion = -1;
-  ArenaAlloc arena(arenaIn);
   const AnalysisOptions opt = [&] {
     AnalysisOptions o = options;
     if (o.maxLineLength > 65535) o.maxLineLength = 65535;
@@ -151,7 +157,7 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
   // Scratch: built texts (two names of the longest line) and the hook's tokens.
   const size_t scratchSize = 2 * static_cast<size_t>(opt.maxLineLength) + 256;
   char* scratch = arena.array<char>(scratchSize);
-  Token* tokens = sink ? arena.array<Token>(opt.maxLineLength + 1) : nullptr;
+  Token* tokens = sink || finalPass ? arena.array<Token>(opt.maxLineLength + 1) : nullptr;
   if (arena.failed) return oom();
   // The simulator, the line state and the structure finder are small (a few hundred bytes each).
   Simulator simulator;
@@ -168,9 +174,30 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
   Passer pass(reader, opt, result);
   bool pending = false, pendingProbe = false, pendingZero = false;
   uint32_t pendingLine = 0, parseFlags = 0;
+  PassOneFacts facts{0, 0};
+
+  // Job extents (fixed-moves.ts jobExtents): every XY motion but the fixed moves. Endpoints are
+  // kept at the working precision and rescaled with it, as TS's stored positions are (the same
+  // multiplications in the same order, and min and max commute with them); arc extremes are
+  // floats, rounded at the final P at the end (toFixed is monotonic). A fixed-move candidate's
+  // point waits until the next XY motion says whether it is one.
+  double jMinX = HUGE_VAL, jMaxX = -HUGE_VAL, jMinY = HUGE_VAL, jMaxY = -HUGE_VAL;
+  double aMinX = HUGE_VAL, aMaxX = -HUGE_VAL, aMinY = HUGE_VAL, aMaxY = -HUGE_VAL;
+  double pendingX = 0, pendingY = 0;
+  bool pendingKnown = false;
+  int raisesSeen = 0;
+  const auto jobAdd = [&](double x, double y) {
+    if (x < jMinX) jMinX = x;
+    if (x > jMaxX) jMaxX = x;
+    if (y < jMinY) jMinY = y;
+    if (y > jMaxY) jMaxY = y;
+  };
   const auto resolve = [&](bool nextIsG0) {
-    if (pending && nextIsG0 && (pendingProbe || pendingZero)) {
+    if (!pending) return true;
+    if (nextIsG0 && (pendingProbe || pendingZero)) {
       if (!fixed.push(arena, FixedMove{pendingLine, pendingProbe ? FixedMoveKind::Probe : FixedMoveKind::Zero})) return false;
+    } else if (pendingKnown) {
+      jobAdd(pendingX, pendingY);
     }
     pending = false;
     return true;
@@ -182,6 +209,23 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
     sim->step(t.p, t.n, i, *st);
     structure->step(t.p, t.n, i);
     if (!stockCommentsIn(t.p, t.n, i, arena, stocks)) return oom();
+    facts.gLo |= st->gLo;
+    facts.gHi |= st->gHi;
+
+    // This line's precision rises bring the earlier lines' points along.
+    for (; raisesSeen < sim->raiseCount(); raisesSeen++) {
+      const double k = sim->raises()[raisesSeen].factor;
+      if (jMinX != HUGE_VAL) {
+        jMinX *= k;
+        jMaxX *= k;
+        jMinY *= k;
+        jMaxY *= k;
+      }
+      if (pending && pendingKnown) {
+        pendingX *= k;
+        pendingY *= k;
+      }
+    }
 
     // Fixed positioning moves (fixed-moves.ts), resolved at the next XY motion line.
     if (pending) {
@@ -191,12 +235,30 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
         pendingProbe = true;
       }
     }
-    if (st->isXYMotion && st->motion == Motion::G0 && st->distance == Distance::G90 &&
-        (st->letters & (LETTER_X | LETTER_Y)) == (LETTER_X | LETTER_Y) && st->owner == Owner::Motion) {
-      pending = true;
-      pendingLine = i;
-      pendingProbe = false;
-      pendingZero = st->after.x == 0 && st->after.y == 0;
+    if (st->isXYMotion) {
+      const bool candidate = st->motion == Motion::G0 && st->distance == Distance::G90 &&
+                             (st->letters & (LETTER_X | LETTER_Y)) == (LETTER_X | LETTER_Y) && st->owner == Owner::Motion;
+      const bool endKnown = known(st->after.x) && known(st->after.y);
+      if (candidate) {
+        pending = true;
+        pendingLine = i;
+        pendingProbe = false;
+        pendingZero = st->after.x == 0 && st->after.y == 0;
+        pendingKnown = endKnown;
+        pendingX = st->after.x;
+        pendingY = st->after.y;
+      } else if (endKnown) {
+        jobAdd(st->after.x, st->after.y);
+      }
+      if (st->arc.state == ArcState::Ok) {
+        const ArcGeometry& g = st->arc.geometry;
+        for (int k = 0; k < g.extremeCount; k++) {
+          if (g.extremeX[k] < aMinX) aMinX = g.extremeX[k];
+          if (g.extremeX[k] > aMaxX) aMaxX = g.extremeX[k];
+          if (g.extremeY[k] < aMinY) aMinY = g.extremeY[k];
+          if (g.extremeY[k] > aMaxY) aMaxY = g.extremeY[k];
+        }
+      }
     }
     result.lineCount = i + 1;
     if (arena.failed) return oom();
@@ -217,6 +279,21 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
   result.fixedMoveCount = fixed.size;
   result.stockBox.present = false;
   if (stocks.size) stockBox(stocks.back(), P, result.stockBox);
+  // Each arc extreme is a point (x, y); the box of their rounded values is the rounded box.
+  if (aMinX != HUGE_VAL) {
+    if (toFixed(aMinX, P) < jMinX) jMinX = toFixed(aMinX, P);
+    if (toFixed(aMaxX, P) > jMaxX) jMaxX = toFixed(aMaxX, P);
+  }
+  if (aMinY != HUGE_VAL) {
+    if (toFixed(aMinY, P) < jMinY) jMinY = toFixed(aMinY, P);
+    if (toFixed(aMaxY, P) > jMaxY) jMaxY = toFixed(aMaxY, P);
+  }
+  result.jobExtents.present = jMinX != HUGE_VAL;
+  result.jobExtents.minX = jMinX;
+  result.jobExtents.maxX = jMaxX;
+  result.jobExtents.minY = jMinY;
+  result.jobExtents.maxY = jMaxY;
+  if (finalPass && !finalPass->begin(result, facts)) return oom();
 
   // The rises of pass 1, for bringing each line to the final precision.
   const int raiseCount = sim->raiseCount();
@@ -231,13 +308,6 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
   sim->reset();
   const Structure& s = result.structure;
   uint32_t fixedAt = 0, unitAt = 0, simFlags = 0;
-  double jMinX = HUGE_VAL, jMaxX = -HUGE_VAL, jMinY = HUGE_VAL, jMaxY = -HUGE_VAL;
-  const auto jobAdd = [&](double x, double y) {
-    if (x < jMinX) jMinX = x;
-    if (x > jMaxX) jMaxX = x;
-    if (y < jMinY) jMinY = y;
-    if (y > jMaxY) jMaxY = y;
-  };
   while (pass.next(false)) {
     const LineText& t = pass.text;
     const uint32_t i = pass.line.index;
@@ -256,15 +326,7 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
     while (fixedAt < fixed.size && fixed.data[fixedAt].line < i) fixedAt++;
     const bool isFixed = fixedAt < fixed.size && fixed.data[fixedAt].line == i;
 
-    // Job extents (fixed-moves.ts jobExtents): every XY motion but the fixed moves.
-    if (st->isXYMotion && !isFixed) {
-      if (known(st->after.x) && known(st->after.y)) jobAdd(st->after.x, st->after.y);
-      if (st->arc.state == ArcState::Ok) {
-        for (int k = 0; k < st->arc.geometry.extremeCount; k++) jobAdd(toFixed(st->arc.geometry.extremeX[k], P), toFixed(st->arc.geometry.extremeY[k], P));
-      }
-    }
-
-    if (sink) {
+    if (sink || finalPass) {
       // Segments: motion lines under G0–G3.
       const bool motionLine = static_cast<int>(st->motion) <= 3 && (st->owner == Owner::Motion || st->isXYMotion);
       if (motionLine) {
@@ -294,22 +356,18 @@ Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn
           g.flags = 0;
           if ((st->units == UnitsMode::G20) != (result.units == Units::In)) g.flags |= kSegmentMixedUnits;
           if (isFixed) g.flags |= kSegmentFixedMove;
-          sink->segment(g);
+          if (sink) sink->segment(g);
         }
       }
       TokenCollector tc(tokens, opt.maxLineLength + 1);
       scanLine(t.p, t.n, tc);
       const Line view{t.p, t.n, pass.line.ending, i, t.offset};
-      sink->line(view, tokens, static_cast<uint16_t>(tc.count), *st);
+      if (sink) sink->line(view, tokens, static_cast<uint16_t>(tc.count), *st);
+      if (finalPass && !finalPass->line(view, tokens, static_cast<uint16_t>(tc.count), *st)) return oom();
     }
   }
   if (result.status != Status::Ok) return result.status;
   result.simFlags = simFlags;
-  result.jobExtents.present = jMinX != HUGE_VAL;
-  result.jobExtents.minX = jMinX;
-  result.jobExtents.maxX = jMaxX;
-  result.jobExtents.minY = jMinY;
-  result.jobExtents.maxY = jMaxY;
   result.arenaUsed = arena.used();
   return arena.failed ? oom() : Status::Ok;
 }
