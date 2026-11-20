@@ -266,9 +266,22 @@ run; the `perf` figures below the table.
 | 5 MB perf fixture | 5.0 MB | 204,387 | 14.7 s (about 340 KB/s) | 44.5 s | 2,304 B | 77 ms |
 
 SD write: 256 KB in about 785 ms (about 330 KB/s). The device is roughly 600 to 800 times slower
-than the PC here. Reading is about half of `analyse()`'s time (it reads the file twice); the
-reader takes one byte at a time (`SdReader::get`), which is the first thing to speed up before
-budgets are set (HANDOFF).
+than the PC here. Reading is about half of `analyse()`'s time (it reads the file twice).
+
+Again with the SD reader scanning 16 KB chunks for line ends instead of taking a byte at a time
+(device, Jeffrey, 2026-11-19):
+
+| Job | Read | `analyse()` | Arena | Change |
+|-----|------|-------------|-------|--------|
+| `Spoilboard_DogHoles.gcode` | 2.05 s (about 380 KB/s) | 7.76 s | 69,108 B | read -5%, analyse -8% |
+| `CNC_EscapeWheel.gcode` | 0.43 s | 1.52 s | 11,068 B | read -3%, analyse -8% |
+| 5 MB perf fixture | 14.1 s (about 360 KB/s) | 42.6 s | 2,304 B | read -4%, analyse -4% |
+
+Write unchanged (783 ms). The per-byte handling wasn't the cost: the display SD runs its SPI
+bus at **4 MHz** (`SD.begin(..., 4000000, ...)` in upstream's `UploadManager::init`), which caps
+transfers at 500 KB/s, and the card already gives about 380. Reading is still about half of
+`analyse()` (two passes of about 2 s for the reference job); the other half, about 3.7 s, is the
+library's own work.
 
 ### S2 procedure
 
