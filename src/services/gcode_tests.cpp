@@ -167,9 +167,12 @@ public:
         File f = SD.open(writePath, FILE_WRITE);
         return f ? new SdWriter(f) : nullptr;
     }
+    // The perf group's write test is removed; a transform's mismatched output
+    // (mismatch-<case>-<kind>.gcode) stays on the card to be compared
     void closeWriter(gcode::ByteWriter *writer) override {
         delete static_cast<SdWriter *>(writer);
-        SD.remove(writePath);
+        const char *name = strrchr(writePath, '/');
+        if (name && strcmp(name + 1, "perf-write.tmp") == 0) SD.remove(writePath);
     }
     void print(const char *text) override {
         if (results) {
