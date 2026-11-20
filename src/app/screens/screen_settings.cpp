@@ -7,6 +7,8 @@
 #include "app/screens/draw_test.h"
 #include "config.h"
 #include "core/power_manager.h"
+#include "services/gcode_tests.h"
+#include "services/job_service.h"
 #include "services/position_log.h"
 #include "services/machine_service.h"
 #include "services/settings_service.h"
@@ -555,6 +557,28 @@ void onPosLog(lv_event_t *e) {
     showPosLog();
 }
 
+// The G-code library's device test suite (D73)
+lv_obj_t *testButton;
+lv_obj_t *testStatus;
+lv_obj_t *testFailure;
+
+void showTests() {
+    char buf[200];
+    GcodeTests::statusText(buf, sizeof(buf));
+    setText(testStatus, buf);
+    bool running = GcodeTests::state() == GcodeTests::State::Running;
+    bool bad = GcodeTests::state() == GcodeTests::State::Error || strncmp(buf, "FAILED", 6) == 0;
+    setTextColor(testStatus, bad ? UITheme::STATE_ALARM : UITheme::TEXT_MEDIUM);
+    GcodeTests::firstFailure(buf, sizeof(buf));
+    setText(testFailure, buf);
+    setEnabled(testButton, !running && !JobService::active());
+}
+
+void onRunTests(lv_event_t *) {
+    GcodeTests::start();
+    showTests();
+}
+
 void saveAll();
 
 void onRestartClassic(lv_event_t *) {
@@ -582,8 +606,17 @@ void createToolsPage(lv_obj_t *page) {
     lv_obj_set_width(posLogStatus, CONTENT_W - 224);
     lv_label_set_long_mode(posLogStatus, LV_LABEL_LONG_DOT);
 
-    section(page, 178, "About");
-    aboutText = label(page, 0, 208, FONT_MID, UITheme::TEXT_LIGHT, "");
+    section(page, 178, "Library tests");
+    testButton = button(page, 0, 208, 140, 52, "Run", FONT_MID, onRunTests);
+    testStatus = label(page, 156, 208, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_width(testStatus, CONTENT_W - 156);
+    lv_label_set_long_mode(testStatus, LV_LABEL_LONG_WRAP);
+    testFailure = label(page, 156, 248, FONT_SMALL, UITheme::STATE_ALARM, "");
+    lv_obj_set_width(testFailure, CONTENT_W - 156);
+    lv_label_set_long_mode(testFailure, LV_LABEL_LONG_DOT);
+
+    section(page, 280, "About");
+    aboutText = label(page, 0, 310, FONT_MID, UITheme::TEXT_LIGHT, "");
     lv_obj_set_width(aboutText, CONTENT_W);
     lv_obj_set_style_text_line_space(aboutText, 6, 0);
 }
@@ -716,6 +749,7 @@ void showPage(int page) {
     if (page == PAGE_TOOLS) {
         showAbout();
         showPosLog();
+        showTests();
         aboutAtMs = millis();
     }
 }
@@ -786,5 +820,6 @@ void SettingsScreen::update() {
         aboutAtMs = millis();
         showAbout();
         showPosLog();
+        showTests();
     }
 }

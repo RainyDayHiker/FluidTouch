@@ -254,7 +254,47 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
-| | | | None yet (first run in M4) |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device, display SD at 20 MHz (D74):** passed 57, failed 0, skipped 0 in 0:58 |
+| 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device (Jeffrey, CrowPanel Advance):** passed 57, failed 0, skipped 0 in 1:51. The first attempt rebooted after `float` (the task watchdog: the test task never yielded); fixed by yielding every 50 ms in the SD reader |
+
+`perf` on the device, 0.0.1-build.64 (times include the 50 ms yield, about 2%):
+
+| Job | Size | Lines | Read through the SD reader | `analyse()` (two passes) | Arena (32-bit) | On the PC (MSVC, CNC-Tools' arena.md) |
+|-----|------|-------|----------------------------|--------------------------|----------------|----------------------------------------|
+| `Spoilboard_DogHoles.gcode` | 789 KB | 14,189 | 2.15 s (about 360 KB/s) | 8.4 s | 69,104 B | 10.7 ms, 85,784 B |
+| `CNC_EscapeWheel.gcode` | 157 KB | 2,993 | 0.44 s | 1.65 s | 11,072 B | 2.3 ms |
+| 5 MB perf fixture | 5.0 MB | 204,387 | 14.7 s (about 340 KB/s) | 44.5 s | 2,304 B | 77 ms |
+
+SD write: 256 KB in about 785 ms (about 330 KB/s). The device is roughly 600 to 800 times slower
+than the PC here. Reading is about half of `analyse()`'s time (it reads the file twice).
+
+Again with the SD reader scanning 16 KB chunks for line ends instead of taking a byte at a time
+(device, Jeffrey, 2026-11-19):
+
+| Job | Read | `analyse()` | Arena | Change |
+|-----|------|-------------|-------|--------|
+| `Spoilboard_DogHoles.gcode` | 2.05 s (about 380 KB/s) | 7.76 s | 69,108 B | read -5%, analyse -8% |
+| `CNC_EscapeWheel.gcode` | 0.43 s | 1.52 s | 11,068 B | read -3%, analyse -8% |
+| 5 MB perf fixture | 14.1 s (about 360 KB/s) | 42.6 s | 2,304 B | read -4%, analyse -4% |
+
+Write unchanged (783 ms). The per-byte handling wasn't the cost: the display SD runs its SPI
+bus at **4 MHz** (`SD.begin(..., 4000000, ...)` in upstream's `UploadManager::init`), which caps
+transfers at 500 KB/s, and the card already gives about 380. Reading is still about half of
+`analyse()` (two passes of about 2 s for the reference job); the other half, about 3.7 s, is the
+library's own work. Hence D74: the display SD at 20 MHz.
+
+At 20 MHz (device, Jeffrey, 2026-11-19; the log says "SD Card mounted at 20 MHz", a 7.4 GB
+SDHC card; the suite passed 57 of 57 in 0:58, down from 1:51):
+
+| Job | Read | `analyse()` | Arena | Against 4 MHz with the same reader |
+|-----|------|-------------|-------|------------------------------------|
+| `Spoilboard_DogHoles.gcode` | 0.73 s (about 1.07 MB/s) | 5.0 s | 69,104 B | read 2.8 times faster, analyse -36% |
+| `CNC_EscapeWheel.gcode` | 0.16 s | 0.97 s | 11,072 B | read 2.7 times, analyse -36% |
+| 5 MB perf fixture | 5.3 s (about 950 KB/s) | 25.2 s | 2,304 B | read 2.6 times, analyse -41% |
+
+SD write: 256 KB in about 337 ms (about 780 KB/s, was 330). The library's own work is now most
+of `analyse()`: about 3.5 s of the reference job's 5.0 s (two reads of 0.73 s each).
 
 ### S2 procedure
 

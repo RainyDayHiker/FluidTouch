@@ -1,0 +1,15 @@
+{
+  "name": "gcode-core",
+  "version": "0.0.1-build.64",
+  "description": "C++17 port of the G-code Editor core: reading, Rotate, Flip and Outline Check, identical to the TypeScript reference",
+  "keywords": ["gcode", "cnc", "fluidnc"],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*",
+  "build": {
+    "srcDir": "src",
+    "includeDir": "include",
+    "flags": ["-fno-exceptions", "-fno-rtti", "-ffp-contract=off", "-std=gnu++17"],
+    "unflags": ["-std=gnu++11", "-std=gnu++14"]
+  }
+}

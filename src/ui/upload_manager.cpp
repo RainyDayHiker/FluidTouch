@@ -71,13 +71,22 @@ bool UploadManager::init() {
 #ifdef HARDWARE_ADVANCE
     Serial.println("[UploadManager] Advance: SPI mode (MOSI=6, MISO=4, CLK=5, CS=0/GND)");
     // CS is GPIO 0 per Elecrow example, though physically tied to GND
-    SPI.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
-    if (!SD.begin(SD_CS, SPI, 4000000, "/sd", 5, false)) {
 #else
     Serial.println("[UploadManager] Basic: SPI mode (MOSI=11, MISO=13, CLK=12, CS=10)");
-    SPI.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
-    if (!SD.begin(SD_CS, SPI, 4000000, "/sd", 5, false)) {  // Use configured CS pin
 #endif
+    SPI.begin(SD_CLK, SD_MISO, SD_MOSI, SD_CS);
+    // 4 MHz caps transfers near 500 KB/s, so try 20 MHz first (LowRider Touch D74); a card
+    // that won't mount at 20 MHz gets 4 MHz as before
+    uint32_t clockHz = 20000000;
+    bool mounted = SD.begin(SD_CS, SPI, clockHz, "/sd", 5, false) && SD.cardType() != CARD_NONE;
+    if (!mounted) {
+        SD.end();
+        Serial.println("[UploadManager] SD Card mount failed at 20 MHz, trying 4 MHz");
+        clockHz = 4000000;
+        mounted = SD.begin(SD_CS, SPI, clockHz, "/sd", 5, false);
+    }
+    if (mounted) Serial.printf("[UploadManager] SD Card mounted at %u MHz\n", (unsigned)(clockHz / 1000000));
+    if (!mounted) {
         Serial.println("[UploadManager] SD Card mount failed");
         return false;
     }

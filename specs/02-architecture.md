@@ -5,7 +5,8 @@
 ```
 src/app/        screens, tabs, status bar               new   depends on services
 src/services/   machine, job, files, macros, settings   new   depends on lib/gcode, platform
-lib/gcode/      tokenizer, simulator, ops, outline      copy  from CNC-Tools (D67); C++17, no Arduino/LVGL
+lib/gcode/      tokenizer, simulator, ops, outline      copy  from a CNC-Tools release (D67, D69); C++17, no Arduino/LVGL
+src/services/gcode_device/  the library's device test runner  copy  from the same release (D73)
 src/core/       display, touch, power                   kept
 src/network/    FluidNCClient, upload                   kept, small edits
 src/ui/         classic UI                              kept, untouched where possible
@@ -28,11 +29,11 @@ Kept deliberately small, to stay mergeable (G11):
 |------|--------|
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
-| `ui/upload_manager.*` | Used as is by `FileService`. A download function is added next to it (new file). |
+| `ui/upload_manager.*` | Used by `FileService`. A download function is added next to it (new file). `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
 | `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
-| `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` later. The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
+| `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` added with `add_subdirectory` and linked (its own flags for its own sources). The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
 
 ## 3. UI mode
 
@@ -194,3 +195,9 @@ of CNC-Tools' C3. The library's own working memory comes from an arena sized fro
 | Connect task (core 0), short-lived | one `FluidNCClient::connect()` attempt ([§4](#4-services)) |
 
 Worker results are handed over by a flag the main loop checks; no LVGL calls from the worker.
+
+**A task doing long work yields regularly** (`delay(1)` at least every 50 ms; the G-code
+library's line reader is the natural place). The library and SD reads never block, and a
+task on core 0 that doesn't yield starves the idle task until the task watchdog reboots the
+device (seen with the library tests, 2026-11-19). The simulator runs tasks as threads and
+doesn't catch this; check it in review.
