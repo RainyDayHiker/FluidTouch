@@ -144,4 +144,11 @@ analysis can be cancelled. There is no size limit beyond D66's 10 MB. Expected o
 (06, display SD at 20 MHz): about 1 s for a typical job of 100 to 200 KB, 5 s for the 789 KB
 reference job, 25 s for 5 MB, about 50 s for 10 MB. The preview, extents and first tool fill
 in when it finishes. START doesn't wait for the analysis: a job can be started while it is
-still running. The transforms' budget is set from C2's device `perf` figures.
+still running.
+
+**The transforms' budget (D76)** is the same: in the background with one progress bar over
+check, the report, apply and the analysis of the result; cancellable; no size limit beyond
+10 MB. Expected on the device (06, C2): about 5 s for the escape wheel, 25 s for the
+reference job, 2¼ min for 5 MB, about 4½ min for 10 MB, plus writing the output (about
+780 KB/s). Asked of CNC-Tools: an `apply()` that skips its second check
+([outgoing/cnc-tools-notes-c2.md](outgoing/cnc-tools-notes-c2.md)).
