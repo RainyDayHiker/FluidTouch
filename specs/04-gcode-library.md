@@ -104,10 +104,14 @@ software and text-to-number conversion is newlib's, so the same cases are run on
   `AppText::forDisplay`: valid UTF-8 is shown as it is; anything else is read as Latin-1, as
   the G-code Editor reads such a file (CNC-Tools 04 §2), with the C1 controls shown as `?`.
   Characters outside these sets show LVGL's placeholder box.
-- The outline's cell cap: the algorithm needs 4 bits per cell, so the 1 MB the display can
-  spare holds about 2 M cells; its tolerance is coarser than the editor's for large jobs and
-  the generated file says so. C3 starts with a design note, reviewed here, that bounds the
-  outline's other memory (15 §6.3.1).
+- The Outline Check (C3): its design note, 15 §18, was reviewed here (revision 12,
+  2026-11-21, D77). The editor's method changed first (CNC-Tools D69): a 0.5 mm grid capped
+  at 1 M cells, drawn in analyse()'s second pass, so the display's outline is identical to
+  the editor's, with no display cap. The display asks for it in the preview's analysis
+  (`AnalysisOptions::outline`); it can't fail the analysis (`Analysis::outlineStatus`),
+  holds only its corners and report afterwards (`Analysis::outlineHeld`), gives the loops
+  for the Outline view with `outlineLoops()` and writes the file with `writeOutline()`, and
+  calls `progress` during its grid work too.
 - Mapping `SD:` progress and the tool's position to segments on Run (Q22).
 
 ## 4. New features from the editor
@@ -136,7 +140,9 @@ Every job gets one analysis when selected: one or two sequential reads of the ca
 789 KB reference job, `Spoilboard_DogHoles.gcode`, is one of CNC-Tools' reference jobs). A
 transform reads the file three times (check; then apply's own check and its rewrite) and
 writes a new file on the display SD; the analysis then runs on the result for the preview.
-The Outline Check reads the file about four times.
+From 0.2.0, `applyChecked()` writes from the check just run, without the second check (15
+§5.3, R69): two reads. The Outline Check reads nothing of its own: it is built in the
+preview's analysis (D77), and only its grid work and the write are added.
 
 **The analysis budget (D75).** A chosen job is analysed on a background task (yielding as
 02 §7 says), with a progress bar from the bytes read; the screens stay usable and the
@@ -150,5 +156,10 @@ still running.
 check, the report, apply and the analysis of the result; cancellable; no size limit beyond
 10 MB. Expected on the device (06, C2): about 5 s for the escape wheel, 25 s for the
 reference job, 2¼ min for 5 MB, about 4½ min for 10 MB, plus writing the output (about
-780 KB/s). Asked of CNC-Tools: an `apply()` that skips its second check
-([outgoing/cnc-tools-notes-c2.md](outgoing/cnc-tools-notes-c2.md)).
+780 KB/s). With `applyChecked()` (0.2.0) the display skips apply's second check: about
+17 s for the reference job and 1½ min for 5 MB. It is safe here because only the display
+writes its working folder; a changed file still gives `FileChanged`.
+
+**The Outline Check's budget** follows D75: it adds the outline's drawing in pass 2 and its
+grid work to the preview's analysis, and the write on "Run outline". CNC-Tools measures both
+on the device in C3's `perf` group; the figure goes here then.
