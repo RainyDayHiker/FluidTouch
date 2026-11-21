@@ -254,7 +254,8 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
-| 2026-11-21 | 0.3.0-build.87 (C3) | all (float, parse, self, analyse, transform, outline, perf) | PC: passed 288, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. Host: the outline adds 6 ms to the reference job's 10 ms analysis; peak 337,728 B, held 8,960 B (64-bit). Not yet on the device |
+| 2026-11-21 | 0.3.0-build.87 (C3) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 288, failed 0, skipped 0 in 8:31 |
+| 2026-11-21 | 0.3.0-build.87 (C3) | all (float, parse, self, analyse, transform, outline, perf) | PC: passed 288, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. Host: the outline adds 6 ms to the reference job's 10 ms analysis; peak 337,728 B, held 8,960 B (64-bit) |
 | 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:47 |
 | 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | PC: passed 162, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:03 |
@@ -325,6 +326,18 @@ about 40% of that.
 
 `analyse()` 4.7 s, 0.92 s and 24.4 s, as before. These are the D76 figures with
 `applyChecked()` (04 §5).
+
+0.3.0-build.87 (C3) on the device (Jeffrey, 2026-11-21), the Outline Check:
+
+| Job | `analyse()` | With the outline | Of which Finish | `outlineCheck()` alone | Arena peak / held (32-bit) |
+|-----|-------------|------------------|-----------------|------------------------|-----------------------------|
+| `Spoilboard_DogHoles.gcode` | 4.6 s | 7.7 s (+68%) | 1.0 s | 7.9 s | 320,872 / 8,780 B, 45 loops |
+| `CNC_EscapeWheel.gcode` | 0.89 s | 1.6 s (+79%) | 0.23 s | 1.6 s | 75,832 / 4,332 B |
+| 5 MB perf fixture | 24.3 s | 36.5 s (+50%) | 0.24 s | 37.1 s | 74,508 / 8,644 B |
+
+The peak fits D77's 512 KB with about 190 KB to spare for the reference job. Most of the added
+time is the drawing in pass 2, not Finish: on the host the outline adds 6 ms to 10 ms, on the
+device 3.1 s to 4.6 s.
 
 ### S2 procedure
 
