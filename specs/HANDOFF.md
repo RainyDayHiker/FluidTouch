@@ -91,7 +91,13 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    D74 raises it to 20 MHz, falling back to 4 MHz: on the device the suite passes 57 of 57
    at 20 MHz, reads at about 1 MB/s, and the reference job analyses in 5.0 s (06). Not yet
    checked on the device at 20 MHz: an upload from the display SD in the classic UI, other
-   cards. Next: the display's budgets (how long an analysis may take, with progress shown). Done ahead of C1: the fallback font and the
+   cards.
+   **Library version in use: 0.1.0-build.70 (C2, Rotate and Flip, 2026-11-20).** Copied and
+   built (firmware and simulator); the suite passes 162 of 162 on the PC, in the simulator
+   and **on the device** (6:03, 2026-11-20, Jeffrey). Rotate CW on the reference job: check
+   8.0 s, apply 11.5 s (06). Budgets set: analysis D75, transforms D76 (04 §5). Sent to CNC-Tools
+   (`specs/outgoing/cnc-tools-notes-c2.md`): an `apply()` without its second check, and the
+   manifest's `"phase": "C1"` slip. Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.

@@ -26,8 +26,8 @@ struct Line {
 /**
  * Supplies the file's lines in order (implemented by the caller). Lines are split exactly as
  * the TS core's splitLines does: `\r\n`, `\n` or `\r` ends a line, a final line may have no
- * ending, and a file ending with a newline has no empty line after it. LineSplitter does this
- * for a reader that has bytes.
+ * ending, and a file ending with a newline has no empty line after it. MemoryLineReader does
+ * this for bytes in memory; a file reader splits its chunks the same way.
  */
 class LineReader {
  public:
@@ -94,6 +94,12 @@ enum class Status : uint8_t {
   ReadError,
   OutOfMemory,
   Cancelled,
+  /** A transform's report has a Blocking issue, so nothing was written (15 §5.3). */
+  Blocked,
+  /** A choice the library doesn't support yet: Flip's "Flip and reverse cuts" until C4. */
+  NotSupported,
+  /** The ByteWriter failed. */
+  WriteError,
 };
 
 /**

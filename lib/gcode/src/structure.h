@@ -7,6 +7,23 @@
 
 namespace gcode {
 
+/** stripOff's prefixLength: the `;OFF ` or `;OFF[Tn] ` prefix of a line that's off, else 0. */
+uint32_t offPrefixLength(const char* text, size_t length);
+
+/** trimBlanks (parse/blanks.ts): the line without leading and trailing spaces and tabs. */
+Str trimmedBlanks(const char* text, size_t length);
+
+/** What a line is to Flip's cut groups (flip.ts cutGroups), by its trimmed text. */
+enum class LineMarker : uint8_t {
+  None,
+  BeginOperation,   ///< `(Begin operation: NAME)`; the name is set.
+  FinishOperation,  ///< `(Finish operation: …)`.
+  ToolChange,       ///< `(Begin toolchange)` or an M6 line (M6_RE).
+};
+
+/** The line's marker; for BeginOperation, `name` is markerName's, pointing into `text`. */
+LineMarker lineMarker(const char* text, size_t length, Str& name);
+
 class StructureFinder {
  public:
   StructureFinder(ArenaAlloc& arena, char* scratch, size_t scratchSize) : arena_(arena), scratch_(scratch), scratchSize_(scratchSize) {}

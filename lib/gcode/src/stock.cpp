@@ -41,7 +41,7 @@ bool isDecimal(const char* s, size_t n) {
 namespace {
 
 /** One comment body [bodyStart, bodyEnd): a stock comment when it starts with "Stock:". */
-bool readBody(const char* text, size_t bodyStart, size_t bodyEnd, uint32_t line, ArenaAlloc& arena, Vec<StockComment>& out) {
+bool readBody(const char* text, size_t bodyStart, size_t bodyEnd, uint32_t line, StockVisitor& out) {
   size_t at = bodyStart;
   const size_t end = bodyEnd;
   while (at < end && isBlank(text[at])) at++;
@@ -96,7 +96,7 @@ bool readBody(const char* text, size_t bodyStart, size_t bodyEnd, uint32_t line,
       v.start = static_cast<uint16_t>(q);
       v.end = static_cast<uint16_t>(valueEnd);
       v.fractionDigits = static_cast<uint8_t>(dot ? valueEnd - (dot - text) - 1 : 0);
-      v.text = arena.copy(text + q, valueEnd - q);
+      v.text = Str{text + q, static_cast<uint32_t>(valueEnd - q)};
       have[key] = true;
     }
     s = valueEnd;
@@ -104,14 +104,14 @@ bool readBody(const char* text, size_t bodyStart, size_t bodyEnd, uint32_t line,
   if (!(have[0] && have[1] && have[2] && have[3] && have[4] && have[5])) return true;
   const auto n = [&](int kk) { return parseDecimal(c.values[kk].text.data, c.values[kk].text.length); };
   if (n(1) > n(0) && n(3) > n(2) && n(5) > n(4)) {
-    if (!out.push(arena, c)) return false;
+    if (!out.comment(c)) return false;
   }
   return true;
 }
 
 }  // namespace
 
-bool stockCommentsIn(const char* text, size_t length, uint32_t line, ArenaAlloc& arena, Vec<StockComment>& out) {
+bool eachStockComment(const char* text, size_t length, uint32_t line, StockVisitor& out) {
   // Comment bodies: `( … )` (to the next `)`) and `; …` (to the end of the line), each read as
   // soon as it's found.
   for (size_t i = 0; i < length; i++) {
@@ -129,10 +129,26 @@ bool stockCommentsIn(const char* text, size_t length, uint32_t line, ArenaAlloc&
     } else {
       continue;
     }
-    if (!readBody(text, bodyStart, bodyEnd, line, arena, out)) return false;
+    if (!readBody(text, bodyStart, bodyEnd, line, out)) return false;
     if (last) break;
   }
-  return !arena.failed;
+  return true;
+}
+
+bool stockCommentsIn(const char* text, size_t length, uint32_t line, ArenaAlloc& arena, Vec<StockComment>& out) {
+  // The value texts are copied: the line's bytes are valid only until the next read.
+  class Keep final : public StockVisitor {
+   public:
+    Keep(ArenaAlloc& a, Vec<StockComment>& o) : arena(a), out(o) {}
+    ArenaAlloc& arena;
+    Vec<StockComment>& out;
+    bool comment(const StockComment& c) override {
+      StockComment kept = c;
+      for (StockValue& v : kept.values) v.text = arena.copy(v.text.data, v.text.length);
+      return out.push(arena, kept) && !arena.failed;
+    }
+  } keep(arena, out);
+  return eachStockComment(text, length, line, keep) && !arena.failed;
 }
 
 bool stockBox(const StockComment& c, int p, Extents& box) {

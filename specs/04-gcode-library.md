@@ -65,11 +65,14 @@ software and text-to-number conversion is newlib's, so the same cases are run on
   It runs every group the release has (`float`, `parse`, `self`, `analyse`, `perf`, then
   `transform` from C2 and `outline` from C3) and writes one line per case to
   `/gcode-tests/results.txt` and the serial port; Tools shows the progress and the summary.
-  Not while a job runs.
+  Not while a job runs. A transform case whose output differs leaves
+  `mismatch-<case>-<kind>.gcode` in `/gcode-tests/` to compare; the `perf` group's write
+  test file is removed.
 - **To run it:** `python tools/gcode_core.py data <version> <folder>`, copy the folder's
   contents to `/gcode-tests/` on the display SD, Settings > Tools > Library tests > Run.
-- Cost of keeping it in the firmware: about 46 KB of flash, and about 28 KB of internal RAM
-  for the runner's static buffers (asked of CNC-Tools: take them from the arena).
+- Cost of keeping it in the firmware: flash only (the firmware grew 46 KB with C1, 21 KB
+  more with C2). From C2 the runner keeps no static buffers: it takes about 17 KB from the
+  front of the arena while it runs.
 - The `perf` group measures time and peak memory per entry point for both reference jobs and
   the 5 MB fixture, and the SD card's read and write rate. **Those figures set the display's
   budgets** (how long an analysis or a Rotate may take, how big a job may be previewed), and
@@ -134,3 +137,18 @@ Every job gets one analysis when selected: one or two sequential reads of the ca
 transform reads the file three times (check; then apply's own check and its rewrite) and
 writes a new file on the display SD; the analysis then runs on the result for the preview.
 The Outline Check reads the file about four times.
+
+**The analysis budget (D75).** A chosen job is analysed on a background task (yielding as
+02 §7 says), with a progress bar from the bytes read; the screens stay usable and the
+analysis can be cancelled. There is no size limit beyond D66's 10 MB. Expected on the device
+(06, display SD at 20 MHz): about 1 s for a typical job of 100 to 200 KB, 5 s for the 789 KB
+reference job, 25 s for 5 MB, about 50 s for 10 MB. The preview, extents and first tool fill
+in when it finishes. START doesn't wait for the analysis: a job can be started while it is
+still running.
+
+**The transforms' budget (D76)** is the same: in the background with one progress bar over
+check, the report, apply and the analysis of the result; cancellable; no size limit beyond
+10 MB. Expected on the device (06, C2): about 5 s for the escape wheel, 25 s for the
+reference job, 2¼ min for 5 MB, about 4½ min for 10 MB, plus writing the output (about
+780 KB/s). Asked of CNC-Tools: an `apply()` that skips its second check
+([outgoing/cnc-tools-notes-c2.md](outgoing/cnc-tools-notes-c2.md)).

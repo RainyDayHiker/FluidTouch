@@ -180,7 +180,7 @@ States of the right-hand panel:
 
 | State | Panel shows |
 |-------|-------------|
-| Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5) |
+| Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5); they fill in when it finishes, and START doesn't wait for it (D75) |
 | Running | As drawn |
 | Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") and one large CONTINUE button. Pause/Abort stay below |
 | Paused (HOLD by the user) | RESUME in place of PAUSE |
