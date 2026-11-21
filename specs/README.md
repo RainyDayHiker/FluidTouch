@@ -18,6 +18,7 @@ questions; the list is in [07-decisions.md](07-decisions.md#open-questions).
 | 07 | [Decisions and open questions](07-decisions.md) | Living log |
 | 08 | [Milestones](08-milestones.md) | Draft |
 | 09 | [Git workflow](09-git-workflow.md) | Draft |
+| 10 | [New jobs (generators)](10-new-jobs.md) | Draft, 2026-11-21; M8 |
 |    | [Handoff](HANDOFF.md) | Current state and next steps; read first |
 
 Related specs live in the CNC-Tools repo (`gcode-editor/specs/`). Its specs 04 (G-code

@@ -68,7 +68,8 @@ connection changed.
 |---------|------|-----------------|
 | MachineService | Connection, status snapshot, events (state change, message, alarm, hold, probe result) | jog, cancel jog, home, unlock, zero, go to, hold, resume, reset, overrides, run file, send line |
 | FileService | File sources and transfers | list(source, path), fetch to cache, upload to controller, delete; progress and cancel |
-| JobService | The selected job: source file, cached copy, analysis (extents, stock, tools, operations, segment list), derived files, run state | select, analyse, transform, build outline, commit (upload), start, progress mapping |
+| JobService | The selected job: source file, cached copy, analysis (extents, stock, tools, operations, segment list), derived files, run state | select, generate (a new job, [10](10-new-jobs.md)), analyse, transform, build outline, commit (upload), start, progress mapping |
+| Generators | The list of generators and their common interface: texts, fields, messages, plan, write ([10 §7](10-new-jobs.md#7-services)) | list, form data, messages, plan, write |
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |
 
@@ -135,7 +136,7 @@ alike; nothing else from `src/ui` is included by the new code except `ui/machine
 
 ### Job state machine
 
-`None -> Fetching -> Analysing -> Ready -> (Transforming -> Ready)* -> Uploading -> Selected
+`None -> (Fetching | Generating) -> Analysing -> Ready -> (Transforming -> Ready)* -> Uploading -> Selected
 -> Running <-> Held -> Finished | Aborted -> Selected`
 
 A job that is already on the controller and untransformed goes from Ready to Selected
@@ -145,7 +146,8 @@ without uploading.
 
 | What | Where |
 |------|-------|
-| Working copy of the selected file, transform outputs, outline file | Display SD, `/lrt/work/` (cleared when a new job is selected) |
+| Working copy of the selected file, transform outputs, outline file, a generated new job | Display SD, `/lrt/work/` (cleared when a new job is selected) |
+| The last values of each New job form, as typed | Display SD, `/lrt/new-job-values.txt`, written on Create ([10 §6](10-new-jobs.md#6-the-values-kept)) |
 | Fallback when no SD card is present | PSRAM, files up to 2 MB; larger files can be run but not previewed |
 | Segment list for preview | PSRAM |
 | Jobs to run | FluidNC SD, as now. Uploaded and generated files go to `/sd/fluidtouch/uploads/` (D53) |

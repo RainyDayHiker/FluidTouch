@@ -153,7 +153,7 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 
 | Control | Behaviour |
 |---------|-----------|
-| Card | Controller SD (`$Files/ListGcode`, which lists G-code files and folders) or Display SD (files ending in `.gcode`, `.gc`, `.nc`, `.ngc`, `.tap`, and folders). An inbox source comes in M8 |
+| Card | Controller SD (`$Files/ListGcode`, which lists G-code files and folders) or Display SD (files ending in `.gcode`, `.gc`, `.nc`, `.ngc`, `.tap`, and folders). **New job** (M8): the generators, each opening its form, greyed out while a job runs ([10](10-new-jobs.md)). An inbox source comes in M9 |
 | List | Folders first, then files, each by name A to Z (D49). Tap a folder to open it; tap a file to choose it and close the picker. Opens in the folder last used, for the session |
 | Up / Close | Parent folder / back to Job without changing the choice |
 | Delete (trash) | Asks "Delete <name> from <card>?" with Delete and Cancel (D50), then deletes and refreshes the list. Controller: `$SD/Delete=<path>`. Not offered while a job runs (S3) |
@@ -284,5 +284,5 @@ refused on OK with the range in red. Text (names, WiFi, address) opens a keyboar
 
 The spec's earlier Files page (file manager, copy to controller, inbox address) is not
 built: the Job picker lists and deletes on both cards, "Use this job" copies to the
-controller, and the inbox address comes with M8. Travel X/Y/Z comes with the Move screen,
-which is the first thing to use it. Terminal and settings backup/restore are later (M8).
+controller, and the inbox address comes with M9. Travel X/Y/Z comes with the Move screen,
+which is the first thing to use it. Terminal and settings backup/restore are later (M9).
