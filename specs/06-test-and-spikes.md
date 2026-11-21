@@ -254,6 +254,7 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | PC: passed 162, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. Not yet on the device |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:03 |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all (float, parse, self, analyse, transform, perf) | PC: passed 162, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (no warnings), and again from Settings > Tools in the simulator |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
