@@ -1,5 +1,10 @@
 # Notes for CNC-Tools: generators on the display (after spec 15 revision 15)
 
+> **Answered** in spec 15 revision 16 (R94 to R97, §12.6, §20.10): the slip fixed; the
+> title, description, set-up and bit lines in core (`surfacingForm()`); `fieldValue()` for
+> every generator (D70 decided); §12.6's shape with `gcode/generators.h` at the second
+> generator; choice fields as data. Kept as sent.
+
 From LowRider Touch, 2026-11-21. Spec 15 §20 (New Surfacing Job) is agreed as it stands;
 the display's design for it is this repo's spec 10. One slip, then a request for the next
 generators.
