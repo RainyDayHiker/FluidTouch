@@ -1,5 +1,8 @@
 # Notes for CNC-Tools after C2 (0.1.0-build.70)
 
+> **Answered** in spec 15 revision 11 (R69 to R72): `applyChecked()` with `Status::FileChanged`,
+> and the manifest's `phase` set per phase. Kept as sent.
+
 From LowRider Touch, 2026-11-20. The release passes the device suite on the CrowPanel
 (162 of 162 in 6:03, display SD at 20 MHz), the host program built with MinGW GCC 16.2 with
 no warnings, and the simulator. The C1 notes (runner statics, yield docs, `LineSplitter`,

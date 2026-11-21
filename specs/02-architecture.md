@@ -164,8 +164,8 @@ Budget for the preview, replacing the earlier targets (which added up to 3.7 MB)
 |-----|------|------|
 | Preview canvas, RGB565, 480 x 360 | 337 KB | Job and Run screens |
 | Second canvas layer for cut progress | 337 KB | Run screen only |
-| Segment list, 8 bytes per segment (D30) | What is left: about 1.5 MB on Job, 1.1 MB on Run (about 144,000 segments) | While a job is selected |
-| Outline grids | Whatever is free once the canvases are released | Only while tracing |
+| Library arena (analysis with the outline, transforms) | 512 KB, provisional until C3's device `perf` figures (D77) | While a job is selected |
+| Segment list, 8 bytes per segment (D30) | What is left: about 1.0 MB on Job, 0.6 MB on Run (about 75,000 segments, 5.2 times the reference job, G8) | While a job is selected |
 
 At 24 bytes per segment (as tested), 1.1 MB holds about 48,000 segments: 3.4 times the
 reference job, short of the "at least 5x" in G8. The options were (Q21, decided as A: D30):
@@ -179,12 +179,16 @@ reference job, short of the "at least 5x" in G8. The options were (Q21, decided 
 **A is chosen (D30)**, with B as the fallback for jobs that still do not fit (preview
 "simplified, and says so", G8). C is not planned.
 
-The outline grid (4 bits per cell, CNC-Tools 15 §6.3.1) gets whatever is free while
-tracing: with the canvases released and a reference-sized job loaded that is about 1.5 MB.
-At 1 MB that is about 2 M cells; for larger jobs the cells get coarser and the outline's
-tolerance with them. The outline's other memory is bounded by a design note at the start
-of CNC-Tools' C3. The library's own working memory comes from an arena sized from its
-`arena.md` and the device suite's `perf` results ([04](04-gcode-library.md)).
+The Outline Check is built in the same analysis as the preview (D77, CNC-Tools 15 §18):
+a grid of at most 1 M cells at 2 bits a cell (250 KB), the same cells and tolerance as the
+editor's, taken from the top of the library's arena and given back when the outline is
+done. What stays held while the job is selected is the outline's corners and report (about
+9 KB for the reference job). The arena needs analyse()'s own peak plus about 400 KB for a
+full 2440 × 1220 mm sheet (the reference job's analysis peaks at 69 KB): 512 KB, held while
+a job is selected, which leaves the segment list 5.2 times the reference job on Run (G8). A
+1 MB arena would leave it 1.6 times. Past the arena only the outline is unavailable, never
+the preview. The size is checked against CNC-Tools' `arena.md` and C3's device `perf`
+results ([04](04-gcode-library.md)).
 
 ## 7. Threads
 

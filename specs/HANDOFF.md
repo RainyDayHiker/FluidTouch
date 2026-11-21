@@ -95,9 +95,11 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    **Library version in use: 0.1.0-build.70 (C2, Rotate and Flip, 2026-11-20).** Copied and
    built (firmware and simulator); the suite passes 162 of 162 on the PC, in the simulator
    and **on the device** (6:03, 2026-11-20, Jeffrey). Rotate CW on the reference job: check
-   8.0 s, apply 11.5 s (06). Budgets set: analysis D75, transforms D76 (04 §5). Sent to CNC-Tools
-   (`specs/outgoing/cnc-tools-notes-c2.md`): an `apply()` without its second check, and the
-   manifest's `"phase": "C1"` slip. Done ahead of C1: the fallback font and the
+   8.0 s, apply 11.5 s (06). Budgets set: analysis D75, transforms D76 (04 §5). CNC-Tools answered the C2
+   notes in spec 15 revision 11 (`applyChecked()`, `FileChanged`, the manifest's phase;
+   version 0.2.0, not yet released). **C3's design note (15 §18) is reviewed** (revision
+   12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
+   editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.
