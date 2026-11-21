@@ -137,3 +137,11 @@ Every job gets one analysis when selected: one or two sequential reads of the ca
 transform reads the file three times (check; then apply's own check and its rewrite) and
 writes a new file on the display SD; the analysis then runs on the result for the preview.
 The Outline Check reads the file about four times.
+
+**The analysis budget (D75).** A chosen job is analysed on a background task (yielding as
+02 §7 says), with a progress bar from the bytes read; the screens stay usable and the
+analysis can be cancelled. There is no size limit beyond D66's 10 MB. Expected on the device
+(06, display SD at 20 MHz): about 1 s for a typical job of 100 to 200 KB, 5 s for the 789 KB
+reference job, 25 s for 5 MB, about 50 s for 10 MB. The preview, extents and first tool fill
+in when it finishes. START doesn't wait for the analysis: a job can be started while it is
+still running. The transforms' budget is set from C2's device `perf` figures.

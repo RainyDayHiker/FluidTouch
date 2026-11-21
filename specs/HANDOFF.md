@@ -96,8 +96,8 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    built (firmware and simulator); the suite passes 162 of 162 on the PC and in the
    simulator. **Its run on the device is next**: copy the release's data (157 cases,
    14.3 MB) over `/gcode-tests/` on the display SD, then Run; the `perf` lines now time
-   Rotate CW too. Its manifest says `"phase": "C1"` (told CNC-Tools). Then: the display's
-   budgets (how long an analysis may take, with progress shown). Done ahead of C1: the fallback font and the
+   Rotate CW too. Its manifest says `"phase": "C1"` (to tell CNC-Tools). The analysis
+   budget is set (D75, 04 §5); the transforms' budget follows from C2's device figures. Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.
