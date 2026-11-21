@@ -254,6 +254,7 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-21 | 0.3.0-build.87 (C3) | all (float, parse, self, analyse, transform, outline, perf) | PC: passed 288, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. Host: the outline adds 6 ms to the reference job's 10 ms analysis; peak 337,728 B, held 8,960 B (64-bit). Not yet on the device |
 | 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:47 |
 | 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | PC: passed 162, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:03 |

@@ -100,8 +100,12 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    **Library version in use: 0.2.0-build.84** (C2 with `applyChecked()`, 2026-11-21; a
    pre-release on GitHub): 162 of 162 on the PC, in the simulator and on the device (6:47,
    2026-11-21, Jeffrey). `applyChecked()` on the reference job: 3.7 s against apply()'s
-   11.8 s, so a transform with its new analysis is about 17 s (06). Next from CNC-Tools: C3
-   (0.3.0). **C3's design note (15 §18) is reviewed** (revision
+   11.8 s, so a transform with its new analysis is about 17 s (06).
+   **Library version in use: 0.3.0-build.87** (C3, the Outline Check, 2026-11-21, marked
+   latest): 288 of 288 on the PC and in the simulator. **Its device run is next**: the data
+   changed (280 cases, 14.4 MB; replace `/gcode-tests/`). The `perf` group's `.outline` lines
+   give the outline's device time (its budget, 04 §5) and the arena peak against D77's
+   512 KB. **C3's design note (15 §18) is reviewed** (revision
    12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
    editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
