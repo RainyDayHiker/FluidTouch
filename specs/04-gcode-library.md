@@ -147,9 +147,10 @@ preview's analysis (D77), and only its grid work and the write are added.
 **The analysis budget (D75).** A chosen job is analysed on a background task (yielding as
 02 §7 says), with a progress bar from the bytes read; the screens stay usable and the
 analysis can be cancelled. There is no size limit beyond D66's 10 MB. Expected on the device
-(06, display SD at 20 MHz): about 1 s for a typical job of 100 to 200 KB, 5 s for the 789 KB
-reference job, 25 s for 5 MB, about 50 s for 10 MB. The preview, extents and first tool fill
-in when it finishes. START doesn't wait for the analysis: a job can be started while it is
+(06, display SD at 20 MHz), with the outline built in the same analysis (D77): about 1.6 s
+for a typical job of 100 to 200 KB, 7.7 s for the 789 KB reference job, 37 s for 5 MB, about
+75 s for 10 MB (without the outline: 1 s, 4.6 s, 24 s, 50 s). The preview, extents, first
+tool and outline fill in when it finishes. START doesn't wait for the analysis: a job can be started while it is
 still running.
 
 **The transforms' budget (D76)** is the same: in the background with one progress bar over
@@ -160,6 +161,8 @@ reference job, 2¼ min for 5 MB, about 4½ min for 10 MB, plus writing the outpu
 17 s for the reference job and 1½ min for 5 MB. It is safe here because only the display
 writes its working folder; a changed file still gives `FileChanged`.
 
-**The Outline Check's budget** follows D75: it adds the outline's drawing in pass 2 and its
-grid work to the preview's analysis, and the write on "Run outline". CNC-Tools measures both
-on the device in C3's `perf` group; the figure goes here then.
+**The Outline Check's budget** is part of the analysis's (above): measured on the device it
+adds 50 to 80% to `analyse()`, mostly the drawing in pass 2 (Finish is 1.0 s for the reference
+job). The Outline view is then immediate, and "Run outline" only writes about 12 KB. Kept so
+for now (D77, 2026-11-21); building the outline on request instead is the option if large
+jobs' previews feel slow.
