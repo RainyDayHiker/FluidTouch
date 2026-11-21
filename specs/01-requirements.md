@@ -34,6 +34,7 @@ the display itself.
 | G10 | The classic UI stays reachable (restart into it from Settings) until explicitly retired. |
 | G11 | Platform code (`src/core`, `src/network`, `sim/`) stays mergeable with upstream FluidTouch. |
 | G12 | Everything runs in the desktop simulator against the fake FluidNC. |
+| G13 | **New jobs from values:** make a complete job on the display from a few values, starting with the G-code Editor's surfacing job, equal to the editor's for the same values, then preview, transform, outline-check and run it like any other job. More such generators can be added from later library releases ([10](10-new-jobs.md)). |
 
 ## 4. Non-goals
 
@@ -52,7 +53,7 @@ the display itself.
 | S3 | While a job runs or is held, jog, zero, home, file and transform actions are disabled. |
 | S4 | If the connection drops during a job, the screen says the job continues on the controller, and reconnects on its own for a while (retries after 5, 5, 10 and 10 s), then waits for Reconnect (D46). |
 | S5 | The display never sends motion on its own initiative (no auto-home, no auto-move after connect). |
-| S6 | A generated file (transform, outline) is only offered to run after it was uploaded and its size confirmed on the controller. |
+| S6 | A generated file (transform, outline, new job) is only offered to run after it was uploaded and its size confirmed on the controller. |
 
 ## 6. Acceptance for the whole project
 

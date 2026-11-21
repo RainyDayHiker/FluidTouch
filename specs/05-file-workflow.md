@@ -78,11 +78,11 @@ OneDrive exists, so option A is the fallback if spike S5 shows B is not practica
 
 1. M3: file-source interface with Controller SD and Display SD, in Job's file picker ([03 §3](03-screens.md#3-job)).
 2. M1: spike S5, so the answer is known early.
-3. M8: build B, or A if S5 fails. The source interface is the same either way.
+3. M9: build B, or A if S5 fails. The source interface is the same either way.
 
 ## 5. On the controller
 
-- Generated and uploaded jobs go to `/sd/fluidtouch/uploads/`, the folder the classic UI's
+- Generated (new jobs, [10](10-new-jobs.md)), transformed and uploaded jobs go to `/sd/fluidtouch/uploads/`, the folder the classic UI's
   upload already uses (D53).
 - Uploading a name that exists overwrites it after a confirm.
 - Uploads are limited to 10 MB (classic's `UploadManager`, D66); S4 measured 5 MB in 40 s

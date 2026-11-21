@@ -47,7 +47,7 @@ the queue is up to about 40 lines, not 15, and a prompt's text came 50 s before 
 ## 2. Spikes
 
 S1 and S2 were run on 2026-11-16 (S1 during a job on 2026-11-18), S3 and S4 on 2026-11-18; results are below the
-table. S5 has not been run; it is deferred until its answer is needed, before M8 (D32).
+table. S5 has not been run; it is deferred until its answer is needed, before M9, the inbox (D32; numbered M8 until D78).
 
 | # | Question | How | Decides |
 |---|----------|-----|---------|

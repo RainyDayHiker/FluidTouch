@@ -56,7 +56,7 @@ Known gaps, deliberately left:
   bug); the classic UI's upload against the fake FluidNC's HTTP.
 - The fake FluidNC ignores the `P` word on `G38.2` and skips `$` lines inside a file.
 
-Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), D64 to D66, Q22 open); S5 before M8 (D32).
+Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test-and-spikes.md), D64 to D66, Q22 open); S5 before M9, the inbox (D32, D78).
 
 ## 2. Next steps
 
@@ -106,7 +106,11 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    Jeffrey). The outline in the preview's analysis (D77) makes it 68% longer for the
    reference job (7.7 s against 4.6 s); the arena peak, 321 KB, fits 512 KB (06). Kept so for
    now (D77, 2026-11-21); building it on request is the fallback if large previews feel slow.
-   The library side of M4 to M7 is now in hand (C1 to C3). **C3's design note (15 §18) is reviewed** (revision
+   The library side of M4 to M7 is now in hand (C1 to C3).
+   **New jobs (M8, spec 10, D78)**, designed 2026-11-21: generators, starting with New
+   Surfacing Job (CNC-Tools 15 §20, revision 15 reviewed; library 0.4.0 to come). Sent to
+   CNC-Tools: `specs/outgoing/cnc-tools-generators.md` (the form's title, description and
+   instructions into core; one shape for every generator). Open with Jeffrey: Q26, Q27. **C3's design note (15 §18) is reviewed** (revision
    12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
    editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
