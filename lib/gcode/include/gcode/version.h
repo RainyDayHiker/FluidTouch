@@ -2,7 +2,7 @@
 // the root package.json, and stamped with the build number on main builds. Don't edit by hand.
 #pragma once
 
-#define GCODE_CORE_VERSION "0.3.0-build.87"
+#define GCODE_CORE_VERSION "0.4.0-build.100"
 
 namespace gcode {
 

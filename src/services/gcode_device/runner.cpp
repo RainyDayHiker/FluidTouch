@@ -15,12 +15,15 @@
 #include "gcode/num.h"
 #include "gcode/outline.h"
 #include "gcode/transform.h"
+#include "gcode/surfacing.h"
 #include "gcode/version.h"
+#include "sha256.h"
 
 namespace gcode_device {
 namespace {
 
 using namespace gcode;
+using gcode_test::Sha256;
 
 // ---- Text helpers ----------------------------------------------------------------------------
 
@@ -110,9 +113,10 @@ const char* endingName(Ending e) {
 }
 
 const char* statusName(Status s) {
-  static const char* const k[] = {"Ok", "Refused", "LineTooLong", "ReadError", "OutOfMemory", "Cancelled", "Blocked", "NotSupported", "WriteError", "FileChanged"};
+  static const char* const k[] = {"Ok",      "Refused",      "LineTooLong", "ReadError",  "OutOfMemory",      "Cancelled",
+                                  "Blocked", "NotSupported", "WriteError",  "FileChanged", "InvalidParameters"};
   const int i = static_cast<int>(s);
-  return i >= 0 && i < 10 ? k[i] : "?";
+  return i >= 0 && i < 11 ? k[i] : "?";
 }
 
 /** Whether `hex` (lowercase) is exactly the hex of bytes[0, n). */
@@ -124,94 +128,6 @@ bool sameHexBytes(const char* hex, const char* bytes, size_t n) {
   }
   return hex[2 * n] == '\0';
 }
-
-// ---- SHA-256 (FIPS 180-4): a transform's output against the TS bytes, without storing it ----
-
-class Sha256 {
- public:
-  Sha256() {
-    static const uint32_t kInit[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-    std::memcpy(h_, kInit, sizeof h_);
-  }
-  void update(const char* p, size_t n) {
-    bits_ += static_cast<uint64_t>(n) * 8;
-    while (n > 0) {
-      const size_t k = n < 64 - used_ ? n : 64 - used_;
-      std::memcpy(buf_ + used_, p, k);
-      used_ += k;
-      p += k;
-      n -= k;
-      if (used_ == 64) {
-        block(buf_);
-        used_ = 0;
-      }
-    }
-  }
-  /** The digest as 64 lowercase hex digits (ends the hash). */
-  void hex(char out[65]) {
-    const uint64_t bits = bits_;
-    const char pad = static_cast<char>(0x80), zero = 0;
-    update(&pad, 1);
-    while (used_ != 56) update(&zero, 1);
-    char len[8];
-    for (int k = 0; k < 8; k++) len[k] = static_cast<char>(bits >> (56 - 8 * k));
-    update(len, 8);
-    static const char d[] = "0123456789abcdef";
-    for (int k = 0; k < 32; k++) {
-      const unsigned b = (h_[k / 4] >> (24 - 8 * (k % 4))) & 0xffu;
-      out[2 * k] = d[b >> 4];
-      out[2 * k + 1] = d[b & 15];
-    }
-    out[64] = '\0';
-  }
-
- private:
-  static uint32_t rotr(uint32_t x, int n) { return (x >> n) | (x << (32 - n)); }
-  void block(const unsigned char* b) {
-    static const uint32_t K[64] = {
-        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be,
-        0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa,
-        0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85,
-        0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-        0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f,
-        0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
-    uint32_t w[64];
-    for (int t = 0; t < 16; t++) {
-      w[t] = static_cast<uint32_t>(b[4 * t]) << 24 | static_cast<uint32_t>(b[4 * t + 1]) << 16 | static_cast<uint32_t>(b[4 * t + 2]) << 8 |
-             static_cast<uint32_t>(b[4 * t + 3]);
-    }
-    for (int t = 16; t < 64; t++) {
-      const uint32_t s0 = rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >> 3);
-      const uint32_t s1 = rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >> 10);
-      w[t] = w[t - 16] + s0 + w[t - 7] + s1;
-    }
-    uint32_t a = h_[0], bb = h_[1], c = h_[2], d = h_[3], e = h_[4], f = h_[5], g = h_[6], h = h_[7];
-    for (int t = 0; t < 64; t++) {
-      const uint32_t t1 = h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[t] + w[t];
-      const uint32_t t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & bb) ^ (a & c) ^ (bb & c));
-      h = g;
-      g = f;
-      f = e;
-      e = d + t1;
-      d = c;
-      c = bb;
-      bb = a;
-      a = t1 + t2;
-    }
-    h_[0] += a;
-    h_[1] += bb;
-    h_[2] += c;
-    h_[3] += d;
-    h_[4] += e;
-    h_[5] += f;
-    h_[6] += g;
-    h_[7] += h;
-  }
-  uint32_t h_[8];
-  unsigned char buf_[64];
-  size_t used_ = 0;
-  uint64_t bits_ = 0;
-};
 
 /** A transform's output, hashed and counted, not kept. */
 class HashWriter final : public ByteWriter {
@@ -843,6 +759,162 @@ void outlineGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const
   r.result(m.any ? "FAIL" : "PASS", id, detail);
 }
 
+// ---- surfacing group -------------------------------------------------------------------------
+
+/** A hex field against text, "-" against none. */
+bool sameHexText(const char* want, const char* got) {
+  if (!got) return std::strcmp(want, "-") == 0;
+  return sameHexBytes(want, got, std::strlen(got));
+}
+
+/** The arena's first kSurfacingBufferSize bytes: what a display gives the writer (15 §20.4). */
+Arena smallArena(Arena arena) { return Arena{arena.base, arena.size < kSurfacingBufferSize ? arena.size : kSurfacingBufferSize}; }
+
+/**
+ * New Surfacing Job (surfacing.tsv, 15 §20.6): the form's data (M, B and F lines), each field
+ * text's value and message (X lines), then each case (J lines): its field errors, or
+ * planSurfacing()'s and writeSurfacingJob()'s name, laps, cutting length and summary, and the
+ * file by SHA-256 and length. One result each for the form, the texts and the jobs.
+ */
+void surfacingGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const char* id, const char* path) {
+  LineReader* in = platform.open(path);
+  if (!in) return r.result("FAIL", id, "can't open the cases");
+  Mismatch form, texts, jobs;
+  uint32_t formLines = 0, textCount = 0, jobCount = 0;
+  uint64_t written = 0;
+  Fields& f = sc.group;
+  Line l{};
+  const Arena small = smallArena(arena);
+  while (in->next(l)) {
+    f.load(l);
+    if (f.is(0, "M")) {
+      formLines++;
+      const SurfacingForm& m = surfacingForm();
+      const char* got[] = {m.title, m.description, m.setup, m.bitLine, m.advancedTitle};
+      for (int k = 0; k < 5; k++) {
+        if (!sameHexText(f[1 + k], got[k])) form.set("form text %s: %s", f[1 + k], got[k]);
+      }
+    } else if (f.is(0, "B")) {
+      formLines++;
+      const SurfacingBit& b = surfacingBit();
+      if (!sameHexText(f[1], b.title) || !sameHexText(f[2], b.label) || !sameHexText(f[3], b.description) || !sameHex(f[4], b.diameter) ||
+          !sameHex(f[5], b.maxRpm)) {
+        form.set("the bit%s%s", "", "");
+      }
+    } else if (f.is(0, "F")) {
+      formLines++;
+      const int k = std::atoi(f[1]);
+      if (k < 0 || k >= kSurfacingFieldCount) {
+        form.set("field %s%s", f[2], "");
+        continue;
+      }
+      const SurfacingFieldInfo& fi = surfacingField(static_cast<SurfacingField>(k));
+      if (!f.is(2, fi.name) || !sameHexText(f[3], fi.label) || !sameHexText(f[4], fi.fieldUnit) || f.is(5, "1") != fi.advanced ||
+          !sameHex(f[6], fi.min) || !sameHex(f[7], fi.max) || !sameHex(f[8], fi.defaultValue) || !f.is(9, fi.defaultText)) {
+        form.set("field %s%s", f[2], "");
+      }
+    } else if (f.is(0, "X")) {
+      // X field textHex valueBits messageHex|-
+      textCount++;
+      const int k = std::atoi(f[1]);
+      if (k < 0 || k >= kSurfacingFieldCount) {
+        texts.set("field %s%s", f[1], "");
+        continue;
+      }
+      char* text = sc.text;
+      size_t n = 0;
+      for (const char* h = f[2]; h[0] && h[1] && n < sizeof sc.text; h += 2) {
+        const char pair[3] = {h[0], h[1], 0};
+        text[n++] = static_cast<char>(std::strtoul(pair, nullptr, 16));
+      }
+      const double v = fieldValue(text, n);
+      SurfacingParams p;
+      setSurfacingValue(p, static_cast<SurfacingField>(k), v);
+      const char* messages[kSurfacingFieldCount];
+      surfacingErrors(p, messages);
+      if (!sameHex(f[3], v)) texts.set("text %s: value %s", f[2], f[3]);
+      else if (!sameHexText(f[4], messages[k])) texts.set("text %s: message %s", f[2], f[4]);
+    } else if (f.is(0, "J")) {
+      // J name p0..p6 E m0..m6, or J name p0..p6 O sha256 length laps cutLength name summaryHex
+      jobCount++;
+      SurfacingParams p;
+      for (int k = 0; k < kSurfacingFieldCount; k++) setSurfacingValue(p, static_cast<SurfacingField>(k), fromHex(f[2 + k]));
+      const char* messages[kSurfacingFieldCount];
+      const uint32_t bits = surfacingErrors(p, messages);
+      SurfacingPlan plan{}, wplan{};
+      HashWriter hw;
+      const Status ps = planSurfacing(p, plan);
+      const Status ws = writeSurfacingJob(p, hw, small, wplan);
+      if (f.is(9, "E")) {
+        bool ok = bits != 0 && ps == Status::InvalidParameters && ws == Status::InvalidParameters && hw.length == 0;
+        for (int k = 0; k < kSurfacingFieldCount; k++) ok = ok && sameHexText(f[10 + k], messages[k]);
+        if (!ok) jobs.set("%s: the errors%s", f[1]);
+        continue;
+      }
+      char digest[65];
+      hw.sha.hex(digest);
+      if (ps != Status::Ok || ws != Status::Ok) {
+        jobs.set("%s: status %s", f[1], statusName(ps != Status::Ok ? ps : ws));
+      } else if (!f.is(10, digest) || std::strtoull(f[11], nullptr, 10) != hw.length) {
+        jobs.set("%s: the file (%s)", f[1], digest);
+      } else if (std::strtoul(f[12], nullptr, 10) != plan.laps || !sameHex(f[13], plan.cutLength)) {
+        jobs.set("%s: laps or cutLength%s", f[1]);
+      } else if (!f.is(14, plan.name) || !sameHexText(f[15], plan.summary)) {
+        jobs.set("%s: name or summary %s", f[1], plan.summary);
+      } else if (wplan.laps != plan.laps || !sameDouble(wplan.cutLength, plan.cutLength) || std::strcmp(wplan.name, plan.name) != 0 ||
+                 std::strcmp(wplan.summary, plan.summary) != 0) {
+        jobs.set("%s: planSurfacing() differs from writeSurfacingJob()%s", f[1]);
+      } else {
+        written += hw.length;
+      }
+    }
+  }
+  platform.close(in);
+  char cid[160], detail[480];
+  std::snprintf(cid, sizeof cid, "%s.form", id);
+  std::snprintf(detail, sizeof detail, "%u lines%s%s", static_cast<unsigned>(formLines), form.any ? ", first mismatch: " : "", form.any ? form.text : "");
+  r.result(form.any || formLines != 2 + kSurfacingFieldCount ? "FAIL" : "PASS", cid, detail);
+  std::snprintf(cid, sizeof cid, "%s.texts", id);
+  std::snprintf(detail, sizeof detail, "%u texts%s%s", static_cast<unsigned>(textCount), texts.any ? ", first mismatch: " : "", texts.any ? texts.text : "");
+  r.result(texts.any || textCount == 0 ? "FAIL" : "PASS", cid, detail);
+  std::snprintf(cid, sizeof cid, "%s.jobs", id);
+  std::snprintf(detail, sizeof detail, "%u cases, %llu bytes written%s%s", static_cast<unsigned>(jobCount), static_cast<unsigned long long>(written),
+                jobs.any ? ", first mismatch: " : "", jobs.any ? jobs.text : "");
+  r.result(jobs.any || jobCount == 0 ? "FAIL" : "PASS", cid, detail);
+}
+
+/** The largest surfacing job (15 §20.5): planned, written to a hash, then to a scratch file when the platform has one. */
+void surfacingPerf(Platform& platform, Report& r, Arena arena, const char* id) {
+  SurfacingParams p;
+  p.width = 3000;
+  p.height = 3000;
+  p.stepover = 10;
+  SurfacingPlan plan{};
+  uint32_t t0 = platform.millis();
+  const Status ps = planSurfacing(p, plan);
+  const uint32_t planMs = platform.millis() - t0;
+  const Arena small = smallArena(arena);
+  HashWriter hashed;
+  t0 = platform.millis();
+  const Status hs = writeSurfacingJob(p, hashed, small, plan);
+  const uint32_t hashMs = platform.millis() - t0;
+  char detail[480];
+  int n = std::snprintf(detail, sizeof detail, "3000 x 3000 mm at 10%%: %u laps, %llu bytes; plan %u ms, write to a hash %u ms",
+                        static_cast<unsigned>(plan.laps), static_cast<unsigned long long>(hashed.length), static_cast<unsigned>(planMs),
+                        static_cast<unsigned>(hashMs));
+  Status fs = Status::Ok;
+  if (ByteWriter* w = platform.create("perf-surfacing.tmp")) {
+    t0 = platform.millis();
+    fs = writeSurfacingJob(p, *w, small, plan);
+    platform.closeWriter(w);
+    const uint32_t fileMs = platform.millis() - t0;
+    if (n > 0 && static_cast<size_t>(n) < sizeof detail) {
+      std::snprintf(detail + n, sizeof detail - static_cast<size_t>(n), ", to a file %u ms (%s)", static_cast<unsigned>(fileMs), statusName(fs));
+    }
+  }
+  r.result(ps == Status::Ok && hs == Status::Ok && fs == Status::Ok ? "INFO" : "FAIL", id, detail);
+}
+
 // ---- perf group ------------------------------------------------------------------------------
 
 void perfGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const char* id, const char* inputPath) {
@@ -988,6 +1060,8 @@ Totals run(Platform& platform, Arena arena, const char* groups) {
     else if (std::strcmp(group, "analyse") == 0) analyseGroup(platform, r, sc, arena, id, f[3], f[4]);
     else if (std::strcmp(group, "transform") == 0) transformGroup(platform, r, sc, arena, id, f[3], f[4]);
     else if (std::strcmp(group, "outline") == 0) outlineGroup(platform, r, sc, arena, id, f[3], f[4]);
+    else if (std::strcmp(group, "surfacing") == 0) surfacingGroup(platform, r, sc, arena, id, f[3]);
+    else if (std::strcmp(group, "perf") == 0 && f.is(1, "perf.surfacing")) surfacingPerf(platform, r, arena, id);
     else if (std::strcmp(group, "perf") == 0) perfGroup(platform, r, sc, arena, id, f[3]);
     else r.result("SKIP", id, "unknown group");
   }

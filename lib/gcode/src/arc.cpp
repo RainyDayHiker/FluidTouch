@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <initializer_list>
 
 #include "gcode/num.h"
 
@@ -73,7 +74,14 @@ bool centreFromR(const ArcInput& a, double rWord, double& cx, double& cy, double
   const double x = a.ex - a.sx;
   const double y = a.ey - a.sy;
   if (x == 0 && y == 0) return fail(out, "R form can't describe a full circle (start equals end)");
-  const double h2 = 4 * rWord * rWord - x * x - y * y;
+  double h2 = 4 * rWord * rWord - x * x - y * y;
+  // A half circle whose chord came out a hair longer than 2|R| from rounding E - S is a half
+  // circle (09 D71): within 2^-40 of the arc's largest coordinate, as arc.ts's R_ROUNDING.
+  if (h2 < 0) {
+    double scale = std::fabs(a.sx);
+    for (const double v : {std::fabs(a.sy), std::fabs(a.ex), std::fabs(a.ey), std::fabs(rWord)}) scale = v > scale ? v : scale;
+    if (!(fmath::hypot(x, y) - 2 * std::fabs(rWord) > scale * (1 / 1099511627776.0))) h2 = 0;
+  }
   if (h2 < 0) {
     out.state = ArcState::Invalid;
     out.reasonLength = 0;

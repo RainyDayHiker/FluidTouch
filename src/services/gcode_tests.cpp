@@ -171,8 +171,10 @@ public:
     // (mismatch-<case>-<kind>.gcode) stays on the card to be compared
     void closeWriter(gcode::ByteWriter *writer) override {
         delete static_cast<SdWriter *>(writer);
-        const char *name = strrchr(writePath, '/');
-        if (name && strcmp(name + 1, "perf-write.tmp") == 0) SD.remove(writePath);
+        // the runner's timing files (perf-write.tmp, perf-surfacing.tmp) are scratch; a
+        // mismatch-*.gcode file is kept for the report
+        const size_t len = strlen(writePath);
+        if (len > 4 && strcmp(writePath + len - 4, ".tmp") == 0) SD.remove(writePath);
     }
     void print(const char *text) override {
         if (results) {
