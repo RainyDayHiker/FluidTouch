@@ -110,7 +110,8 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    **New jobs (M8, spec 10, D78)**, designed 2026-11-21: generators, starting with New
    Surfacing Job (CNC-Tools 15 §20, revision 15 reviewed; library 0.4.0 to come). Sent to
    CNC-Tools: `specs/outgoing/cnc-tools-generators.md` (the form's title, description and
-   instructions into core; one shape for every generator). Open with Jeffrey: Q26, Q27. **C3's design note (15 §18) is reviewed** (revision
+   instructions into core; one shape for every generator). Q26 and Q27 answered (D78): no copy
+   kept on the display SD; New job is a card in the picker. **C3's design note (15 §18) is reviewed** (revision
    12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
    editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message

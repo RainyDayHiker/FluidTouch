@@ -120,7 +120,7 @@ the probe, remove the probe and start the router (CNC-Tools 14 §4), each a Prom
 
 The generated file is not kept anywhere else on the display SD: the working folder is cleared
 when another job is chosen, and the same job is made again from the kept values, or chosen
-from the controller's uploads folder (Q26).
+from the controller's uploads folder (D78).
 
 ## 6. The values kept
 
