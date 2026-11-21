@@ -10,9 +10,9 @@ release provides. Milestone M8 ([08](08-milestones.md)); decision D78.
 
 | Part | Where it comes from |
 |------|---------------------|
-| Title ("New surfacing job"), a one-line description, the tool to fit, a line of set-up instructions | The library (its form data and tool data). The tool's data is there (`surfacingBit()`); the title, description and instructions are asked of CNC-Tools, being still in the editor's dialog ([outgoing note](outgoing/cnc-tools-generators.md) §2) |
+| Title ("New Surfacing Job"), a one-line description, the set-up line (where to zero), the bit line (what to fit), the advanced group's title | The library, as finished text (`surfacingForm()`, CNC-Tools 15 §20.4, revision 16), and the tool's data (`surfacingBit()`) |
 | Fields: label, unit as shown, main or advanced group, limits, default text | The library (`surfacingField()`, CNC-Tools 15 §20.4) |
-| A field's text to its value; each field's message | The library (`surfacingFieldValue()`, `surfacingErrors()`) |
+| A field's text to its value; each field's message | The library (`fieldValue()`, the rule for every generator's number fields, CNC-Tools D70; `surfacingErrors()`) |
 | The summary line and the file name, as the values are typed | The library (`planSurfacing()`) |
 | The file | The library (`writeSurfacingJob()`), into the display's working folder |
 | The form, the keypad, the flow, where the values are kept | The display, the same for every generator (§3 to §6) |
@@ -30,12 +30,16 @@ same data, so the two can't drift ([04 §4](04-gcode-library.md#4-new-features-f
    lines that map the generator's typed library calls onto the common interface. Nothing else
    changes: it appears under New job in the picker, with its own form built from its data.
 
-What the common interface needs from every generator is the list in §1. CNC-Tools is asked to
-give each new generator the same shape, and ideally one shared descriptor, so the adapter
-becomes a single generic one ([outgoing/cnc-tools-generators.md](outgoing/cnc-tools-generators.md)).
+What the common interface needs from every generator is the list in §1. CNC-Tools 15 §12.6
+(revision 16) makes it the shape every generator provides, Surfacing's, and adds a shared
+descriptor, `gcode/generators.h`, with the second generator. From that release the adapters
+are replaced by one generic adapter over the descriptor, and a release that adds a generator
+needs no code here at all.
 
-Fields are numbers today. A generator that needs a choice (a bit from a list, a direction) adds
-a choice field type to the form and to the library's field data together; it is not built now.
+Fields are numbers today. A choice field (a bit from a list, a direction) comes as field data
+from the library when a generator first needs one (15 §12.6: its options with ids and labels,
+its default, its message); the form then draws a list where it draws a number field. It is not
+built now.
 
 ## 3. Where it starts: New job in the picker
 
@@ -47,12 +51,13 @@ and Display SD:
 | [Controller SD] [Display SD] [New job]                                [Close]  |
 |--------------------------------------------------------------------------------|
 | Surfacing                                                                      |
-| Flatten the spoilboard or a blank: probes the surface, then skims an area.     |
+| Probes the surface, then skims the area in one pass with an inward clockwise   |
+| spiral, so the cut is conventional.                                            |
 | ...                                              (one row per generator)       |
 +--------------------------------------------------------------------------------+
 ```
 
-- One row per generator: its title and a one-line description, both from the library. A tap
+- One row per generator: its title and its description (up to two lines), both from the library. A tap
   opens its form (§4) over the picker.
 - **Greyed out while a job runs or is held** (S3: making a job is a file action), with the
   reason under the card: "Not while a job runs."
@@ -65,9 +70,9 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 
 ```
 +--------------------------------------------------------------------------------+
-| New surfacing job                                                      [Close] |
+| New Surfacing Job                                                      [Close] |
 | Bit: 1/2in 14° dovetail (Freud 22-104), 12.7 mm at the tip                      |
-| Zero X/Y at the area's lower-left corner; the bit hangs 6.35 mm past each edge  |
+| Zero X/Y at the area's lower-left corner; the bit hangs 6.35 mm past every edge.|
 |--------------------------------------------------------------------------------|
 | Width (X) [ 300      ] mm    Height (Y) [ 200      ] mm   Depth [ 0.1    ] mm   |
 |                              Between 1 and 3000 mm                              |
@@ -82,7 +87,7 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 
 | Element | Behaviour |
 |---------|-----------|
-| Title, tool, instructions | From the library. The tool line names what to fit before the job's first prompt |
+| Title, bit line, set-up line | From the library (`surfacingForm()`). The bit line names what to fit before the job's first prompt |
 | Fields | In the library's order: the main group, then the advanced group under its title ("Stepover and feeds"). Not folded: the screen has room for both. Each shows its text as typed, its label before and its unit after |
 | Editing a field | A tap opens the **text keypad** (§4.1) with the field's text |
 | Message | Under its field in red, from the library (`Enter a number`, `Between 1 and 3000 mm`), checked whenever a field changes |
@@ -142,7 +147,7 @@ interface the form and JobService use. Per generator, an adapter gives:
 
 | Call | Does |
 |------|------|
-| `id()`, `title()`, `description()`, `tool()`, `instructions()` | The texts of §3 and §4 |
+| `id()`, `title()`, `description()`, `setup()`, `toolLine()`, `advancedTitle()` | The texts of §3 and §4 |
 | `fieldCount()`, `field(i)` | Label, unit as shown, group, limits text, default text |
 | `messages(texts, out)` | Each field's message for the texts as typed (through the library's field-value and error calls) |
 | `plan(texts, summary, name)` | The summary and file name, or false while a field has a message |
