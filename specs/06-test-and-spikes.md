@@ -254,7 +254,8 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
-| 2026-11-20 | 0.1.0-build.70 (C2) | all (float, parse, self, analyse, transform, perf) | PC: passed 162, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (no warnings), and again from Settings > Tools in the simulator. Not yet on the device |
+| 2026-11-20 | 0.1.0-build.70 (C2) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:03 |
+| 2026-11-20 | 0.1.0-build.70 (C2) | all (float, parse, self, analyse, transform, perf) | PC: passed 162, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (no warnings), and again from Settings > Tools in the simulator |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device, display SD at 20 MHz (D74):** passed 57, failed 0, skipped 0 in 0:58 |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all | **Device (Jeffrey, CrowPanel Advance):** passed 57, failed 0, skipped 0 in 1:51. The first attempt rebooted after `float` (the task watchdog: the test task never yielded); fixed by yielding every 50 ms in the SD reader |
@@ -296,6 +297,20 @@ SDHC card; the suite passed 57 of 57 in 0:58, down from 1:51):
 
 SD write: 256 KB in about 337 ms (about 780 KB/s, was 330). The library's own work is now most
 of `analyse()`: about 3.5 s of the reference job's 5.0 s (two reads of 0.73 s each).
+
+0.1.0-build.70 (C2) on the device, display SD at 20 MHz (Jeffrey, 2026-11-20). `apply()`
+includes its own `check()`; the output goes to a hash, not the card:
+
+| Job | Read | `analyse()` | Rotate CW `check()` | Rotate CW `apply()` | Arena (analyse / Rotate) |
+|-----|------|-------------|---------------------|---------------------|--------------------------|
+| `Spoilboard_DogHoles.gcode` | 0.72 s | 4.8 s | 8.0 s | 11.5 s | 69,104 / 140,432 B |
+| `CNC_EscapeWheel.gcode` | 0.16 s | 0.96 s | 1.6 s | 2.3 s | 11,072 / 82,392 B |
+| 5 MB perf fixture | 5.3 s | 25.1 s | 45.5 s | 64.8 s | 2,304 / 73,632 B |
+
+A transform as the display runs it (check, confirm, apply, then the analysis of the result for
+the preview) is therefore about 25 s for the reference job, 5 s for the escape wheel and 135 s
+for 5 MB, plus writing the output to the card (about 780 KB/s). `apply()`'s second check is
+about 40% of that.
 
 ### S2 procedure
 
