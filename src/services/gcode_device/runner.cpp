@@ -109,9 +109,9 @@ const char* endingName(Ending e) {
 }
 
 const char* statusName(Status s) {
-  static const char* const k[] = {"Ok", "Refused", "LineTooLong", "ReadError", "OutOfMemory", "Cancelled", "Blocked", "NotSupported", "WriteError"};
+  static const char* const k[] = {"Ok", "Refused", "LineTooLong", "ReadError", "OutOfMemory", "Cancelled", "Blocked", "NotSupported", "WriteError", "FileChanged"};
   const int i = static_cast<int>(s);
-  return i >= 0 && i < 9 ? k[i] : "?";
+  return i >= 0 && i < 10 ? k[i] : "?";
 }
 
 /** Whether `hex` (lowercase) is exactly the hex of bytes[0, n). */
@@ -615,7 +615,8 @@ void transformGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
     const bool wantBlocked = f.is(2, "1"), wantWarnings = f.is(3, "1");
     const unsigned long wantOmitted = std::strtoul(f[4], nullptr, 10), wantCount = std::strtoul(f[5], nullptr, 10);
     gcode::Report rep{};
-    const Status s = check(*input, kind, TransformOptions{}, arena, rep);
+    CheckedTransform checked{};
+    const Status s = check(*input, kind, TransformOptions{}, arena, rep, checked);
     if (s == Status::OutOfMemory) {
       skipped = true;
       break;
@@ -655,20 +656,31 @@ void transformGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
       break;
     }
     f.load(l);  // O sha256 length linesChanged summaryHex, or O - when blocked
+    // applyChecked() from the check above first (apply() reuses the arena), then apply(): the
+    // same bytes, which must be the expected ones.
+    HashWriter viaChecked;
+    TransformResult checkedRes{};
+    const Status cs = applyChecked(*input, viaChecked, checked, FlipChoice::FlipOnly, TransformOptions{}, arena, checkedRes);
     HashWriter hw;
     TransformResult res{};
     const Status as = apply(*input, hw, kind, FlipChoice::FlipOnly, TransformOptions{}, arena, rep, res);
-    if (as == Status::OutOfMemory) {
+    if (as == Status::OutOfMemory || cs == Status::OutOfMemory) {
       skipped = true;
       break;
     }
     if (f.is(1, "-")) {
       if (as != Status::Blocked || hw.length != 0) m.set("%s: apply should block, got %s", kindName, statusName(as));
+      if (cs != Status::Blocked || viaChecked.length != 0) m.set("%s: applyChecked should block, got %s", kindName, statusName(cs));
       continue;
     }
     outputs++;
-    char digest[65];
+    char digest[65], checkedDigest[65];
     hw.sha.hex(digest);
+    viaChecked.sha.hex(checkedDigest);
+    if (cs != Status::Ok || std::strcmp(digest, checkedDigest) != 0 || checkedRes.linesChanged != res.linesChanged ||
+        std::strcmp(checkedRes.summary, res.summary) != 0) {
+      m.set("%s: applyChecked differs from apply (%s)", kindName, statusName(cs));
+    }
     const bool ok = as == Status::Ok && f.is(1, digest) && std::strtoull(f[2], nullptr, 10) == hw.length &&
                     std::strtoul(f[3], nullptr, 10) == res.linesChanged && sameHexBytes(f[4], res.summary, res.summaryLength);
     if (!ok) {
@@ -712,13 +724,18 @@ void perfGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const ch
     platform.close(in);
     return r.result("SKIP", id, "needs more memory than the arena");
   }
-  // Rotate CW: check, then apply (which checks again) into a hash.
+  // Rotate CW: check, then applyChecked (the write pass alone) and apply (which checks again),
+  // each into a hash.
   gcode::Report rep{};
   TransformResult res{};
-  HashWriter hashed;
+  HashWriter hashed, hashedChecked;
+  CheckedTransform checked{};
   t0 = platform.millis();
-  const Status cs = check(*in, TransformKind::RotateCW, TransformOptions{}, arena, rep);
+  const Status cs = check(*in, TransformKind::RotateCW, TransformOptions{}, arena, rep, checked);
   const uint32_t checkMs = platform.millis() - t0;
+  t0 = platform.millis();
+  const Status xs = cs == Status::Ok ? applyChecked(*in, hashedChecked, checked, FlipChoice::FlipOnly, TransformOptions{}, arena, res) : cs;
+  const uint32_t checkedMs = platform.millis() - t0;
   t0 = platform.millis();
   const Status as = cs == Status::Ok ? apply(*in, hashed, TransformKind::RotateCW, FlipChoice::FlipOnly, TransformOptions{}, arena, rep, res) : cs;
   const uint32_t applyMs = platform.millis() - t0;
@@ -734,14 +751,15 @@ void perfGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const ch
     platform.closeWriter(w);
     writeMs = platform.millis() - t0;
   }
-  char detail[400];
+  char detail[480];
   std::snprintf(detail, sizeof detail,
-                "%llu content bytes, %u lines: read %u ms, analyse %u ms, arena %lu bytes; Rotate CW %s: check %u ms, apply %u ms, arena %lu bytes; "
+                "%llu content bytes, %u lines: read %u ms, analyse %u ms, arena %lu bytes; Rotate CW %s: check %u ms, applyChecked %u ms, apply %u ms, arena %lu bytes; "
                 "write %u bytes in %u ms",
                 static_cast<unsigned long long>(bytes), static_cast<unsigned>(a.lineCount), static_cast<unsigned>(readMs),
                 static_cast<unsigned>(analyseMs), static_cast<unsigned long>(a.arenaUsed), statusName(as), static_cast<unsigned>(checkMs),
-                static_cast<unsigned>(applyMs), static_cast<unsigned long>(transformArena), static_cast<unsigned>(written), static_cast<unsigned>(writeMs));
-  r.result(s == Status::Ok && (as == Status::Ok || as == Status::Blocked) ? "INFO" : "FAIL", id, detail);
+                static_cast<unsigned>(checkedMs), static_cast<unsigned>(applyMs), static_cast<unsigned long>(transformArena), static_cast<unsigned>(written), static_cast<unsigned>(writeMs));
+  const bool same = as != Status::Ok || (xs == Status::Ok && hashed.length == hashedChecked.length);
+  r.result(s == Status::Ok && (as == Status::Ok || as == Status::Blocked) && same ? "INFO" : "FAIL", id, detail);
 }
 
 }  // namespace
