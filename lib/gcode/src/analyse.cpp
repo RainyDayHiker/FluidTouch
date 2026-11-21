@@ -10,6 +10,7 @@
 #include "arena.h"
 #include "gcode/analysis.h"
 #include "gcode/num.h"
+#include "outline_internal.h"
 #include "simulator.h"
 #include "stock.h"
 #include "structure.h"
@@ -135,7 +136,13 @@ class Passer {
 
 Status analyse(LineReader& reader, const AnalysisOptions& options, Arena arenaIn, AnalysisSink* sink, Analysis& result) {
   ArenaAlloc arena(arenaIn);
-  return analyseWith(reader, options, arena, sink, nullptr, result);
+  if (options.outline) {
+    OutlineTuning tuning;
+    return analyseOutline(reader, options, arena, sink, result, false, tuning);
+  }
+  const Status s = analyseWith(reader, options, arena, sink, nullptr, result);
+  result.outlineStatus = Status::NotSupported;  // not asked for
+  return s;
 }
 
 Status analyseWith(LineReader& reader, const AnalysisOptions& options, ArenaAlloc& arena, AnalysisSink* sink, FinalPass* finalPass,
@@ -157,7 +164,8 @@ Status analyseWith(LineReader& reader, const AnalysisOptions& options, ArenaAllo
   // Scratch: built texts (two names of the longest line) and the hook's tokens.
   const size_t scratchSize = 2 * static_cast<size_t>(opt.maxLineLength) + 256;
   char* scratch = arena.array<char>(scratchSize);
-  Token* tokens = sink || finalPass ? arena.array<Token>(opt.maxLineLength + 1) : nullptr;
+  const bool wantTokens = sink || (finalPass && finalPass->wantsTokens());
+  Token* tokens = wantTokens ? arena.array<Token>(opt.maxLineLength + 1) : nullptr;
   if (arena.failed) return oom();
   // The simulator, the line state and the structure finder are small (a few hundred bytes each).
   Simulator simulator;
@@ -359,8 +367,8 @@ Status analyseWith(LineReader& reader, const AnalysisOptions& options, ArenaAllo
           if (sink) sink->segment(g);
         }
       }
-      TokenCollector tc(tokens, opt.maxLineLength + 1);
-      scanLine(t.p, t.n, tc);
+      TokenCollector tc(tokens, tokens ? opt.maxLineLength + 1 : 0);
+      if (tokens) scanLine(t.p, t.n, tc);
       const Line view{t.p, t.n, pass.line.ending, i, t.offset};
       if (sink) sink->line(view, tokens, static_cast<uint16_t>(tc.count), *st);
       if (finalPass && !finalPass->line(view, tokens, static_cast<uint16_t>(tc.count), *st)) return oom();
@@ -369,6 +377,7 @@ Status analyseWith(LineReader& reader, const AnalysisOptions& options, ArenaAllo
   if (result.status != Status::Ok) return result.status;
   result.simFlags = simFlags;
   result.arenaUsed = arena.used();
+  result.arenaPeak = arena.peak();
   return arena.failed ? oom() : Status::Ok;
 }
 

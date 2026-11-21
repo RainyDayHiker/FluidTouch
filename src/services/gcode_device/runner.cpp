@@ -13,6 +13,7 @@
 
 #include "gcode/analysis.h"
 #include "gcode/num.h"
+#include "gcode/outline.h"
 #include "gcode/transform.h"
 #include "gcode/version.h"
 
@@ -702,6 +703,146 @@ void transformGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
   r.result(m.any ? "FAIL" : "PASS", id, detail);
 }
 
+// ---- outline group ---------------------------------------------------------------------------
+
+/** A digest of a result's loops (their starts and corners' bits) and summary, so two can be compared without a copy. */
+void loopsDigest(const OutlineResult& res, char out[65]) {
+  Sha256 sha;
+  sha.update(reinterpret_cast<const char*>(&res.loopCount), sizeof res.loopCount);
+  if (res.loopCount) {
+    sha.update(reinterpret_cast<const char*>(res.loopStarts), (res.loopCount + 1) * sizeof(uint32_t));
+    sha.update(reinterpret_cast<const char*>(res.corners), 2 * res.loopStarts[res.loopCount] * sizeof(double));
+  }
+  sha.update(res.summary, res.summaryLength);
+  sha.hex(out);
+}
+
+/**
+ * A case's Outline Check (outline.tsv): outlineCheck() against the report, every issue with its
+ * line text read back, and the output by SHA-256, length, loops and summary; then the preview's
+ * path, analyse() with AnalysisOptions::outline, whose outlineLoops() must be outlineCheck()'s and
+ * whose writeOutline() must give the same bytes (15 §18.6).
+ */
+void outlineGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const char* id, const char* inputPath, const char* expectedPath) {
+  LineReader* input = platform.open(inputPath);
+  LineReader* expected = platform.open(expectedPath);
+  if (!input || !expected) {
+    if (input) platform.close(input);
+    if (expected) platform.close(expected);
+    return r.result("FAIL", id, "can't open the case's files");
+  }
+  Mismatch m;
+  Fields& f = sc.group;
+  Line l{};
+  char name[256];
+  size_t nameLength = 0;
+  bool skipped = false;
+  uint32_t issues = 0;
+  // N sourceNameHex
+  if (expected->next(l) && (f.load(l), f.is(0, "N"))) {
+    const char* h = f[1];
+    for (; h[0] && h[1] && nameLength < sizeof name; h += 2) {
+      const char pair[3] = {h[0], h[1], '\0'};
+      name[nameLength++] = static_cast<char>(std::strtoul(pair, nullptr, 16));
+    }
+  } else {
+    m.set("outline.tsv has no N line%s", "");
+  }
+  // R blocked warnings omitted count
+  if (!m.any && !(expected->next(l) && (f.load(l), f.is(0, "R")))) m.set("outline.tsv has no R line%s", "");
+  const bool wantBlocked = f.is(1, "1"), wantWarnings = f.is(2, "1");
+  const unsigned long wantOmitted = std::strtoul(f[3], nullptr, 10), wantCount = std::strtoul(f[4], nullptr, 10);
+  gcode::Report rep{};
+  OutlineResult res{};
+  HashWriter hw;
+  const Status s = m.any ? Status::Ok : outlineCheck(*input, hw, name, nameLength, OutlineOptions{}, arena, rep, res);
+  if (s == Status::OutOfMemory) skipped = true;
+  if (!m.any && !skipped) {
+    if (s != Status::Ok && s != Status::Blocked) m.set("outlineCheck status %s%s", statusName(s));
+    if (rep.blocked != wantBlocked || rep.warnings != wantWarnings || rep.omitted != wantOmitted || rep.count != wantCount) {
+      m.set("the report's counts%s", "");
+    }
+  }
+  for (unsigned long k = 0; !skipped && k < wantCount; k++) {
+    if (!expected->next(l)) {
+      m.set("outline.tsv ended%s", "");
+      break;
+    }
+    f.load(l);  // I line severity ruleId choices reasonHex lineTextHex
+    if (m.any || k >= rep.count) continue;
+    const Issue& g = rep.issues[k];
+    bool ok = f.is(0, "I") && std::strtoul(f[1], nullptr, 10) == g.line && f.is(2, severityName(g.severity)) && f.is(3, g.ruleId) &&
+              f.is(4, g.hasChoices ? "1" : "0") && sameHexBytes(f[5], g.reason.data, g.reason.length);
+    if (ok) {
+      const int32_t n = reportLineText(*input, g, sc.text, sizeof sc.text);
+      ok = n >= 0 && sameHexBytes(f[6], sc.text, static_cast<size_t>(n));
+    }
+    issues++;
+    if (!ok) {
+      char where[96];
+      std::snprintf(where, sizeof where, "issue %lu (%s, line %s)", k, f[3], f[1]);
+      m.set("%s%s", where, "");
+    }
+  }
+  // O - | O empty | O sha256 length loops corners precision toleranceHex summaryHex
+  if (!skipped && !m.any && !(expected->next(l) && (f.load(l), f.is(0, "O")))) m.set("outline.tsv has no O line%s", "");
+  char ownDigest[65] = "", ownLoops[65] = "";
+  if (!skipped && !m.any) {
+    hw.sha.hex(ownDigest);
+    if (f.is(1, "-")) {
+      if (s != Status::Blocked || hw.length != 0) m.set("outlineCheck should block, got %s%s", statusName(s));
+    } else if (f.is(1, "empty")) {
+      if (s != Status::Ok || !res.empty || hw.length != 0) m.set("outlineCheck should be empty, got %s%s", statusName(s));
+    } else {
+      const uint32_t corners = res.loopCount ? res.loopStarts[res.loopCount] : 0;
+      const bool ok = s == Status::Ok && f.is(1, ownDigest) && std::strtoull(f[2], nullptr, 10) == hw.length &&
+                      std::strtoul(f[3], nullptr, 10) == res.loopCount && std::strtoul(f[4], nullptr, 10) == corners &&
+                      std::strtoul(f[5], nullptr, 10) == res.precision && sameHex(f[6], res.tolerance) &&
+                      sameHexBytes(f[7], res.summary, res.summaryLength);
+      if (!ok) m.set("the output (outlineCheck %s)%s", statusName(s));
+    }
+    loopsDigest(res, ownLoops);  // before the arena is used again
+  }
+  // The preview's path: the same report, loops and bytes, with nothing read again.
+  if (!skipped && !m.any) {
+    Analysis a;
+    AnalysisOptions ao;
+    ao.outline = true;
+    input->rewind();  // analyse() reads on from where the reader is
+    const Status as = analyse(*input, ao, arena, nullptr, a);
+    if (as == Status::OutOfMemory || a.outlineStatus == Status::OutOfMemory) {
+      skipped = true;
+    } else if (as != Status::Ok || a.outlineStatus != Status::Ok) {
+      m.set("analyse with the outline: %s / %s", statusName(as), statusName(a.outlineStatus));
+    } else {
+      gcode::Report pr{};
+      OutlineResult loops{};
+      const Status rs = outlineReport(a, pr);
+      const Status ls = outlineLoops(a, loops);
+      char previewLoops[65] = "";
+      if (ls == Status::Ok) loopsDigest(loops, previewLoops);
+      HashWriter written;
+      OutlineResult wres{};
+      const Status ws = writeOutline(a, written, name, nameLength, arena, wres);
+      char writtenDigest[65];
+      written.sha.hex(writtenDigest);
+      if (rs != Status::Ok || pr.count != rep.count || pr.blocked != rep.blocked) m.set("preview: the report (%s)%s", statusName(rs));
+      else if (rep.blocked ? ls != Status::Blocked || ws != Status::Blocked : ls != Status::Ok || std::strcmp(previewLoops, ownLoops) != 0) {
+        m.set("preview: outlineLoops() differs from outlineCheck()'s (%s)%s", statusName(ls));
+      } else if (!rep.blocked && (ws != Status::Ok || written.length != hw.length || std::strcmp(writtenDigest, ownDigest) != 0)) {
+        m.set("preview: writeOutline() differs (%s)%s", statusName(ws));
+      }
+    }
+  }
+  platform.close(input);
+  platform.close(expected);
+  if (skipped) return r.result("SKIP", id, "needs more memory than the arena");
+  char detail[480];
+  std::snprintf(detail, sizeof detail, "%u issues, %u loops%s%s", static_cast<unsigned>(issues), static_cast<unsigned>(res.loopCount),
+                m.any ? ", first mismatch: " : "", m.any ? m.text : "");
+  r.result(m.any ? "FAIL" : "PASS", id, detail);
+}
+
 // ---- perf group ------------------------------------------------------------------------------
 
 void perfGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const char* id, const char* inputPath) {
@@ -760,6 +901,53 @@ void perfGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, const ch
                 static_cast<unsigned>(checkedMs), static_cast<unsigned>(applyMs), static_cast<unsigned long>(transformArena), static_cast<unsigned>(written), static_cast<unsigned>(writeMs));
   const bool same = as != Status::Ok || (xs == Status::Ok && hashed.length == hashedChecked.length);
   r.result(s == Status::Ok && (as == Status::Ok || as == Status::Blocked) && same ? "INFO" : "FAIL", id, detail);
+
+  // The Outline Check (15 §18.5): analyse() with the outline, Finish on its own (from its first
+  // progress call, which passes the line count, to the return), the arena's peak and the bytes the
+  // outline holds after; then outlineCheck() on its own, with its write.
+  in = platform.open(inputPath);
+  if (!in) return;
+  struct FinishClock {
+    Platform* p;
+    uint32_t lines;
+    uint32_t at;
+    bool started;
+  } clock{&platform, a.lineCount, 0, false};
+  AnalysisOptions ao;
+  ao.outline = true;
+  ao.progressContext = &clock;
+  ao.progress = [](void* ctx, uint32_t line, uint64_t) {
+    auto* c = static_cast<FinishClock*>(ctx);
+    if (line == c->lines && !c->started) {
+      c->started = true;
+      c->at = c->p->millis();
+    }
+    return true;
+  };
+  Analysis o;
+  t0 = platform.millis();
+  const Status os = analyse(*in, ao, arena, nullptr, o);
+  const uint32_t outlineMs = platform.millis() - t0;
+  const uint32_t finishMs = clock.started ? platform.millis() - clock.at : 0;
+  OutlineResult loops{};
+  const Status ls = os == Status::Ok ? outlineLoops(o, loops) : os;
+  const size_t peak = o.arenaPeak, held = o.outlineHeld;
+  HashWriter outlineFile;
+  OutlineResult res2{};
+  t0 = platform.millis();
+  const Status cs2 = os == Status::Ok ? outlineCheck(*in, outlineFile, "perf.nc", 7, OutlineOptions{}, arena, rep, res2) : os;
+  const uint32_t checkMs2 = platform.millis() - t0;
+  platform.close(in);
+  char oid[160];
+  std::snprintf(oid, sizeof oid, "%s.outline", id);
+  std::snprintf(detail, sizeof detail,
+                "analyse with the outline %s/%s %u ms, Finish %u ms, peak %lu bytes, held %lu bytes, %u loops; outlineCheck %s %u ms, %llu bytes written",
+                statusName(os), statusName(o.outlineStatus), static_cast<unsigned>(outlineMs), static_cast<unsigned>(finishMs),
+                static_cast<unsigned long>(peak), static_cast<unsigned long>(held), static_cast<unsigned>(ls == Status::Ok ? loops.loopCount : 0),
+                statusName(cs2), static_cast<unsigned>(checkMs2), static_cast<unsigned long long>(outlineFile.length));
+  const bool outlineOk = os == Status::Ok && (o.outlineStatus == Status::Ok || o.outlineStatus == Status::OutOfMemory) &&
+                         (cs2 == Status::Ok || cs2 == Status::Blocked || cs2 == Status::OutOfMemory);
+  r.result(outlineOk ? "INFO" : "FAIL", oid, detail);
 }
 
 }  // namespace
@@ -799,6 +987,7 @@ Totals run(Platform& platform, Arena arena, const char* groups) {
     else if (std::strcmp(group, "self") == 0) selfGroup(r, arena);
     else if (std::strcmp(group, "analyse") == 0) analyseGroup(platform, r, sc, arena, id, f[3], f[4]);
     else if (std::strcmp(group, "transform") == 0) transformGroup(platform, r, sc, arena, id, f[3], f[4]);
+    else if (std::strcmp(group, "outline") == 0) outlineGroup(platform, r, sc, arena, id, f[3], f[4]);
     else if (std::strcmp(group, "perf") == 0) perfGroup(platform, r, sc, arena, id, f[3]);
     else r.result("SKIP", id, "unknown group");
   }

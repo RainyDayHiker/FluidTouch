@@ -1,16 +1,16 @@
 {
   "name": "gcode-core",
-  "version": "0.2.0-build.84",
-  "source": "c6d00ce5e002beb43b30d272d1474f0d77894e82",
-  "phase": "C2",
-  "goldenFormat": 2,
+  "version": "0.3.0-build.87",
+  "source": "ac8e0211ca03188e2d1cf8eb6383963679061000",
+  "phase": "C3",
+  "goldenFormat": 3,
   "platform": "pioarduino platform-espressif32 55.03.312-1",
   "referenceJobs": {
     "Spoilboard_DogHoles.gcode": "44117bad102b51deb64f0759d51415f199b1114e397c1ac7f8797fcf1264c9d5",
     "CNC_EscapeWheel.gcode": "f9ebd08ec078e30d0625f127bffd3baed697ba867242f82aaa04028b0a611743"
   },
   "deviceData": {
-    "cases": 157,
-    "bytes": 14296297
+    "cases": 280,
+    "bytes": 14401407
   }
 }
