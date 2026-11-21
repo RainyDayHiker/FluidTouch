@@ -90,6 +90,9 @@ class EnabledForm final : public LineReader {
 
   bool next(Line& out) override {
     if (!r_.next(orig_)) return false;
+    // The file's lines and bytes as read, for applyChecked()'s check that it hasn't changed.
+    lines = orig_.index + 1;
+    bytes = orig_.offset + orig_.length + (orig_.ending == Ending::CRLF ? 2 : orig_.ending == Ending::None ? 0 : 1);
     const auto* b = reinterpret_cast<const unsigned char*>(orig_.data);
     const uint32_t bom = orig_.index == 0 && orig_.length >= 3 && b[0] == 0xef && b[1] == 0xbb && b[2] == 0xbf ? 3 : 0;
     prefix_ = offPrefixLength(orig_.data + bom, orig_.length - bom);
@@ -118,6 +121,9 @@ class EnabledForm final : public LineReader {
   uint32_t prefix() const { return prefix_; }
   /** The current line as read from the file. */
   const Line& original() const { return orig_; }
+
+  uint32_t lines = 0;  ///< Lines read so far.
+  uint64_t bytes = 0;  ///< Bytes read so far, endings included.
 
  private:
   LineReader& r_;
@@ -640,11 +646,15 @@ class Checker final : public FinalPass {
   uint32_t fixedAt_ = 0, stockAt_ = 0;
 };
 
-/** What check() leaves for apply(). */
+/** What check() leaves for the write pass (and applyChecked()). */
 struct Checked {
   Analysis analysis;
+  TransformKind kind;
   bool hasSetup;
+  bool blocked;
   TransformSetup setup;
+  uint32_t lines;  // the file's lines and bytes as read
+  uint64_t bytes;
 };
 
 uint32_t lineLimit(const TransformOptions& o) { return o.maxLineLength > 65535 ? 65535 : o.maxLineLength; }
@@ -682,14 +692,22 @@ Status runCheck(LineReader& reader, TransformKind kind, const TransformOptions& 
       return Status::OutOfMemory;
     }
     report.arenaUsed = arena.used();
+    out.kind = kind;
     out.hasSetup = false;
+    out.blocked = true;
+    out.lines = 0;
+    out.bytes = 0;
     return Status::Ok;
   }
   if (s != Status::Ok) return s;
   if (!checker.finish() || arena.failed || !issues.finish(report)) return Status::OutOfMemory;
   report.arenaUsed = arena.used();
+  out.kind = kind;
   out.hasSetup = checker.hasSetup;
+  out.blocked = report.blocked;
   out.setup = checker.setup;
+  out.lines = form.lines;
+  out.bytes = form.bytes;
   return Status::Ok;
 }
 
@@ -806,19 +824,15 @@ Status check(LineReader& reader, TransformKind kind, const TransformOptions& opt
   return runCheck(reader, kind, options, arena, report, *c);
 }
 
-Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipChoice choice, const TransformOptions& options, Arena arenaIn,
-             Report& report, TransformResult& result) {
-  std::memset(&result, 0, sizeof result);
-  report = Report{nullptr, 0, 0, false, false, 0};
-  const bool mirror = kind == TransformKind::FlipH || kind == TransformKind::FlipV;
-  if (mirror && choice == FlipChoice::FlipAndReverseCuts) return Status::NotSupported;  // reverse cuts: C4
-  ArenaAlloc arena(arenaIn);
-  Checked* c = arena.array<Checked>(1);
-  if (!c) return Status::OutOfMemory;
-  const Status s = runCheck(reader, kind, options, arena, report, *c);
-  if (s != Status::Ok) return s;
-  if (report.blocked) return Status::Blocked;
+namespace {
 
+/**
+ * The write pass (TS apply() and serializeDocument()): every line through `writer`, with its
+ * edits. FileChanged when the file doesn't have the lines and bytes check() read.
+ */
+Status writePass(LineReader& reader, ByteWriter& writer, const Checked& c, const TransformOptions& options, ArenaAlloc& arena,
+                 TransformResult& result) {
+  const bool mirror = c.kind == TransformKind::FlipH || c.kind == TransformKind::FlipV;
   const size_t outCap = 4096;
   char* outBuf = arena.array<char>(outCap);
   if (!outBuf) return Status::OutOfMemory;
@@ -826,8 +840,9 @@ Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipCho
   Out out(writer, outBuf, outCap);
   Simulator sim;
   LineState st{};
-  const Analysis& a = c->analysis;
-  uint32_t fixedAt = 0, stockAt = 0, changed = 0;
+  const Analysis& a = c.analysis;
+  uint32_t fixedAt = 0, stockAt = 0, changed = 0, lines = 0;
+  uint64_t bytes = 0;
   Line l{};
   while (reader.next(l)) {
     const uint32_t i = l.index;
@@ -839,10 +854,13 @@ Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipCho
     const uint32_t prefix = offPrefixLength(l.data + bom, l.length - bom);
     const char* text = l.data + bom + prefix;
     const uint32_t n = l.length - bom - prefix;
-    out.put(l.data, bom + prefix);  // the BOM, and the `;OFF ` prefix put back (11 §6)
     size_t endLength = 0;
     const char* end = ending(l.ending, endLength);
-    if (!c->hasSetup) {
+    lines = i + 1;
+    bytes = l.offset + l.length + endLength;
+    if (lines > c.lines) return Status::FileChanged;
+    out.put(l.data, bom + prefix);  // the BOM, and the `;OFF ` prefix put back (11 §6)
+    if (!c.hasSetup) {
       out.put(text, n);
       out.put(end, endLength);
       continue;
@@ -861,21 +879,68 @@ Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipCho
     }
     Edit edits[5];
     int count = 0;
-    // check() reports every overflow (B-OVERFLOW), so these can't fail: an internal error.
-    if (words && !wordEdits(text, n, c->setup, st.distance == Distance::G91, edits, count)) return Status::Blocked;
+    // check() reports every overflow (B-OVERFLOW), so these can't fail: an internal error, or
+    // (applyChecked) a file that changed.
+    if (words && !wordEdits(text, n, c.setup, st.distance == Distance::G91, edits, count)) return Status::Blocked;
     LineWriter lw(out, text, n, edits, count);
-    if (stock && !stockEdits(text, n, i, c->setup, &lw)) return out.failed ? Status::WriteError : Status::Blocked;
+    if (stock && !stockEdits(text, n, i, c.setup, &lw)) return out.failed ? Status::WriteError : Status::Blocked;
     lw.finish();
     if (lw.changed) changed++;
     out.put(end, endLength);
     if (out.failed) return Status::WriteError;
   }
   if (reader.failed()) return Status::ReadError;
+  if (lines != c.lines || bytes != c.bytes) return Status::FileChanged;
   out.flush();
   if (out.failed) return Status::WriteError;
-  summarize(kind, *c, changed, result);
-  report.arenaUsed = arena.used();
+  summarize(c.kind, c, changed, result);
   return Status::Ok;
+}
+
+}  // namespace
+
+Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipChoice choice, const TransformOptions& options, Arena arenaIn,
+             Report& report, TransformResult& result) {
+  std::memset(&result, 0, sizeof result);
+  report = Report{nullptr, 0, 0, false, false, 0};
+  const bool mirror = kind == TransformKind::FlipH || kind == TransformKind::FlipV;
+  if (mirror && choice == FlipChoice::FlipAndReverseCuts) return Status::NotSupported;  // reverse cuts: C4
+  ArenaAlloc arena(arenaIn);
+  Checked* c = arena.array<Checked>(1);
+  if (!c) return Status::OutOfMemory;
+  const Status s = runCheck(reader, kind, options, arena, report, *c);
+  if (s != Status::Ok) return s;
+  if (report.blocked) return Status::Blocked;
+  const Status w = writePass(reader, writer, *c, options, arena, result);
+  report.arenaUsed = arena.used();
+  return w;
+}
+
+Status check(LineReader& reader, TransformKind kind, const TransformOptions& options, Arena arenaIn, Report& report,
+             CheckedTransform& checked) {
+  checked = CheckedTransform{nullptr, 0};
+  ArenaAlloc arena(arenaIn);
+  Checked* c = arena.array<Checked>(1);
+  if (!c) {
+    report = Report{nullptr, 0, 0, false, false, 0};
+    return Status::OutOfMemory;
+  }
+  const Status s = runCheck(reader, kind, options, arena, report, *c);
+  if (s == Status::Ok) checked = CheckedTransform{c, report.arenaUsed};
+  return s;
+}
+
+Status applyChecked(LineReader& reader, ByteWriter& writer, const CheckedTransform& checked, FlipChoice choice,
+                    const TransformOptions& options, Arena arenaIn, TransformResult& result) {
+  std::memset(&result, 0, sizeof result);
+  const auto* c = static_cast<const Checked*>(checked.state);
+  if (!c || checked.arenaUsed > arenaIn.size) return Status::OutOfMemory;
+  const bool mirror = c->kind == TransformKind::FlipH || c->kind == TransformKind::FlipV;
+  if (mirror && choice == FlipChoice::FlipAndReverseCuts) return Status::NotSupported;  // reverse cuts: C4
+  if (c->blocked) return Status::Blocked;
+  // check()'s report and state stay as they are: only the arena past them is used.
+  ArenaAlloc arena(Arena{static_cast<char*>(arenaIn.base) + checked.arenaUsed, arenaIn.size - checked.arenaUsed});
+  return writePass(reader, writer, *c, options, arena, result);
 }
 
 int32_t reportLineText(LineReader& reader, const Issue& issue, char* out, size_t capacity) {

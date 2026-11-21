@@ -1,8 +1,8 @@
 {
   "name": "gcode-core",
-  "version": "0.1.0-build.70",
-  "source": "0eae9203cb33e3467283736e592c91afcbd18c1d",
-  "phase": "C1",
+  "version": "0.2.0-build.84",
+  "source": "c6d00ce5e002beb43b30d272d1474f0d77894e82",
+  "phase": "C2",
   "goldenFormat": 2,
   "platform": "pioarduino platform-espressif32 55.03.312-1",
   "referenceJobs": {

@@ -100,6 +100,8 @@ enum class Status : uint8_t {
   NotSupported,
   /** The ByteWriter failed. */
   WriteError,
+  /** applyChecked(): the file doesn't have the lines and bytes its check() read. */
+  FileChanged,
 };
 
 /**

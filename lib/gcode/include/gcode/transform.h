@@ -106,6 +106,31 @@ Status apply(LineReader& reader, ByteWriter& writer, TransformKind kind, FlipCho
              Arena arena, Report& report, TransformResult& result);
 
 /**
+ * What a check() found, for applyChecked(): a handle to state check() left in its arena, with
+ * `report`. Valid while the first `arenaUsed` bytes of that arena are left as they are.
+ */
+struct CheckedTransform {
+  const void* state;  ///< Null when check() didn't return Ok.
+  size_t arenaUsed;   ///< Bytes of the arena holding the state and the report.
+};
+
+/** check(), keeping what it found for applyChecked(). */
+Status check(LineReader& reader, TransformKind kind, const TransformOptions& options, Arena arena, Report& report,
+             CheckedTransform& checked);
+
+/**
+ * apply() without its second check (15 §5.3): the write pass alone, from what check() found.
+ * The caller vouches that the file hasn't changed since that check(), as the editor's revision
+ * check does; a file whose line count or size differs gives FileChanged (a cheap guard, not a
+ * proof). Pass the same `arena` as check(): only the bytes past `checked.arenaUsed` are used, so
+ * check()'s report stays valid. Blocked, writing nothing, when the report blocked; NotSupported
+ * for FlipAndReverseCuts. The output is byte for byte apply()'s. Any other status but Ok may
+ * leave a partial output, which the caller deletes (15 §4.5).
+ */
+Status applyChecked(LineReader& reader, ByteWriter& writer, const CheckedTransform& checked, FlipChoice choice,
+                    const TransformOptions& options, Arena arena, TransformResult& result);
+
+/**
  * Reads an issue's line text back from the file (15 §5.3): up to `capacity` bytes into `out`.
  * Returns the bytes written, or -1 if the reader fails or the line isn't found. Rewinds `reader`.
  */

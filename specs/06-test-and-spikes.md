@@ -254,6 +254,8 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:47 |
+| 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | PC: passed 162, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:03 |
 | 2026-11-20 | 0.1.0-build.70 (C2) | all (float, parse, self, analyse, transform, perf) | PC: passed 162, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (no warnings), and again from Settings > Tools in the simulator |
 | 2026-11-19 | 0.0.1-build.64 (C1) | all (float, parse, self, analyse, perf) | PC: passed 57, failed 0, skipped 0, with CNC-Tools' host program built by MinGW GCC 16.2 (a compiler CNC-Tools' CI doesn't use), and again from Settings > Tools in the simulator |
@@ -311,6 +313,17 @@ A transform as the display runs it (check, confirm, apply, then the analysis of 
 the preview) is therefore about 25 s for the reference job, 5 s for the escape wheel and 135 s
 for 5 MB, plus writing the output to the card (about 780 KB/s). `apply()`'s second check is
 about 40% of that.
+
+0.2.0-build.84 on the device (Jeffrey, 2026-11-21): `applyChecked()`, the write pass alone:
+
+| Job | `check()` | `applyChecked()` | `apply()` | Check, apply and analysis of the result |
+|-----|-----------|------------------|-----------|------------------------------------------|
+| `Spoilboard_DogHoles.gcode` | 8.1 s | 3.7 s | 11.8 s | 16.5 s (was 25) |
+| `CNC_EscapeWheel.gcode` | 1.6 s | 0.74 s | 2.3 s | 3.2 s |
+| 5 MB perf fixture | 45.2 s | 20.8 s | 66.0 s | 90 s (was 135) |
+
+`analyse()` 4.7 s, 0.92 s and 24.4 s, as before. These are the D76 figures with
+`applyChecked()` (04 §5).
 
 ### S2 procedure
 

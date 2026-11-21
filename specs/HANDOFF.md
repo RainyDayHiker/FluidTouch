@@ -92,12 +92,16 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    at 20 MHz, reads at about 1 MB/s, and the reference job analyses in 5.0 s (06). Not yet
    checked on the device at 20 MHz: an upload from the display SD in the classic UI, other
    cards.
-   **Library version in use: 0.1.0-build.70 (C2, Rotate and Flip, 2026-11-20).** Copied and
+   **Library version in use: 0.1.0-build.70 (C2, Rotate and Flip, 2026-11-20)** (until 0.2.0, below). Copied and
    built (firmware and simulator); the suite passes 162 of 162 on the PC, in the simulator
    and **on the device** (6:03, 2026-11-20, Jeffrey). Rotate CW on the reference job: check
    8.0 s, apply 11.5 s (06). Budgets set: analysis D75, transforms D76 (04 §5). CNC-Tools answered the C2
-   notes in spec 15 revision 11 (`applyChecked()`, `FileChanged`, the manifest's phase;
-   version 0.2.0, not yet released). **C3's design note (15 §18) is reviewed** (revision
+   notes in spec 15 revision 11 (`applyChecked()`, `FileChanged`, the manifest's phase).
+   **Library version in use: 0.2.0-build.84** (C2 with `applyChecked()`, 2026-11-21; a
+   pre-release on GitHub): 162 of 162 on the PC, in the simulator and on the device (6:47,
+   2026-11-21, Jeffrey). `applyChecked()` on the reference job: 3.7 s against apply()'s
+   11.8 s, so a transform with its new analysis is about 17 s (06). Next from CNC-Tools: C3
+   (0.3.0). **C3's design note (15 §18) is reviewed** (revision
    12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
    editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
