@@ -308,6 +308,22 @@ struct Analysis {
   bool segmentsSkipped;
   /** Bytes of the arena the call used: size the arena for a job from this (15 §4.2). */
   size_t arenaUsed;
+  /**
+   * The most of the arena in use at once: arenaUsed, plus, with AnalysisOptions::outline, the
+   * outline's grid and working memory at the arena's top (15 §18.3).
+   */
+  size_t arenaPeak;
+  /**
+   * With AnalysisOptions::outline: Ok when the outline is there (outlineReport(), outlineLoops(),
+   * writeOutline() in outline.h), or why not: OutOfMemory or Cancelled (the outline stopped on its
+   * own, and the analysis is as without it), NotSupported when a corner isn't a safe integer, or
+   * the analysis's own status when that isn't Ok. NotSupported when the outline wasn't asked for.
+   */
+  Status outlineStatus;
+  /** Bytes the outline holds at the arena's top after the call (15 §18.3); 0 without one. */
+  size_t outlineHeld;
+  /** The outline's state, for the calls of outline.h; null without one. */
+  const void* outline;
 };
 
 /** How analyse() reads. */
@@ -318,6 +334,12 @@ struct AnalysisOptions {
   Progress progress = nullptr;
   /** Passed to progress. */
   void* progressContext = nullptr;
+  /**
+   * Also build the Outline Check in the same passes (15 §18.2), from the arena's top. It never
+   * changes the analysis's result or status: see Analysis::outlineStatus. Progress is then also
+   * called in its Finish, as OutlineOptions::progress says.
+   */
+  bool outline = false;
 };
 
 /**

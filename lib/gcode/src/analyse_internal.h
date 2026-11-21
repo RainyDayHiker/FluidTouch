@@ -23,6 +23,11 @@ class FinalPass {
   virtual bool begin(const Analysis& a, const PassOneFacts& facts) = 0;
   /** Each line of pass 2, as AnalysisSink::line(). False stops (out of memory). */
   virtual bool line(const Line& line, const Token* tokens, uint16_t tokenCount, const LineState& state) = 0;
+  /**
+   * Whether line() needs the tokens. Without, line() gets none, and analyse() takes no memory
+   * for them (the Outline Check scans the few lines it needs itself, 15 §18.2).
+   */
+  virtual bool wantsTokens() const { return true; }
 
  protected:
   ~FinalPass() = default;
