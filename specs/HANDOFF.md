@@ -109,7 +109,8 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    The library side of M4 to M7 is now in hand (C1 to C3).
    **Library version in use: 0.4.0-build.100** (New Surfacing Job, 2026-11-21, marked
    latest; also `fieldValue()` and the R half-circle fix, CNC-Tools D70, D71): 294 of 294 on
-   the PC and in the simulator. **Not yet run on the device.** The library side of M8 is in
+   the PC, in the simulator and on the device (9:01, 2026-11-21, Jeffrey). The largest
+   surfacing job is written to the display SD in 0.28 s (06). The library side of M8 is in
    hand; its API matches spec 10 (`surfacingForm()`, `fieldValue()`, a 4 KB write buffer).
    The suite's SD writer now removes every `*.tmp` it closes (the new `perf-surfacing.tmp`
    as well as `perf-write.tmp`).

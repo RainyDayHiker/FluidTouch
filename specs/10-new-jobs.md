@@ -110,8 +110,8 @@ returns the text unchanged on OK and refuses nothing. Its text is at most 32 cha
 1. The values are kept (§6).
 2. The working folder `/lrt/work/` is cleared, as for any new job (02 §5), and the job is
    written there under the library's name (`surface-300x200-0.1mm.nc`) by the library, on the
-   worker task (02 §7). It takes about 0.15 s for the largest surfacing job (CNC-Tools 15
-   §20.5). A write that fails deletes the partial file and shows the reason on the form.
+   worker task (02 §7). It takes 0.28 s for the largest surfacing job on the device (06; 3000 x
+   3000 mm at 10%, 105 KB). A write that fails deletes the partial file and shows the reason on the form.
 3. The file becomes the chosen job, as one chosen from the display SD: Job's file line shows
    `surface-300x200-0.1mm.nc  7 KB  New job · Surfacing`, and the analysis with the outline
    runs (D75, D77), so the preview, the info line, the transforms and the Outline Check work on
@@ -160,7 +160,7 @@ usual `Analysing -> Ready` (02 §4). Its source is "New job · <title>".
 
 Nothing new held: a form is a few labels and 32-byte texts; the write takes 4 KB while it
 runs. The summary is the library's plan loop without writing (at most about 4,700 points for
-surfacing), recomputed only when a field's keypad is closed, not per key.
+surfacing, 45 ms on the device for the largest job), recomputed only when a field's keypad is closed, not per key.
 
 ## 9. Testing
 
