@@ -63,11 +63,11 @@ software and text-to-number conversion is newlib's, so the same cases are run on
   its file interfaces over `/gcode-tests/` on the display SD, a 1 MB arena from PSRAM (taken
   only while it runs), and a background task, so the screen and the connection keep going.
   It runs every group the release has (`float`, `parse`, `self`, `analyse`, `perf`, then
-  `transform` from C2 and `outline` from C3) and writes one line per case to
+  `transform` from C2, `outline` from C3 and `surfacing` from 0.4.0) and writes one line per case to
   `/gcode-tests/results.txt` and the serial port; Tools shows the progress and the summary.
   Not while a job runs. A transform case whose output differs leaves
   `mismatch-<case>-<kind>.gcode` in `/gcode-tests/` to compare; the `perf` group's write
-  test file is removed.
+  test files (`*.tmp`) are removed.
 - **To run it:** `python tools/gcode_core.py data <version> <folder>`, copy the folder's
   contents to `/gcode-tests/` on the display SD, Settings > Tools > Library tests > Run.
 - Cost of keeping it in the firmware: flash only (the firmware grew 46 KB with C1, 21 KB

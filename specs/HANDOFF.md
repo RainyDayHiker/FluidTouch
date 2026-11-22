@@ -107,13 +107,20 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    reference job (7.7 s against 4.6 s); the arena peak, 321 KB, fits 512 KB (06). Kept so for
    now (D77, 2026-11-21); building it on request is the fallback if large previews feel slow.
    The library side of M4 to M7 is now in hand (C1 to C3).
+   **Library version in use: 0.4.0-build.100** (New Surfacing Job, 2026-11-21, marked
+   latest; also `fieldValue()` and the R half-circle fix, CNC-Tools D70, D71): 294 of 294 on
+   the PC, in the simulator and on the device (9:01, 2026-11-21, Jeffrey). The largest
+   surfacing job is written to the display SD in 0.28 s (06). The library side of M8 is in
+   hand; its API matches spec 10 (`surfacingForm()`, `fieldValue()`, a 4 KB write buffer).
+   The suite's SD writer now removes every `*.tmp` it closes (the new `perf-surfacing.tmp`
+   as well as `perf-write.tmp`).
    **New jobs (M8, spec 10, D78)**, designed 2026-11-21: generators, starting with New
-   Surfacing Job (CNC-Tools 15 §20, revision 15 reviewed; library 0.4.0 to come). CNC-Tools
+   Surfacing Job (CNC-Tools 15 §20, revision 15 reviewed; library 0.4.0 integrated, above). CNC-Tools
    answered `specs/outgoing/cnc-tools-generators.md` in spec 15 revision 16 (the form's texts
    in core, `fieldValue()`, §12.6's shape for every generator). Q26 and Q27 answered (D78): no copy
    kept on the display SD; New job is a card in the picker. **C3's design note (15 §18) is reviewed** (revision
    12, 2026-11-21, D77): the outline is built in the preview's analysis, identical to the
-   editor's. Next from CNC-Tools: 0.2.0, then C3 (0.3.0). Done ahead of C1: the fallback font and the
+   editor's. Done ahead of C1: the fallback font and the
    display-text rule (D71), checked in the simulator only (a UTF-8 file name and message
    with `É – ° … “ ” — ½ © Å` on Job and Run; the Latin-1 conversion by a host test); not
    yet seen on the device.

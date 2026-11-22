@@ -254,6 +254,8 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-21 | 0.4.0-build.100 (New Surfacing Job) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 294, failed 0, skipped 0 in 9:01. A first run had 96 cases with "can't open the case's files" (whole case families: reference, refused, roundtrip, synthetic, random-1031 onwards); after the data was copied to the card again, all passed |
+| 2026-11-21 | 0.4.0-build.100 (New Surfacing Job) | all (float, parse, self, analyse, transform, outline, surfacing, perf) | PC: passed 294, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. `surfacing`: 420 field texts, 318 jobs (1,495,159 bytes) identical to the editor's. Host `perf.surfacing`, the largest job (3000 x 3000 mm at 10%, 1,183 laps, 105,040 bytes): plan 0 ms, write 1 ms |
 | 2026-11-21 | 0.3.0-build.87 (C3) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 288, failed 0, skipped 0 in 8:31 |
 | 2026-11-21 | 0.3.0-build.87 (C3) | all (float, parse, self, analyse, transform, outline, perf) | PC: passed 288, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. Host: the outline adds 6 ms to the reference job's 10 ms analysis; peak 337,728 B, held 8,960 B (64-bit) |
 | 2026-11-21 | 0.2.0-build.84 (C2, `applyChecked()`) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 162, failed 0, skipped 0 in 6:47 |
@@ -338,6 +340,12 @@ about 40% of that.
 The peak fits D77's 512 KB with about 190 KB to spare for the reference job. Most of the added
 time is the drawing in pass 2, not Finish: on the host the outline adds 6 ms to 10 ms, on the
 device 3.1 s to 4.6 s.
+
+0.4.0-build.100 on the device (Jeffrey, 2026-11-21), New Surfacing Job. The largest job
+(3000 x 3000 mm at 10% stepover, 1,183 laps, 105,040 bytes): plan 45 ms, write to a hash
+176 ms, **to a file on the display SD 275 ms**. The other `perf` figures are as for C3
+(reference job: analyse 4.7 s, with the outline 7.9 s, `applyChecked()` 4.0 s; arena peak
+320,864 B).
 
 ### S2 procedure
 

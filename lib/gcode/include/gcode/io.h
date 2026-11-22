@@ -102,6 +102,8 @@ enum class Status : uint8_t {
   WriteError,
   /** applyChecked(): the file doesn't have the lines and bytes its check() read. */
   FileChanged,
+  /** A generator's parameters have field errors (surfacingErrors()), so nothing was written. */
+  InvalidParameters,
 };
 
 /**

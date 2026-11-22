@@ -109,9 +109,52 @@ double parseDecimal(const char* text, size_t length) {
     return negative ? -v : v;
   }
   // Past the fast path: strtod, correctly rounded in glibc, newlib and MSVC, in the "C" locale.
-  char buf[1100];
-  const size_t n = length < sizeof(buf) - 1 ? length : sizeof(buf) - 1;
-  std::memcpy(buf, text, n);
+  // The text is passed as "0.<digits>e<exponent>" with the leading zeros dropped, so text of any
+  // length fits: past kKept significant digits, the rest only matters as "something nonzero",
+  // kept as one last 1. Every halfway point between two doubles has at most 767 significant
+  // digits, so the value stays on the same side of each one and rounds the same. 768 digits in
+  // all is also as many as MSVC's strtod reads: it drops the rest without looking at them.
+  constexpr size_t kKept = 767;
+  char buf[kKept + 40];
+  size_t n = 0;
+  buf[n++] = negative ? '-' : '+';
+  buf[n++] = '0';
+  buf[n++] = '.';
+  int64_t exponent = 0;  // the value is 0.<digits> × 10^exponent
+  size_t digits = 0;
+  bool sticky = false, seenPoint = false;
+  for (size_t k = (length > 0 && (text[0] == '-' || text[0] == '+')) ? 1 : 0; k < length; k++) {
+    const char c = text[k];
+    if (c == '.') {
+      seenPoint = true;
+      continue;
+    }
+    if (digits == 0 && c == '0') {
+      if (seenPoint) exponent--;  // 0.00ddd: each zero after the point moves the digits right
+      continue;
+    }
+    if (!seenPoint) exponent++;
+    if (digits < kKept) {
+      buf[n++] = c;
+      digits++;
+    } else if (c != '0') {
+      sticky = true;
+    }
+  }
+  if (digits == 0) return negative ? -0.0 : 0.0;
+  if (sticky) buf[n++] = '1';
+  buf[n++] = 'e';
+  if (exponent < 0) {
+    buf[n++] = '-';
+    exponent = -exponent;
+  }
+  char rev[24];
+  int e = 0;
+  do {
+    rev[e++] = static_cast<char>('0' + exponent % 10);
+    exponent /= 10;
+  } while (exponent != 0);
+  while (e > 0) buf[n++] = rev[--e];
   buf[n] = '\0';
   return std::strtod(buf, nullptr);
 }
