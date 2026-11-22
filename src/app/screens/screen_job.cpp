@@ -5,6 +5,7 @@
 #include "services/file_service.h"
 #include "services/job_service.h"
 #include "services/machine_service.h"
+#include "services/preview_service.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
 #include <string.h>
@@ -12,7 +13,8 @@
 // The Job screen (specs/03-screens.md section 3). Content area 800 x 360:
 //
 //   y   8..72   the chosen file; tapping it opens the file picker
-//   y  80..288  preview (M5); until then the file in large type, or the upload
+//   y  80..288  preview (M5); until part 5b the file in large type with the analysis's
+//               result, or the download and analysis with their bar, or the upload
 //   y 296..352  Use this job
 //
 // The picker covers the whole content area while open.
@@ -40,6 +42,13 @@ lv_obj_t *uploadGroup;
 lv_obj_t *uploadText;
 lv_obj_t *uploadBar;
 lv_obj_t *useButton;
+
+// The preview's download and analysis (specs/11-preview.md §2)
+lv_obj_t *previewGroup;
+lv_obj_t *previewText;
+lv_obj_t *previewBar;
+lv_obj_t *previewInfo;
+lv_obj_t *retryButton;
 
 // Picker
 lv_obj_t *picker;
@@ -239,8 +248,84 @@ void onUseClicked(lv_event_t *) {
 }
 
 void onCancelUpload(lv_event_t *) { JobService::cancelUse(); }
+void onCancelPreview(lv_event_t *) { PreviewService::cancel(); }
+void onRetryPreview(lv_event_t *) { PreviewService::retry(); }
 void onReplace(lv_event_t *) { JobService::replace(true); }
 void onKeep(lv_event_t *) { JobService::replace(false); }
+
+// --- The preview's download and analysis ---------------------------------------------------
+
+// "14,189 lines" with thousands separators
+void formatCount(char *out, size_t outLen, uint32_t n) {
+    if (n >= 1000000) {
+        snprintf(out, outLen, "%lu,%03lu,%03lu", (unsigned long)(n / 1000000), (unsigned long)(n / 1000 % 1000),
+                 (unsigned long)(n % 1000));
+    } else if (n >= 1000) {
+        snprintf(out, outLen, "%lu,%03lu", (unsigned long)(n / 1000), (unsigned long)(n % 1000));
+    } else {
+        snprintf(out, outLen, "%lu", (unsigned long)n);
+    }
+}
+
+// Until the preview is drawn (part 5b): the analysis's result as a line under the file
+void updatePreview(bool show) {
+    PreviewService::State s = show ? PreviewService::state() : PreviewService::NONE;
+    bool running = s == PreviewService::FETCHING || s == PreviewService::ANALYSING;
+    if (running) {
+        setText(previewText, s == PreviewService::FETCHING ? "Downloading from the controller for the preview..."
+                                                           : "Analysing the job for the preview...");
+        lv_bar_set_value(previewBar, (int32_t)(PreviewService::progress() * 1000), LV_ANIM_OFF);
+        lv_obj_clear_flag(previewGroup, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(previewGroup, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    char text[200] = "";
+    bool problem = false;
+    bool retry = false;
+    switch (s) {
+        case PreviewService::READY: {
+            const PreviewService::Summary &r = PreviewService::summary();
+            char lines[16];
+            formatCount(lines, sizeof(lines), r.lines);
+            if (r.hasExtents) {
+                snprintf(text, sizeof(text), "%s lines   %.0f x %.0f %s   analysed in %.1f s", lines, r.maxX - r.minX,
+                         r.maxY - r.minY, r.inch ? "in" : "mm", r.analyseMs / 1000.0);
+            } else {
+                snprintf(text, sizeof(text), "%s lines, no XY moves   analysed in %.1f s", lines, r.analyseMs / 1000.0);
+            }
+            break;
+        }
+        case PreviewService::NO_CARD:
+            snprintf(text, sizeof(text), "Insert a display SD card to preview this job.");
+            break;
+        case PreviewService::WAITING_FOR_JOB:
+            snprintf(text, sizeof(text), "Downloaded for the preview when the job ends.");
+            break;
+        case PreviewService::FAILED:
+            snprintf(text, sizeof(text), "No preview: %s", PreviewService::message());
+            problem = retry = true;
+            break;
+        case PreviewService::CANCELLED:
+            snprintf(text, sizeof(text), "Preview cancelled.");
+            retry = true;
+            break;
+        default:
+            break;
+    }
+    setText(previewInfo, text);
+    lv_obj_set_style_text_color(previewInfo, problem ? UITheme::STATE_ALARM : UITheme::TEXT_MEDIUM, 0);
+    if (running) {
+        lv_obj_add_flag(previewInfo, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(previewInfo, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (retry) {
+        lv_obj_clear_flag(retryButton, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(retryButton, LV_OBJ_FLAG_HIDDEN);
+    }
+}
 
 // --- Building -----------------------------------------------------------------------------
 
@@ -267,10 +352,11 @@ void createFileLine(lv_obj_t *parent) {
 }
 
 void createBody(lv_obj_t *parent) {
-    bodyName = label(parent, 8, 132, FONT_LARGE, UITheme::TEXT_LIGHT, "");
-    bodyDetail = label(parent, 8, 172, FONT_MID, UITheme::TEXT_MEDIUM, "");
-    bodyError = label(parent, 8, 248, FONT_MID, UITheme::STATE_ALARM, "");
-    for (lv_obj_t *l : {bodyName, bodyDetail, bodyError}) {
+    bodyName = label(parent, 8, 100, FONT_LARGE, UITheme::TEXT_LIGHT, "");
+    bodyDetail = label(parent, 8, 136, FONT_MID, UITheme::TEXT_MEDIUM, "");
+    previewInfo = label(parent, 8, 172, FONT_MID, UITheme::TEXT_MEDIUM, "");
+    bodyError = label(parent, 8, 262, FONT_MID, UITheme::STATE_ALARM, "");
+    for (lv_obj_t *l : {bodyName, bodyDetail, previewInfo, bodyError}) {
         lv_obj_set_width(l, 784);
         lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
@@ -295,6 +381,29 @@ void createBody(lv_obj_t *parent) {
     lv_obj_set_style_bg_color(uploadBar, UITheme::ACCENT_PRIMARY, LV_PART_INDICATOR);
     button(uploadGroup, 312, 84, 160, 56, "Cancel", FONT_MID, onCancelUpload);
     lv_obj_add_flag(uploadGroup, LV_OBJ_FLAG_HIDDEN);
+
+    retryButton = button(parent, 312, 204, 160, 48, LV_SYMBOL_REFRESH "  Retry", FONT_MID, onRetryPreview);
+    lv_obj_add_flag(retryButton, LV_OBJ_FLAG_HIDDEN);
+
+    // The download and analysis, under the file's name while they run
+    previewGroup = lv_obj_create(parent);
+    lv_obj_set_pos(previewGroup, 8, 172);
+    lv_obj_set_size(previewGroup, 784, 116);
+    lv_obj_set_style_bg_opa(previewGroup, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(previewGroup, 0, 0);
+    lv_obj_set_style_pad_all(previewGroup, 0, 0);
+    lv_obj_clear_flag(previewGroup, LV_OBJ_FLAG_SCROLLABLE);
+    previewText = label(previewGroup, 0, 0, FONT_MID, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_width(previewText, 784);
+    lv_obj_set_style_text_align(previewText, LV_TEXT_ALIGN_CENTER, 0);
+    previewBar = lv_bar_create(previewGroup);
+    lv_obj_set_size(previewBar, 600, 16);
+    lv_obj_set_pos(previewBar, 92, 32);
+    lv_bar_set_range(previewBar, 0, 1000);
+    lv_obj_set_style_bg_color(previewBar, UITheme::BG_BUTTON, 0);
+    lv_obj_set_style_bg_color(previewBar, UITheme::ACCENT_PRIMARY, LV_PART_INDICATOR);
+    button(previewGroup, 312, 60, 160, 48, "Cancel", FONT_MID, onCancelPreview);
+    lv_obj_add_flag(previewGroup, LV_OBJ_FLAG_HIDDEN);
 
     useButton = button(parent, 512, 296, 280, 56, "Use this job  " LV_SYMBOL_RIGHT, FONT_BIG, onUseClicked);
     setButtonColor(useButton, UITheme::BTN_PLAY);
@@ -401,6 +510,7 @@ void JobScreen::update() {
         lv_obj_add_flag(uploadGroup, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(bodyDetail, LV_OBJ_FLAG_HIDDEN);
     }
+    updatePreview(c.set && !uploading);
 
     bool confirming = prep == JobService::PREP_CONFIRM_REPLACE;
     if (confirming && lv_obj_has_flag(lv_obj_get_parent(replaceDialog), LV_OBJ_FLAG_HIDDEN)) {
