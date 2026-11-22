@@ -6,6 +6,7 @@
 #include "services/sd_reader.h"
 #include <Arduino.h>
 #include <SD.h>
+#include <errno.h>
 #include <WiFiClient.h>
 #include <esp_heap_caps.h>
 #include <mutex>
@@ -211,7 +212,13 @@ Outcome fetch(const Request &req, const char *localPath, uint64_t &got) {
         if (avail > 0) {
             int n = client.read(buf, avail < (int)FETCH_CHUNK ? (size_t)avail : FETCH_CHUNK);
             if (n <= 0) continue;
-            if (out.write(buf, (size_t)n) != (size_t)n) {
+            size_t wrote = out.write(buf, (size_t)n);
+            if (wrote != (size_t)n) {
+                int err = errno;
+                Serial.printf("PreviewService: write failed at %llu bytes: %u of %d written, errno %d; "
+                              "card %llu MB, used %llu MB\n",
+                              (unsigned long long)got, (unsigned)wrote, n, err,
+                              (unsigned long long)(SD.totalBytes() >> 20), (unsigned long long)(SD.usedBytes() >> 20));
                 outcome = fail("The display SD is full, or writing to it failed.");
                 break;
             }
