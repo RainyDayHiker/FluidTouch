@@ -68,8 +68,9 @@ void SegmentList::putExtra32(Extra kind, uint32_t v, int16_t c) {
     putExtra(kind, (int16_t)(uint16_t)(v & 0xFFFF), (int16_t)(uint16_t)(v >> 16), c);
 }
 
-int32_t SegmentList::toXY(double mm) const { return (int32_t)lround(mm / xy); }
-int32_t SegmentList::toZ(double mm) const { return (int32_t)lround((mm - z0) / zs); }
+// In float: the ESP32-S3's FPU has no doubles
+int32_t SegmentList::toXY(double mm) const { return (int32_t)lroundf((float)mm / xy); }
+int32_t SegmentList::toZ(double mm) const { return (int32_t)lroundf(((float)mm - z0) / zs); }
 
 void SegmentList::doubleXY() {
     xy *= 2;
@@ -132,6 +133,10 @@ void SegmentList::Packer::line(const gcode::Line &l, const gcode::Token *tokens,
     double dwell = 0;
     bool g4 = false;
     double p = NAN;
+    // Only a line with F, N or P has anything to read: the others skip the tokens (parsing every
+    // line's G word took most of the packing time on the device, without an FPU for doubles)
+    const uint32_t wanted = (1u << ('F' - 'A')) | (1u << ('N' - 'A')) | (1u << ('P' - 'A'));
+    if (!(st.letters & wanted)) tokenCount = 0;
     for (uint16_t i = 0; tokens && i < tokenCount; i++) {
         const gcode::Token &t = tokens[i];
         if (t.kind != gcode::TokenKind::Word) continue;
