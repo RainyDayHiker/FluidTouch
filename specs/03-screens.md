@@ -121,8 +121,8 @@ previews that file, transforms it, and hands it to Run (D48).
 |---------|-----------|
 | File line | Name, size, card and folder of the chosen file. With none chosen: "No job chosen. Tap to choose a file." Tapping it, or Change, opens the picker |
 | Use this job | A file on the controller's SD: chosen, and Run opens on its start panel. A file on the display SD: uploaded first to `/sd/fluidtouch/uploads/` (D53) with a progress bar and Cancel; a file of that name already there is overwritten after a confirm ([05 §5](05-file-workflow.md#5-on-the-controller)); the upload counts once the controller lists it at the right size (S6); then Run's start panel. Greyed out while a job runs (S3) |
-| Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job |
-| Info line (M5) | Extents, Z range, tools, operation count, time estimate from feeds, warnings (tap for the list) |
+| Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job ([11 §4](11-preview.md#4-the-job-preview)) |
+| Info line (M5) | Extents, Z range, tools, operation count, time estimate from feeds (D80), warnings (tap for the list) ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate)) |
 | Rot L / Rot R (M6) | Rotate 90 CCW / CW per CNC-Tools spec 06 |
 | Flip H / Flip V (M6) | Mirror per CNC-Tools spec 12. "Flip only", with the climb/conventional warning (W-FLIP) shown and confirmed (D70). "Flip and reverse cuts" once CNC-Tools ports it (its C4) |
 | Move (later, D70) | Enter X and Y shift in mm. Preview shows the result against the stock box. Comes once Move is a G-code Editor feature with a device contract |
