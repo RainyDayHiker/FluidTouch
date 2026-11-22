@@ -282,6 +282,26 @@ void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
     }
 }
 
+// The packer, timed (the log splits analyse()'s time into reading, packing and the rest)
+class TimedPacker : public gcode::AnalysisSink {
+public:
+    explicit TimedPacker(SegmentList::Packer &p) : packer(p) {}
+    void segment(const gcode::Segment &s) override {
+        uint32_t t0 = micros();
+        packer.segment(s);
+        us += micros() - t0;
+    }
+    void line(const gcode::Line &l, const gcode::Token *t, uint16_t n, const gcode::LineState &st) override {
+        uint32_t t0 = micros();
+        packer.line(l, t, n, st);
+        us += micros() - t0;
+    }
+    uint32_t us = 0;
+
+private:
+    SegmentList::Packer &packer;
+};
+
 // The info line's figures and the drawing's overlays, from the analysis and the list
 void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t fileSize) {
     const double unit = a.units == gcode::Units::In ? 25.4 : 1.0;
@@ -390,8 +410,9 @@ void task(void *param) {
                 activeReader = &reader;
                 list.attach(listMemory, listBytes);
                 SegmentList::Packer packer(list);
+                TimedPacker timed(packer);
                 estimateRatesGen = MachineService::ratesGeneration();
-                gcode::Status s = gcode::analyse(reader, options, gcode::Arena{arena, ARENA_SIZE}, &packer, a);
+                gcode::Status s = gcode::analyse(reader, options, gcode::Arena{arena, ARENA_SIZE}, &timed, a);
                 activeReader = nullptr;
                 sum.analyseMs = millis() - t0;
                 if (reader.cancelled() || s == gcode::Status::Cancelled) {
@@ -420,6 +441,8 @@ void task(void *param) {
                 Serial.printf("PreviewService: analyse %s: status %d, %lu lines in %lu ms, outline %d, peak %lu bytes\n",
                               localPath, (int)s, (unsigned long)a.lineCount, (unsigned long)sum.analyseMs,
                               (int)a.outlineStatus, (unsigned long)a.arenaPeak);
+                Serial.printf("PreviewService: of which SD reads %lu ms, packing %lu ms\n",
+                              (unsigned long)(reader.readMicros() / 1000), (unsigned long)(timed.us / 1000));
                 Serial.printf("PreviewService: %lu moves in %lu records of %lu bytes, step %.2f mm, Z step %.1f mm%s, "
                               "estimate %.0f s%s\n",
                               (unsigned long)list.moves(), (unsigned long)list.records(), (unsigned long)listBytes,
