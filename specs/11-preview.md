@@ -18,7 +18,7 @@ M5 is built and checked in three parts, each its own branch:
 
 | Part | Delivers | Checked by |
 |------|----------|------------|
-| 5a | Working folder, fetch from the Controller SD, the analysis on the worker task with a progress bar and Cancel, JobService `Fetching -> Analysing -> Ready` | Simulator with the fake FluidNC; device: the reference job fetched and analysed, times against D75 |
+| 5a | Working folder, fetch from the Controller SD, the analysis on the worker task with a progress bar and Cancel: `PreviewService` (`src/services/preview_service.*`), `Fetching -> Analysing -> Ready`. Built 2026-11-21 | Simulator with the fake FluidNC; device: the reference job fetched and analysed, times against D75 |
 | 5b | Segment list (§3), the Job preview (§4), the info line with the time estimate (§5) | Simulator; device: the reference jobs look like the editor's top view |
 | 5c | Run: progress layer, tool marker, the tool's line (§6), op N of M, the message following the tool, time left from the estimate (§7) | Fake FluidNC playback; device: a real cut |
 
@@ -30,10 +30,16 @@ M5 is built and checked in three parts, each its own branch:
   analysis runs on the copy. Run matches this copy to the running job by name and size.
 - **Display SD file:** analysed where it is, not copied (P1, D82). The working folder holds
   only fetched files, and from M6 the transforms' outputs.
+- **Chosen on Job during a cut:** not downloaded then (D72); Job says "Downloaded for the
+  preview when the job ends." and the download starts when it ends.
 - **During a cut, no copy:** Run's preview area offers the download with the confirm of
   [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
 - A fetch that fails (controller offline, the card full, a short download) deletes the
-  partial file and shows the reason on Job's preview area, with Retry.
+  partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
+  on the controller's SD." for a 404). Cancel leaves "Preview cancelled." with Retry.
+- **Choosing another file** while one is downloaded or analysed cancels it and starts the new
+  one. The library tests (Settings > Tools) take the preview's arena back while they run: the
+  preview shows Retry afterwards.
 - **No display SD card:** a Controller SD file is chosen and run as before, with no preview,
   and the preview area says "Insert a display SD card to preview this job." (P2, D82).
 

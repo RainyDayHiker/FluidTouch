@@ -1,6 +1,7 @@
 #include "services/job_service.h"
 #include "services/machine_service.h"
 #include "services/macro_service.h"
+#include "services/preview_service.h"
 #include <Arduino.h>
 #include <string.h>
 
@@ -51,10 +52,14 @@ void JobService::choose(FileService::Card card, const char *folder, const FileSe
     copy(chosen.name, sizeof(chosen.name), entry.name);
     chosen.size = entry.size;
     if (prepState == PREP_FAILED) prepState = PREP_IDLE;
+    PreviewService::load(card, chosen.path, chosen.name, chosen.size);
 }
 
 void JobService::forget(FileService::Card card, const char *path) {
-    if (chosen.set && chosen.card == card && strcmp(chosen.path, path) == 0) chosen.set = false;
+    if (chosen.set && chosen.card == card && strcmp(chosen.path, path) == 0) {
+        chosen.set = false;
+        PreviewService::clear();
+    }
 }
 
 // --- Use this job ----------------------------------------------------------------

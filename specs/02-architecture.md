@@ -29,7 +29,7 @@ Kept deliberately small, to stay mergeable (G11):
 |------|--------|
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
-| `ui/upload_manager.*` | Used by `FileService`. A download function is added next to it (new file). `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
+| `ui/upload_manager.*` | Used by `FileService`. `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
 | `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
@@ -68,7 +68,8 @@ connection changed.
 |---------|------|-----------------|
 | MachineService | Connection, status snapshot, events (state change, message, alarm, hold, probe result) | jog, cancel jog, home, unlock, zero, go to, hold, resume, reset, overrides, run file, send line |
 | FileService | File sources and transfers | list(source, path), fetch to cache, upload to controller, delete; progress and cancel |
-| JobService | The selected job: source file, cached copy, analysis (extents, stock, tools, operations, segment list), derived files, run state | select, generate (a new job, [10](10-new-jobs.md)), analyse, transform, build outline, commit (upload), start, progress mapping |
+| JobService | The selected job: source file, derived files, run state | select, generate (a new job, [10](10-new-jobs.md)), transform, build outline, commit (upload), start, progress mapping |
+| PreviewService | The selected job's working copy and analysis (extents, stock, tools, operations, segment list), the library's arena ([11](11-preview.md)) | load (fetch from the Controller SD, then analyse, on the worker task), cancel, retry; progress |
 | Generators | The list of generators and their common interface: texts, fields, messages, plan, write ([10 §7](10-new-jobs.md#7-services)) | list, form data, messages, plan, write |
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |

@@ -3,6 +3,8 @@
 #include "services/file_service.h"
 #include "services/gcode_device/runner.h"
 #include "services/job_service.h"
+#include "services/preview_service.h"
+#include "services/sd_reader.h"
 #include <Arduino.h>
 #include <SD.h>
 #include <esp_heap_caps.h>
@@ -14,112 +16,8 @@ namespace GcodeTests {
 namespace {
 
 constexpr size_t ARENA_SIZE = 1024 * 1024;  // the display's budget (CNC-Tools docs/arena.md)
-constexpr size_t CHUNK = 16384;              // SD reads (several sectors per read)
-constexpr size_t LINE_KEPT = 2048;            // longest line kept whole; the data's lines are under 400
-
-void *psram(size_t size) {
-    void *p = heap_caps_malloc(size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    return p ? p : malloc(size);
-}
 
 void fullPath(char *out, size_t size, const char *rel) { snprintf(out, size, "%s/%s", DATA_FOLDER, rel); }
-
-// The library and the runner never wait, and the SD card's SPI reads are busy-waits, so without
-// this the task holds its core until the task watchdog reboots the device (seen on the device,
-// 2026-11-19). Every line read passes here: give the core away for a tick every 50 ms. That
-// lets the idle task and WiFi run, at about 2% of the perf group's times.
-uint32_t lastYieldMs = 0;
-void yieldNow() {
-    uint32_t now = ::millis();
-    if (now - lastYieldMs >= 50) {
-        delay(1);
-        lastYieldMs = ::millis();
-    }
-}
-
-// A file on the display SD, split into lines as the library expects (CNC-Tools guide.md §1):
-// \r\n, \n or \r ends a line; a last line may have no ending. A line longer than LINE_KEPT keeps
-// its first LINE_KEPT bytes but reports its real length, so the library reports LineTooLong.
-class SdReader final : public gcode::LineReader {
-public:
-    explicit SdReader(File f) : file(f) {
-        chunk = (uint8_t *)psram(CHUNK);
-        line = (char *)psram(LINE_KEPT);
-        size = file.size();
-    }
-    ~SdReader() {
-        file.close();
-        free(chunk);
-        free(line);
-    }
-    bool ok() const { return chunk && line; }
-
-    // Scans the chunk for the next line end and copies the bytes before it in one go. Reading a
-    // byte at a time made reading about half of analyse()'s time on the device (06, "Device test
-    // suite runs").
-    bool next(gcode::Line &out) override {
-        yieldNow();
-        size_t n = 0;
-        out.offset = offset;
-        int end = -1;  // the byte that ended the line, or -1 at the end of the file
-        while (fill()) {
-            const uint8_t *p = chunk + at;
-            size_t avail = have - at, i = 0;
-            while (i < avail && p[i] != '\n' && p[i] != '\r') i++;
-            if (n < LINE_KEPT) memcpy(line + n, p, i < LINE_KEPT - n ? i : LINE_KEPT - n);
-            n += i;
-            at += i;
-            offset += i;
-            if (i < avail) {
-                end = chunk[at++];
-                offset++;
-                break;
-            }
-        }
-        if (end < 0 && n == 0) return false;
-        if (end < 0) {
-            out.ending = gcode::Ending::None;
-        } else if (end == '\n') {
-            out.ending = gcode::Ending::LF;
-        } else if (fill() && chunk[at] == '\n') {
-            at++;
-            offset++;
-            out.ending = gcode::Ending::CRLF;
-        } else {
-            out.ending = gcode::Ending::CR;
-        }
-        out.data = line;
-        out.length = (uint32_t)n;
-        out.index = index++;
-        return true;
-    }
-    bool rewind() override {
-        have = at = 0;
-        index = 0;
-        offset = 0;
-        readError = false;
-        return file.seek(0);
-    }
-    bool failed() const override { return readError; }
-
-private:
-    bool fill() {
-        if (at < have) return true;
-        size_t pos = file.position();
-        if (pos >= size) return false;
-        have = file.read(chunk, CHUNK);
-        at = 0;
-        if (have == 0) readError = true;  // short of the end: an SD error
-        return have > 0;
-    }
-    File file;
-    uint8_t *chunk = nullptr;
-    char *line = nullptr;
-    size_t have = 0, at = 0, size = 0;
-    uint32_t index = 0;
-    uint64_t offset = 0;
-    bool readError = false;
-};
 
 class SdWriter final : public gcode::ByteWriter {
 public:
@@ -238,6 +136,8 @@ bool refuse(const char *why) {
 bool start() {
     if (current == State::Running) return false;
     if (JobService::active()) return refuse("Not while a job runs.");
+    // The preview's 512 KB arena and this 1 MB one don't both fit (02 §6)
+    if (!PreviewService::releaseMemory()) return refuse("Wait for the job's preview to finish.");
     if (!FileService::displayCardReady()) return refuse("No display SD.");
     char manifest[160];
     fullPath(manifest, sizeof(manifest), "manifest.tsv");
