@@ -1,6 +1,7 @@
 #include "services/file_service.h"
 #include "config.h"
 #include "network/fluidnc_client.h"
+#include "services/machine_service.h"
 #include "ui/upload_manager.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -27,6 +28,10 @@ uint32_t FileService::requestSinceMs = 0;
 bool FileService::collecting = false;
 bool FileService::relistPending = false;
 uint32_t FileService::relistAtMs = 0;
+bool FileService::ratesWanted = false;
+bool FileService::wasConnected = false;
+uint32_t FileService::connectedAtMs = 0;
+int FileService::rateAxis = 0;
 
 FileService::UploadState FileService::uploadStateValue = FileService::UPLOAD_IDLE;
 char FileService::uploadLocalPath[PATH_LEN] = "";
@@ -197,6 +202,44 @@ void FileService::requestController(Request what, const char *folder) {
     FluidNCClient::sendCommand(cmd);
 }
 
+// The axis rates (specs/11-preview.md §5): $/axes/x/max_rate_mm_per_min and so on, one at a
+// time; the answer is "$/axes/x/max_rate_mm_per_min=8000.000". An error moves on to the next
+void FileService::requestRate(int axis) {
+    static const char names[3] = {'x', 'y', 'z'};
+    request = REQUEST_RATES;
+    rateAxis = axis;
+    requestSinceMs = millis();
+    collecting = false;
+    FluidNCClient::setMessageCallback([](const char *payload) { onLine(payload); });
+    char cmd[48];
+    snprintf(cmd, sizeof(cmd), "$/axes/%c/max_rate_mm_per_min\n", names[axis]);
+    FluidNCClient::sendCommand(cmd);
+}
+
+void FileService::onRateLine(const char *line) {
+    static const char names[3] = {'x', 'y', 'z'};
+    bool answered = false;
+    const char *key = strstr(line, "max_rate_mm_per_min");
+    const char *axes = strstr(line, "axes/");
+    if (key && axes && tolower((unsigned char)axes[5]) == names[rateAxis]) {
+        const char *v = key + strlen("max_rate_mm_per_min");
+        while (*v == ' ' || *v == '=' || *v == ':') v++;
+        float rate = (float)atof(v);
+        if (rate > 0) MachineService::setAxisRate(rateAxis, rate);
+        answered = true;
+    } else if (strncmp(line, "error:", 6) == 0) {
+        answered = true;
+    }
+    if (!answered) return;
+    if (rateAxis < 2) {
+        requestRate(rateAxis + 1);
+    } else {
+        Serial.printf("FileService: axis rates %.0f %.0f %.0f mm/min\n", MachineService::axisRate(0),
+                      MachineService::axisRate(1), MachineService::axisRate(2));
+        finishRequest(true, nullptr);
+    }
+}
+
 // Each received line; a WebSocket text frame may hold several
 void FileService::onLine(const char *payload) {
     if (request == REQUEST_NONE) return;
@@ -206,6 +249,11 @@ void FileService::onLine(const char *payload) {
         String line = nl ? String(p).substring(0, nl - p) : String(p);
         p = nl ? nl + 1 : p + strlen(p);
         line.trim();
+        if (request == REQUEST_RATES) {
+            if (line.length() && line[0] != '<') onRateLine(line.c_str());
+            if (request != REQUEST_RATES) return;
+            continue;
+        }
         if (line.length() == 0 || line[0] == '<' || line.startsWith("[GC:") || line.startsWith("[MSG:") ||
             line.startsWith("PING")) {
             continue;
@@ -406,6 +454,9 @@ void FileService::clearUpload() {
 
 // --- Poll ----------------------------------------------------------------------------------
 
+// How long after a connect the axis rates are asked for
+static const uint32_t RATES_DELAY_MS = 2000;
+
 void FileService::poll() {
     uint32_t now = millis();
 
@@ -416,6 +467,19 @@ void FileService::poll() {
             // A reply without "ok" (or a lost one): use what arrived, if anything
             finishRequest(collecting, collecting ? nullptr : "No answer from the controller.");
         }
+    }
+
+    // After each connect, once its own commands are answered, the axis rates (after the timeout
+    // check above, which reads `now` from before a request started here)
+    bool connected = FluidNCClient::isConnected();
+    if (connected && !wasConnected) {
+        ratesWanted = true;
+        connectedAtMs = now;
+    }
+    wasConnected = connected;
+    if (ratesWanted && connected && request == REQUEST_NONE && now - connectedAtMs >= RATES_DELAY_MS) {
+        ratesWanted = false;
+        requestRate(0);
     }
 
     if (relistPending && request == REQUEST_NONE && (int32_t)(now - relistAtMs) >= 0) {

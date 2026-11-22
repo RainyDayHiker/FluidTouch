@@ -1,5 +1,6 @@
 #include "services/preview_service.h"
 #include "gcode/analysis.h"
+#include "gcode/num.h"
 #include "network/fluidnc_client.h"
 #include "services/machine_service.h"
 #include "services/sd_reader.h"
@@ -18,6 +19,11 @@ namespace {
 
 // The library's arena, held while a job is selected (D77)
 constexpr size_t ARENA_SIZE = 512 * 1024;
+// The segment list: what is left once Run's second canvas would still fit (02 §6), at most
+// LIST_MAX (75,000 records, 5 times the reference job, D30)
+constexpr size_t LIST_MAX = 640 * 1024;
+constexpr size_t LIST_MIN = 64 * 1024;
+constexpr size_t RUN_RESERVE = 400 * 1024;
 // Download buffer and timeouts
 constexpr size_t FETCH_CHUNK = 16384;
 constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;
@@ -37,6 +43,11 @@ volatile bool cancelFlag = false;
 volatile uint32_t generation = 0;  // load() moves it on; an older task's results are ignored
 
 void *arena = nullptr;
+void *listMemory = nullptr;
+size_t listBytes = 0;
+SegmentList list;
+uint32_t readyGen = 0;
+uint32_t estimateRatesGen = 0;
 
 // The service's state; the task writes it only for its own generation
 volatile PreviewService::State current = PreviewService::NONE;
@@ -247,6 +258,79 @@ struct Work {
     uint32_t generation;
 };
 
+SegmentList::Rates currentRates() {
+    return {MachineService::axisRate(0), MachineService::axisRate(1), MachineService::axisRate(2)};
+}
+
+// "T1 T2" from the structure's tool labels
+void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
+    out[0] = '\0';
+    size_t n = 0;
+    for (uint32_t i = 0; i < s.labelCount && n + 12 < outLen; i++) {
+        double t = s.labelTools[i];
+        int w = t == (double)(long)t ? snprintf(out + n, outLen - n, "%sT%ld", n ? " " : "", (long)t)
+                                     : snprintf(out + n, outLen - n, "%sT%g", n ? " " : "", t);
+        if (w < 0) break;
+        n += (size_t)w;
+    }
+}
+
+// The info line's figures and the drawing's overlays, from the analysis and the list
+void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t fileSize) {
+    const double unit = a.units == gcode::Units::In ? 25.4 : 1.0;
+    const int p = a.precision;
+    auto mm = [&](double fixed) { return gcode::toNumber(fixed, p) * unit; };
+    sum.hasJob = a.jobExtents.present;
+    if (sum.hasJob) {
+        sum.jobMinX = mm(a.jobExtents.minX);
+        sum.jobMaxX = mm(a.jobExtents.maxX);
+        sum.jobMinY = mm(a.jobExtents.minY);
+        sum.jobMaxY = mm(a.jobExtents.maxY);
+    }
+    sum.hasStock = a.stockBox.present;
+    if (sum.hasStock) {
+        sum.stockMinX = mm(a.stockBox.minX);
+        sum.stockMaxX = mm(a.stockBox.maxX);
+        sum.stockMinY = mm(a.stockBox.minY);
+        sum.stockMaxY = mm(a.stockBox.maxY);
+    }
+    sum.hasProbe = false;
+    for (uint32_t i = 0; i < a.fixedMoveCount && !sum.hasProbe; i++) {
+        if (a.fixedMoves[i].kind != gcode::FixedMoveKind::Probe) continue;
+        for (int k = 0; k < list.fixedCount(); k++) {
+            if (list.fixedLine(k) == a.fixedMoves[i].line) {
+                sum.hasProbe = true;
+                sum.probeX = list.fixedX(k);
+                sum.probeY = list.fixedY(k);
+                break;
+            }
+        }
+    }
+    sum.hasZ = list.hasZ();
+    sum.zMin = list.zMin();
+    sum.zMax = list.zMax();
+    formatTools(sum.tools, sizeof(sum.tools), a.structure);
+    sum.ops = -1;
+    if (a.structure.kind == gcode::StructureKind::Ok) {
+        sum.ops = 0;
+        for (uint32_t i = 0; i < a.structure.unitCount; i++) {
+            if (a.structure.units[i].enabled) sum.ops++;
+        }
+    }
+    sum.unitsAssumed = a.unitsAssumed;
+    sum.unitsMixed = a.unitsMixed;
+    sum.skipped = list.skippedXY();
+    sum.shownPercent = 100;
+    if (list.truncated() && fileSize) {
+        uint64_t pct = list.truncatedOffset() * 100 / fileSize;
+        sum.shownPercent = (uint8_t)(pct > 99 ? 99 : pct);
+    }
+    sum.moves = list.moves();
+    SegmentList::Estimate e = list.estimate(currentRates());
+    sum.estimateSeconds = e.seconds;
+    sum.estimateIncomplete = e.incomplete;
+}
+
 }  // namespace
 
 // --- The worker task ---------------------------------------------------------------------
@@ -297,7 +381,10 @@ void task(void *param) {
                 gcode::Analysis a;
                 uint32_t t0 = millis();
                 activeReader = &reader;
-                gcode::Status s = gcode::analyse(reader, options, gcode::Arena{arena, ARENA_SIZE}, nullptr, a);
+                list.attach(listMemory, listBytes);
+                SegmentList::Packer packer(list);
+                estimateRatesGen = MachineService::ratesGeneration();
+                gcode::Status s = gcode::analyse(reader, options, gcode::Arena{arena, ARENA_SIZE}, &packer, a);
                 activeReader = nullptr;
                 sum.analyseMs = millis() - t0;
                 if (reader.cancelled() || s == gcode::Status::Cancelled) {
@@ -321,16 +408,25 @@ void task(void *param) {
                     sum.maxY = a.displayExtents.maxY;
                     sum.outline = a.outlineStatus == gcode::Status::Ok;
                     sum.arenaPeak = (uint32_t)a.arenaPeak;
+                    summarise(sum, a, reader.fileSize());
                 }
                 Serial.printf("PreviewService: analyse %s: status %d, %lu lines in %lu ms, outline %d, peak %lu bytes\n",
                               localPath, (int)s, (unsigned long)a.lineCount, (unsigned long)sum.analyseMs,
                               (int)a.outlineStatus, (unsigned long)a.arenaPeak);
+                Serial.printf("PreviewService: %lu moves in %lu records of %lu bytes, step %.2f mm, Z step %.1f mm%s, "
+                              "estimate %.0f s%s\n",
+                              (unsigned long)list.moves(), (unsigned long)list.records(), (unsigned long)listBytes,
+                              list.xyStep(), list.zStep(), list.truncated() ? ", truncated" : "",
+                              sum.estimateSeconds, sum.estimateIncomplete ? "+" : "");
             }
         }
     }
 
     if (gen == generation) {
-        if (outcome == Outcome::Ok) result = sum;
+        if (outcome == Outcome::Ok) {
+            result = sum;
+            readyGen++;
+        }
         setState(gen, outcome == Outcome::Ok          ? PreviewService::READY
                       : outcome == Outcome::Cancelled ? PreviewService::CANCELLED
                                                       : PreviewService::FAILED);
@@ -346,6 +442,8 @@ void task(void *param) {
 
 PreviewService::State PreviewService::state() { return current; }
 const PreviewService::Summary &PreviewService::summary() { return result; }
+const SegmentList *PreviewService::segments() { return current == READY && !taskRunning ? &list : nullptr; }
+uint32_t PreviewService::readyGeneration() { return readyGen; }
 
 void PreviewService::load(FileService::Card card, const char *path, const char *name, int32_t size) {
     request.card = card;
@@ -390,6 +488,10 @@ bool PreviewService::releaseMemory() {
     if (current == READY) current = CANCELLED;
     free(arena);
     arena = nullptr;
+    list.detach();
+    free(listMemory);
+    listMemory = nullptr;
+    listBytes = 0;
     return true;
 }
 
@@ -447,7 +549,17 @@ void PreviewService::start() {
         }
     }
     if (!arena) arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!arena) {
+    if (arena && !listMemory) {
+        // Sized so Run's second canvas still fits beside it (02 §6)
+        size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        size_t bytes = largest > RUN_RESERVE + LIST_MIN ? largest - RUN_RESERVE : 0;
+        if (bytes > LIST_MAX) bytes = LIST_MAX;
+        if (bytes >= LIST_MIN) listMemory = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        listBytes = listMemory ? bytes : 0;
+        Serial.printf("PreviewService: segment list %lu bytes (largest free block %lu)\n", (unsigned long)listBytes,
+                      (unsigned long)largest);
+    }
+    if (!arena || !listMemory) {
         current = FAILED;
         std::lock_guard<std::mutex> g(lock);
         copy(failText, sizeof(failText), "Not enough free memory for the preview.");
@@ -472,4 +584,12 @@ void PreviewService::start() {
 void PreviewService::poll() {
     if (pendingStart && !taskRunning) start();
     if (current == WAITING_FOR_JOB && !taskRunning && !MachineService::jobActive()) start();
+    // The axis rates arrived or changed after the analysis: the estimate again (a pass over the
+    // list, milliseconds)
+    if (current == READY && !taskRunning && MachineService::ratesGeneration() != estimateRatesGen) {
+        estimateRatesGen = MachineService::ratesGeneration();
+        SegmentList::Estimate e = list.estimate(currentRates());
+        result.estimateSeconds = e.seconds;
+        result.estimateIncomplete = e.incomplete;
+    }
 }

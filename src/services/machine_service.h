@@ -71,6 +71,17 @@ public:
 
     static const ProbeResult &lastProbe() { return probe; }
 
+    // The axes' max_rate_mm_per_min from the controller's config, 0 until read (axis 0..2 =
+    // X, Y, Z); FileService reads them after each connect. The generation moves on with each
+    // value, so the preview's estimate can be worked out again (specs/11-preview.md §5)
+    static float axisRate(int axis) { return axis >= 0 && axis < 3 ? axisRates[axis] : 0; }
+    static void setAxisRate(int axis, float mmPerMin) {
+        if (axis < 0 || axis >= 3 || axisRates[axis] == mmPerMin) return;
+        axisRates[axis] = mmPerMin;
+        ratesGen++;
+    }
+    static uint32_t ratesGeneration() { return ratesGen; }
+
     // A probe started by probeZ() has not reported its result yet
     static bool probeActive() { return probing; }
 
@@ -132,6 +143,8 @@ public:
     static void useMachine(bool reconnect);
 
 private:
+    static float axisRates[3];
+    static uint32_t ratesGen;
     class Listener : public FluidNCClientListener {
     public:
         void onProbeResult(float x, float y, float z, bool success) override;

@@ -132,8 +132,12 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    spaces, a 404, no card, a choice during a cut). Checked on the device 2026-11-22
    (Jeffrey): the reference job analysed in 6.5 s with the outline (D75 expected about 7.7 s
    from 06's `perf`), Cancel and Retry, a display SD file analysed in place, and the library
-   tests all passing with a job chosen. The download time wasn't noted. Until 5b the Job
-   screen shows the analysis's line count, size and time under the file.
+   tests all passing with a job chosen. The download time wasn't noted. Merged.
+   **Part 5b** (segment list, Job preview, info line and estimate; branch `lrt/m5b-preview`;
+   D83 layout and list size, D84 record changes) is built and checked in the simulator (the
+   reference jobs, an inch job, a 2 MB job truncated at 80%, zoom to 16x and Fit, the
+   warnings, Cancel and Retry in the new layout, the axis rates read from the fake) and by the
+   host test of the packing (121 files); not yet on the device.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
    (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the

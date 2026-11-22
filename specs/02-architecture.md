@@ -165,10 +165,10 @@ Budget for the preview, replacing the earlier targets (which added up to 3.7 MB)
 
 | Use | Size | When |
 |-----|------|------|
-| Preview canvas, RGB565, 480 x 360 | 337 KB | Job and Run screens |
+| Preview canvas, RGB565 (Job: 784 x 204, D83) | 313 KB | Job and Run screens |
 | Second canvas layer for cut progress | 337 KB | Run screen only |
 | Library arena (analysis with the outline, transforms) | 512 KB, provisional until C3's device `perf` figures (D77) | While a job is selected |
-| Segment list, 8 bytes per segment (D30) | What is left: about 1.0 MB on Job, 0.6 MB on Run (about 75,000 segments, 5.2 times the reference job, G8) | While a job is selected |
+| Segment list, 8 bytes per segment (D30) | Sized for Run (D83): the largest free block less 400 KB for Run's second canvas, at most 640 KB (about 80,000 records, 5.9 times the reference job, G8) | While a job is selected |
 
 At 24 bytes per segment (as tested), 1.1 MB holds about 48,000 segments: 3.4 times the
 reference job, short of the "at least 5x" in G8. The options were (Q21, decided as A: D30):

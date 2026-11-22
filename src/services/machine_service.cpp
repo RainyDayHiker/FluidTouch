@@ -13,6 +13,8 @@ static const int RETRY_COUNT = sizeof(RETRY_DELAYS_MS) / sizeof(RETRY_DELAYS_MS[
 static const uint32_t FIRST_CONNECT_DELAY_MS = 150;   // lets the frame draw "Connecting" first
 
 MachineService::Listener MachineService::listener;
+float MachineService::axisRates[3] = {0, 0, 0};
+uint32_t MachineService::ratesGen = 0;
 DisplayDriver *MachineService::display = nullptr;
 MachineConfig MachineService::config;
 SettingsService::MachineStatus MachineService::machineState = SettingsService::MACHINE_NOT_CONFIGURED;
