@@ -137,7 +137,16 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    D83 layout and list size, D84 record changes) is built and checked in the simulator (the
    reference jobs, an inch job, a 2 MB job truncated at 80%, zoom to 16x and Fit, the
    warnings, Cancel and Retry in the new layout, the axis rates read from the fake) and by the
-   host test of the packing (121 files); not yet on the device.
+   host test of the packing (121 files). On the device 2026-11-22 (Jeffrey): DogHoles drawn
+   in 0.2 s, tap zoom and Fit work; one download failed at 31,592 bytes ("display SD full",
+   not repeated: a retry worked; the failure now logs errno and card space). Found: the
+   analysis took 12.4 s against 5a's 6.5 s (SD reads 1.3 s, packing 1.4 s, the library the
+   rest: a sink makes it tokenise every line); the packer now reads tokens only on lines with
+   F, N or P and rounds in float. `PROFILE_ANALYSE` in `preview_service.cpp` (on, TEMPORARY)
+   times the analysis without a sink and with an empty one before each real run: take its
+   numbers, then remove it before merging. The segment list got 311 KB (largest free block
+   720 KB), not about 600 KB: to look at. Then D85: double tap zooms, drag moves when zoomed
+   in (simulator only). Still to check: the axis rates line on the real machine.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
    (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the

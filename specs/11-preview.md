@@ -101,10 +101,12 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
   Probe) as an orange ring. Fixed moves are drawn as rapids.
 - **Order:** file order, so a later pass is drawn over an earlier one.
 - **Fit** fits the job's extents (`jobExtents`), with the stock box if there is one, 10 px
-  in from the edges, and keeps the aspect ratio. **Tap** zooms in 2x centred on the tap, up
-  to 16x; at 16x a tap centres. The Fit button is in the preview's top right corner (its row
-  is M6's). A redraw takes about 0.3 s for the reference job on the device (S2, D28); 3 ms in
-  the simulator.
+  in from the edges, and keeps the aspect ratio. **Double tap** zooms in 2x centred on the
+  tap, up to 16x; at 16x it centres. A single tap does nothing. **Drag**, only when zoomed in,
+  moves the view: the picture already drawn follows the finger, and it is drawn again when the
+  finger lifts; at least 20 px of what Fit shows stays in view. Zooming out is Fit only (D85).
+  The Fit button is in the preview's top right corner (its row is M6's). A redraw takes 0.2 s
+  for the reference job on the device (5b); 3 ms in the simulator.
 - **While analysing:** the preview area shows the progress bar, Cancel and the file line's
   details. The preview, the info line, the extents and the first tool on Run's start panel
   fill in when the analysis finishes (D75).

@@ -19,6 +19,7 @@ const uint32_t ZERO = 0xE8E8E8;
 const uint32_t PROBE = 0xFB8C00;
 const int MAX_ZOOM = 16;
 const int MARGIN = 10;  // pixels around the job at Fit
+const int DRAG_START = 8;  // pixels a finger moves before a press is a drag
 
 uint16_t rgb(uint32_t hex) { return lv_color_to_u16(lv_color_hex(hex)); }
 
@@ -90,23 +91,85 @@ bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h) {
         Serial.printf("PreviewCanvas: no memory for %d x %d (%lu bytes)\n", w, h, (unsigned long)bytes);
         return false;
     }
-    canvas = lv_canvas_create(parent);
+    // A plain box the canvas's size: it clips the canvas while a drag moves it
+    box = lv_obj_create(parent);
+    lv_obj_remove_style_all(box);
+    lv_obj_set_pos(box, x, y);
+    lv_obj_set_size(box, w, h);
+    lv_obj_set_style_bg_color(box, lv_color_hex(BACKGROUND), 0);
+    lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+    lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_clear_flag(box, LV_OBJ_FLAG_CLICKABLE);
+
+    canvas = lv_canvas_create(box);
     lv_canvas_set_buffer(canvas, buffer, w, h, LV_COLOR_FORMAT_RGB565);
-    lv_obj_set_pos(canvas, x, y);
+    lv_obj_set_pos(canvas, 0, 0);
     lv_obj_add_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(canvas, onClicked, LV_EVENT_CLICKED, this);
+    // A drag moves the view, not whatever scrolls behind it
+    lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLL_CHAIN);
+    lv_obj_clear_flag(canvas, LV_OBJ_FLAG_GESTURE_BUBBLE);
+    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESSING, this);
+    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_RELEASED, this);
+    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESS_LOST, this);
+    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_DOUBLE_CLICKED, this);
     lv_canvas_fill_bg(canvas, lv_color_hex(BACKGROUND), LV_OPA_COVER);
     return true;
 }
 
-void PreviewCanvas::onClicked(lv_event_t *e) {
+void PreviewCanvas::onEvent(lv_event_t *e) {
     PreviewCanvas *self = (PreviewCanvas *)lv_event_get_user_data(e);
-    lv_point_t p;
-    lv_indev_get_point(lv_indev_active(), &p);
-    lv_area_t a;
-    lv_obj_get_coords(self->canvas, &a);
-    self->zoomAt(p.x - a.x1, p.y - a.y1);
-    self->draw();
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_indev_t *indev = lv_indev_active();
+    lv_point_t p = {0, 0};
+    if (indev) lv_indev_get_point(indev, &p);
+
+    if (code == LV_EVENT_PRESSED) {
+        self->pressAt = p;
+        self->dragging = false;
+        self->dragEnded = false;
+    } else if (code == LV_EVENT_PRESSING) {
+        // Only zoomed in: at Fit the whole job is already shown
+        int dx = p.x - self->pressAt.x, dy = p.y - self->pressAt.y;
+        if (!self->dragging && self->zoomLevel > 1 && PreviewService::segments() &&
+            (dx * dx + dy * dy) >= DRAG_START * DRAG_START) {
+            self->dragging = true;
+        }
+        // The picture already drawn moves with the finger
+        if (self->dragging) lv_obj_set_pos(self->canvas, dx, dy);
+    } else if (code == LV_EVENT_RELEASED || code == LV_EVENT_PRESS_LOST) {
+        if (self->dragging) {
+            lv_obj_set_pos(self->canvas, 0, 0);
+            self->pan(p.x - self->pressAt.x, p.y - self->pressAt.y);
+            self->dragging = false;
+            self->dragEnded = true;
+            self->draw();
+        }
+    } else if (code == LV_EVENT_DOUBLE_CLICKED) {
+        if (self->dragEnded) return;  // the second touch was a drag
+        lv_area_t a;
+        lv_obj_get_coords(self->canvas, &a);
+        self->zoomAt(p.x - a.x1, p.y - a.y1);
+        self->draw();
+    }
+}
+
+void PreviewCanvas::pan(int dx, int dy) {
+    // A drag right shows what was to the left: the view moves the other way
+    view.ox -= dx / view.scale;
+    view.oy += dy / view.scale;
+    keepInView();
+}
+
+void PreviewCanvas::keepInView() {
+    // At least KEEP pixels of what Fit shows stay on the canvas
+    const float KEEP = 20;
+    float hw = (width * 0.5f - KEEP) / view.scale, hh = (height * 0.5f - KEEP) / view.scale;
+    float cx = view.ox + (width * 0.5f) / view.scale, cy = view.oy + (height * 0.5f) / view.scale;
+    float kx = cx < fitMinX - hw ? fitMinX - hw : cx > fitMaxX + hw ? fitMaxX + hw : cx;
+    float ky = cy < fitMinY - hh ? fitMinY - hh : cy > fitMaxY + hh ? fitMaxY + hh : cy;
+    view.ox += kx - cx;
+    view.oy += ky - cy;
 }
 
 void PreviewCanvas::computeFit() {
@@ -123,6 +186,10 @@ void PreviewCanvas::computeFit() {
     if (h < 1) h = 1;
     double sx = (width - 2 * MARGIN) / w, sy = (height - 2 * MARGIN) / h;
     fitScale = (float)(sx < sy ? sx : sy);
+    fitMinX = (float)minX;
+    fitMaxX = (float)maxX;
+    fitMinY = (float)minY;
+    fitMaxY = (float)maxY;
     view.scale = fitScale;
     view.ox = (float)((minX + maxX) * 0.5 - (width * 0.5) / fitScale);
     view.oy = (float)((minY + maxY) * 0.5 - (height * 0.5) / fitScale);
@@ -141,6 +208,7 @@ void PreviewCanvas::zoomAt(int px, int py) {
     view.scale = fitScale * zoomLevel;
     view.ox = mx - (width * 0.5f) / view.scale;
     view.oy = my - (height * 0.5f) / view.scale;
+    keepInView();
 }
 
 void PreviewCanvas::draw() {
