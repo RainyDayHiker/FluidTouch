@@ -28,6 +28,7 @@ Kept deliberately small, to stay mergeable (G11):
 | File | Change |
 |------|--------|
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
+| `include/debug_log.h`, `network/fluidnc_client.cpp` | `LOG_STATUS_PRINTF`, off unless built with `-DLOG_FLUIDNC_STATUS=1`, for the lines printed on each status report and parser state (Status, WCO, FS, Ov, GCode State, modals). |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
 | `ui/upload_manager.*` | Used by `FileService`. `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |

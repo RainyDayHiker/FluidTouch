@@ -982,7 +982,7 @@ void FluidNCClient::parseStatusReport(const char* message) {
     static uint32_t lastStatusLog = 0;
     uint32_t now = millis();
     if (now - lastStatusLog >= 5000) {
-        LOG_PRINTF("[FluidNC] Status update (5s): %s\n", message);
+        LOG_STATUS_PRINTF("[FluidNC] Status update (5s): %s\n", message);
         lastStatusLog = now;
     }
     
@@ -1057,7 +1057,7 @@ void FluidNCClient::parseStatusReport(const char* message) {
             // Only 3 axes parsed - machine doesn't have A-axis, set to 0
             currentStatus.wco_a = 0.0f;
         }
-        LOG_PRINTF("[FluidNC] WCO updated: (%.3f,%.3f,%.3f,%.3f)\n",
+        LOG_STATUS_PRINTF("[FluidNC] WCO updated: (%.3f,%.3f,%.3f,%.3f)\n",
                       currentStatus.wco_x, currentStatus.wco_y, currentStatus.wco_z, currentStatus.wco_a);
     }
     
@@ -1085,7 +1085,7 @@ void FluidNCClient::parseStatusReport(const char* message) {
     const char* fs = strstr(message, "FS:");
     if (fs) {
         sscanf(fs + 3, "%f,%f", &currentStatus.feed_rate, &currentStatus.spindle_speed);
-        LOG_PRINTF("[FluidNC] Parsed FS: feed=%.0f, spindle=%.0f\n", 
+        LOG_STATUS_PRINTF("[FluidNC] Parsed FS: feed=%.0f, spindle=%.0f\n", 
                       currentStatus.feed_rate, currentStatus.spindle_speed);
     }
     
@@ -1093,7 +1093,7 @@ void FluidNCClient::parseStatusReport(const char* message) {
     const char* ov = strstr(message, "Ov:");
     if (ov) {
         sscanf(ov + 3, "%f,%f,%f", &currentStatus.feed_override, &currentStatus.rapid_override, &currentStatus.spindle_override);
-        LOG_PRINTF("[FluidNC] Parsed Ov: feed=%.0f%%, rapid=%.0f%%, spindle=%.0f%%\n", 
+        LOG_STATUS_PRINTF("[FluidNC] Parsed Ov: feed=%.0f%%, rapid=%.0f%%, spindle=%.0f%%\n", 
                       currentStatus.feed_override, currentStatus.rapid_override, currentStatus.spindle_override);
     }
 
@@ -1167,7 +1167,7 @@ void FluidNCClient::parseStatusReport(const char* message) {
     // Parse modal states (Pn:, WCO:, etc.)
     // Note: Full parser state might come in separate $G response
     
-    LOG_PRINTF("[FluidNC] Status: State=%d, MPos=(%.3f,%.3f,%.3f,%.3f), WPos=(%.3f,%.3f,%.3f,%.3f)\n",
+    LOG_STATUS_PRINTF("[FluidNC] Status: State=%d, MPos=(%.3f,%.3f,%.3f,%.3f), WPos=(%.3f,%.3f,%.3f,%.3f)\n",
                   currentStatus.state,
                   currentStatus.mpos_x, currentStatus.mpos_y, currentStatus.mpos_z, currentStatus.mpos_a,
                   currentStatus.wpos_x, currentStatus.wpos_y, currentStatus.wpos_z, currentStatus.wpos_a);
@@ -1265,7 +1265,7 @@ void FluidNCClient::parseGCodeState(const char* message) {
     // Example: [GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]
     // Parse modal states from GCode parser state report
     
-    LOG_PRINTF("[FluidNC] GCode State: %s\n", message);
+    LOG_STATUS_PRINTF("[FluidNC] GCode State: %s\n", message);
     
     // Extract modal values by searching for specific patterns
     const char* ptr = message + 4;  // Skip "[GC:"
@@ -1344,7 +1344,7 @@ void FluidNCClient::parseGCodeState(const char* message) {
         }
     }
     
-    LOG_PRINTF("[FluidNC] Parsed modals: Motion=%s, WCS=%s, Plane=%s, Units=%s, Distance=%s, Spindle=%s, Coolant=%s, Tool=%s, Feed=%.0f, SpindleSpeed=%.0f\n",
+    LOG_STATUS_PRINTF("[FluidNC] Parsed modals: Motion=%s, WCS=%s, Plane=%s, Units=%s, Distance=%s, Spindle=%s, Coolant=%s, Tool=%s, Feed=%.0f, SpindleSpeed=%.0f\n",
                   currentStatus.modal_motion, currentStatus.modal_wcs, currentStatus.modal_plane,
                   currentStatus.modal_units, currentStatus.modal_distance, currentStatus.modal_spindle,
                   currentStatus.modal_coolant, currentStatus.modal_tool,
