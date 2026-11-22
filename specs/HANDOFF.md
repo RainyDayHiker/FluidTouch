@@ -126,8 +126,8 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    yet seen on the device.
 3. **M5 (preview) designed** in [11](11-preview.md), 2026-11-21: Q22 answered as D79 (`Ln:`
    when the file has N words, else position matching), the time estimate on the display
-   (D80), no "fits from here" (D81). Its §9 (P1 to P4) waits for Jeffrey's review; then part
-   5a (fetch and analysis) is built first.
+   (D80), no "fits from here" (D81). Its §9 (P1 to P4) accepted (D82). Part 5a (fetch and
+   analysis) is built first.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
    (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the

@@ -146,9 +146,9 @@ without uploading.
 
 | What | Where |
 |------|-------|
-| Working copy of the selected file, transform outputs, outline file, a generated new job | Display SD, `/lrt/work/` (cleared when a new job is selected) |
+| A Controller SD file fetched for the preview, transform outputs, outline file, a generated new job | Display SD, `/lrt/work/` (cleared when a new job is selected). A display SD file is analysed where it is (D82) |
 | The last values of each New job form, as typed | Display SD, `/lrt/new-job-values.txt`, written on Create ([10 §6](10-new-jobs.md#6-the-values-kept)) |
-| Fallback when no SD card is present | PSRAM, files up to 2 MB; larger files can be run but not previewed |
+| No display SD card | No preview: a Controller SD file can be chosen and run, not previewed (D82) |
 | Segment list for preview | PSRAM |
 | Jobs to run | FluidNC SD, as now. Uploaded and generated files go to `/sd/fluidtouch/uploads/` (D53) |
 

@@ -1,7 +1,7 @@
 # 11 — Preview and progress (M5)
 
 How a chosen job is fetched, analysed and drawn on Job, and how Run follows the tool.
-Milestone M5 ([08](08-milestones.md)); decisions D79 to D81, D28 to D30. The screens are
+Milestone M5 ([08](08-milestones.md)); decisions D79 to D82, D28 to D30. The screens are
 [03 §3](03-screens.md#3-job) and [03 §4](03-screens.md#4-run); memory and threads are
 [02 §6, §7](02-architecture.md#6-memory); the analysis is the library's (`analyse()` with the
 outline, D75, D77).
@@ -10,8 +10,7 @@ The geometry comes from the library's segments, the same ones the editor's viewe
 the picture can't drift from the editor's top view. The colours, the scale and how the
 display follows the tool are the display's.
 
-**For review (Jeffrey), before building:** §9 lists what this spec proposes that no
-decision covers yet.
+§9's proposals were accepted by Jeffrey on 2026-11-21 (D82).
 
 ## 1. Building order
 
@@ -29,14 +28,14 @@ M5 is built and checked in three parts, each its own branch:
   `http://<address>/sd/<path>` into `/lrt/work/<name>`, on the worker task, with a progress
   bar from the bytes received and Cancel. The working folder is cleared first (02 §5). The
   analysis runs on the copy. Run matches this copy to the running job by name and size.
-- **Display SD file:** analysed where it is, not copied (§9, P1). The working folder holds
+- **Display SD file:** analysed where it is, not copied (P1, D82). The working folder holds
   only fetched files, and from M6 the transforms' outputs.
 - **During a cut, no copy:** Run's preview area offers the download with the confirm of
   [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
 - A fetch that fails (controller offline, the card full, a short download) deletes the
   partial file and shows the reason on Job's preview area, with Retry.
 - **No display SD card:** a Controller SD file is chosen and run as before, with no preview,
-  and the preview area says "Insert a display SD card to preview this job." (§9, P2).
+  and the preview area says "Insert a display SD card to preview this job." (P2, D82).
 
 ## 3. The segment list
 
@@ -72,7 +71,7 @@ packs it into 8-byte records in PSRAM, one per segment, laid out as D30 says:
 - **Canvas:** the preview area, about 784 x 220, RGB565, drawn by the display's own
   rasteriser into the buffer (D28; `draw_test.cpp` is the starting point).
 - **What is drawn:** rapids thin and dim; feeds and arcs 2 px, coloured by their end Z, from
-  the job's top cut depth (light) to its deepest (dark), in 8 levels (Q15 assumes depth);
+  the job's top cut depth (light) to its deepest (dark), in 8 levels (P4, D82);
   plunges as a dot; the stock box (`Analysis::stockBox`), dashed; job zero as a cross; the
   probe point (`fixedMoves`, kind Probe) as a ring. Fixed moves are drawn as rapids.
 - **Order:** file order, so a later pass is drawn over an earlier one.
@@ -97,7 +96,7 @@ packs it into 8-byte records in PSRAM, one per segment, laid out as D30 says:
 | Tools | `structure.labelTools` ("T1 T2"); left out when the file has none |
 | Ops | enabled units in `structure`; left out when `structure.kind` isn't Ok |
 | Time | the estimate below, "~" and hours:minutes |
-| Warnings | §9, P3 |
+| Warnings | P3 (D82) |
 
 **The time estimate (D80)** is computed by the display from the segment list, not by the
 library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait for CNC-Tools.
@@ -154,7 +153,7 @@ segment list (with the N table) in what is left. The fetch and the analysis run 
 task, one at a time, yielding (02 §7). Packing a segment costs a few divisions; the repacking
 at a doubled step runs on the worker task too.
 
-## 9. Proposed, for review
+## 9. Proposals accepted (D82)
 
 | # | Proposal | Why |
 |---|----------|-----|
