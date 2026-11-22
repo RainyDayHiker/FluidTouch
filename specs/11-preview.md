@@ -18,7 +18,7 @@ M5 is built and checked in three parts, each its own branch:
 
 | Part | Delivers | Checked by |
 |------|----------|------------|
-| 5a | Working folder, fetch from the Controller SD, the analysis on the worker task with a progress bar and Cancel: `PreviewService` (`src/services/preview_service.*`), `Fetching -> Analysing -> Ready`. Built 2026-11-21 | Simulator with the fake FluidNC; device: the reference job fetched and analysed, times against D75 |
+| 5a | Working folder, fetch from the Controller SD, the analysis on the worker task with a progress bar and Cancel: `PreviewService` (`src/services/preview_service.*`), `Fetching -> Analysing -> Ready`. Built 2026-11-21; on the device 2026-11-22: the reference job analysed in 6.5 s | Simulator with the fake FluidNC; device: the reference job fetched and analysed, times against D75 |
 | 5b | Segment list (§3), the Job preview (§4), the info line with the time estimate (§5) | Simulator; device: the reference jobs look like the editor's top view |
 | 5c | Run: progress layer, tool marker, the tool's line (§6), op N of M, the message following the tool, time left from the estimate (§7) | Fake FluidNC playback; device: a real cut |
 

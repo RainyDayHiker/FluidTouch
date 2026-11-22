@@ -129,7 +129,10 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    (D80), no "fits from here" (D81). Its §9 (P1 to P4) accepted (D82). **Part 5a** (fetch and
    analysis, `PreviewService`; branch `lrt/m5a-fetch-analyse`) is built and checked in the
    simulator (download, analysis, Cancel, Retry, a new choice mid-download, a name with
-   spaces, a 404, no card, a choice during a cut); not yet on the device. Until 5b the Job
+   spaces, a 404, no card, a choice during a cut). Checked on the device 2026-11-22
+   (Jeffrey): the reference job analysed in 6.5 s with the outline (D75 expected about 7.7 s
+   from 06's `perf`), Cancel and Retry, a display SD file analysed in place, and the library
+   tests all passing with a job chosen. The download time wasn't noted. Until 5b the Job
    screen shows the analysis's line count, size and time under the file.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
