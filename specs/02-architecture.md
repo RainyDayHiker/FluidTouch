@@ -173,7 +173,7 @@ Budget for the preview, replacing the earlier targets (which added up to 3.7 MB)
 | Use | Size | When |
 |-----|------|------|
 | Job's preview canvas, RGB565, 784 x 204 (D83) | 313 KB | From boot (built with the Job screen) |
-| Run's preview canvas, RGB565, 456 x 344 (D89, D90): the job and the cut so far in one canvas | 306 KB | From boot (built with the Run screen) |
+| Run's preview canvas, RGB565, 568 x 344 (D89, D91): the job and the cut so far in one canvas | 382 KB | From boot (built with the Run screen) |
 | Library arena (analysis with the outline, transforms) | 512 KB, provisional until C3's device `perf` figures (D77) | While a job is selected |
 | Segment list, 8 bytes per segment (D30) | The largest free block less 128 KB of headroom (D89; was 400 KB for a second canvas on Run, D83), at most 640 KB (about 80,000 records, 5.9 times the reference job, G8) | While a job is selected |
 

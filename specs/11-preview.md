@@ -178,7 +178,7 @@ The tool's record is found as follows, at every report:
 
 Then:
 
-- **Run's preview (D89, D90):** one canvas, 456 x 344, left of the panel. The job is drawn as on Job (§4), and the moves before the match in one bright green over
+- **Run's preview (D89, D91):** one canvas, 568 x 344, left of the panel. The job is drawn as on Job (§4), and the moves before the match in one bright green over
   it (rapids a lighter grey), incrementally (D29): each report draws the moves from the last
   drawn one up to the match. A view change (Fit, zoom, drag, following) redraws the whole
   canvas, the job then what is done. Fit, double tap and drag as on
@@ -203,7 +203,24 @@ From the match: the estimate of the records still to come (§5), with the feed o
 to feeds and arcs and the rapid override to rapids, plus nothing for the prompts still to come.
 After 2 minutes of cutting it is scaled by how far the actual time has differed from the
 estimate so far. This replaces the percent formula (D64). Without a segment list (no card, too
-large, or no copy) the percent formula stays.
+large, or no copy) the percent formula stays, with D90's averaging.
+
+How it is shown (D91), so it is steady and still corrects itself:
+
+- **Planned time with a correction.** Each new match gives a target: the estimate still to
+  come x the correction factor. The factor is actual running time / estimated time of the
+  part done; it starts at 1 and moves toward the measured ratio slowly, from 2 minutes of
+  cutting on. Both are seconds, unlike the `SD:` percent, which counts bytes.
+- **Counted down by the clock.** Between reports the value shown goes down one second per
+  second of running time, and stops while the job waits (prompt, pause; D90).
+- **No jumps.** A new target moves the shown value toward it a part of the way each second,
+  not all at once.
+
+The usual alternatives, compared 2026-11-23: extrapolating from percent (D51, D90: noisy,
+because bytes aren't time); FigUI's planned time counted down by the clock (steady, but never
+corrected: when the estimate runs out it shows nothing); smoothing the rate alone (moving
+average, Kalman: hides the noise, doesn't remove it). The constants (how slowly the factor
+moves, how far each second closes the gap) are set in step 2 against the reference jobs.
 
 ## 8. Memory and threads
 

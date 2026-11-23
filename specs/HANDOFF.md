@@ -151,8 +151,10 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    matching, zoom and following (D89; built, checked in the simulator with the fake's
    playback and by the host test of `RunTracker`; not yet on the device), then D90 after
    Jeffrey's look at the screenshots (no file line, panel message or rapid override; STOP
-   reads ABORT during a job; time left averaged and stopped while waiting); (2) the message
-   following the tool, op N of M, time left from the estimate; (3) `Ln:`; (4) the download
+   reads ABORT during a job; time left averaged and stopped while waiting), then D91 (panel
+   200 px, preview 568 x 344, override buttons -10 100 +10; ABORT pressed in the simulator
+   ends the job); (2) the message following the tool, op N of M, time left from the estimate
+   as D91 describes it (11 §7); (3) `Ln:`; (4) the download
    offer during a cut (D72).
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
    on the real machine; Jeffrey sends it when he can.

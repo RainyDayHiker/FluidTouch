@@ -13,10 +13,10 @@
 
 // The Run screen (specs/03-screens.md section 4). Content area 800 x 360:
 //
-//   x   8..464  the preview (specs/11-preview.md §6, D89, D90): 456 x 344, a box over its
+//   x   8..576  the preview (specs/11-preview.md §6, D89, D91): 568 x 344, a box over its
 //               top half at a prompt; without a preview of this job, the file and the
 //               current message in large type
-//   x 488..792  the panel: START; or op N of M, progress, times, feed override and PAUSE
+//   x 592..792  the panel (D91): START; or op N of M, progress, times, feed override and PAUSE
 //               (CONTINUE at a prompt; ABORT is the status bar's STOP during a job, D90);
 //               or the result
 //
@@ -32,9 +32,10 @@ const lv_font_t *const FONT_BIG = &lrt_font_20;
 const lv_font_t *const FONT_MID = &lrt_font_18;
 const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
-const int LEFT_X = 16, LEFT_W = 440;
-const int PANEL_X = 488, PANEL_W = 304;
-const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 456, PREVIEW_H = 344;
+const int LEFT_X = 16, LEFT_W = 552;
+const int LEFT_GROUP_W = 584;  // the left side, up to the divider
+const int PANEL_X = 592, PANEL_W = 200;
+const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 568, PREVIEW_H = 344;
 
 lv_obj_t *noneGroup;
 lv_obj_t *jobGroup;      // everything but noneGroup
@@ -150,7 +151,7 @@ void createNone(lv_obj_t *parent) {
 }
 
 void createPreview(lv_obj_t *parent) {
-    previewGroup = group(parent, 0, 0, 472, Frame::CONTENT_HEIGHT);
+    previewGroup = group(parent, 0, 0, LEFT_GROUP_W, Frame::CONTENT_HEIGHT);
     canvasOk = canvas.create(previewGroup, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, true);
     fitButton = button(previewGroup, PREVIEW_X + PREVIEW_W - 76, PREVIEW_Y + 4, 72, 40, "Fit", FONT_MID, onFit);
     lv_obj_set_style_bg_opa(fitButton, LV_OPA_80, 0);
@@ -169,7 +170,7 @@ void createPreview(lv_obj_t *parent) {
 }
 
 void createLeft(lv_obj_t *parent) {
-    textGroup = group(parent, 0, 0, 472, Frame::CONTENT_HEIGHT);
+    textGroup = group(parent, 0, 0, LEFT_GROUP_W, Frame::CONTENT_HEIGHT);
     leftName = label(textGroup, LEFT_X, 12, FONT_BIG, UITheme::TEXT_LIGHT, "");
     leftDetail = label(textGroup, LEFT_X, 42, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
     leftHeading = label(textGroup, LEFT_X, 92, FONT_MID, UITheme::STATE_HOLD, "Waiting for you");
@@ -178,7 +179,7 @@ void createLeft(lv_obj_t *parent) {
     lv_label_set_long_mode(leftName, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(leftDetail, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(leftMessage, LV_LABEL_LONG_WRAP);
-    divider(parent, 472, 8, 1, Frame::CONTENT_HEIGHT - 16);
+    divider(parent, LEFT_GROUP_W, 8, 1, Frame::CONTENT_HEIGHT - 16);
 }
 
 void createStart(lv_obj_t *parent) {
@@ -204,38 +205,39 @@ void createRun(lv_obj_t *parent) {
     lv_label_set_long_mode(opLabel, LV_LABEL_LONG_DOT);
     progressBar = lv_bar_create(runGroup);
     lv_obj_set_pos(progressBar, 0, 40);
-    lv_obj_set_size(progressBar, PANEL_W - 76, 28);
+    lv_obj_set_size(progressBar, PANEL_W - 60, 24);
     lv_bar_set_range(progressBar, 0, 1000);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_BUTTON, 0);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_PROGRESS, LV_PART_INDICATOR);
-    percentLabel = rightLabel(runGroup, PANEL_W, 42, 140, FONT_BIG, UITheme::TEXT_LIGHT);
+    percentLabel = rightLabel(runGroup, PANEL_W, 42, 120, FONT_MID, UITheme::TEXT_LIGHT);
 
     // The times: captions where they are, values right-aligned
-    label(runGroup, 0, 84, FONT_BIG, UITheme::TEXT_MEDIUM, "Elapsed");
-    elapsedValue = rightLabel(runGroup, PANEL_W, 84, 160, FONT_BIG, UITheme::TEXT_LIGHT);
-    leftCaption = label(runGroup, 0, 116, FONT_BIG, UITheme::TEXT_MEDIUM, "Left");
-    leftValue = rightLabel(runGroup, PANEL_W, 116, 160, FONT_BIG, UITheme::TEXT_LIGHT);
-    feedRateLabel = label(runGroup, 0, 150, FONT_MID, UITheme::TEXT_MEDIUM, "");
-    lv_obj_set_width(feedRateLabel, PANEL_W);
-    lv_label_set_long_mode(feedRateLabel, LV_LABEL_LONG_DOT);
-    divider(runGroup, 0, 182, PANEL_W, 1);
+    label(runGroup, 0, 78, FONT_MID, UITheme::TEXT_MEDIUM, "Elapsed");
+    elapsedValue = rightLabel(runGroup, PANEL_W, 78, 110, FONT_MID, UITheme::TEXT_LIGHT);
+    leftCaption = label(runGroup, 0, 104, FONT_MID, UITheme::TEXT_MEDIUM, "Left");
+    leftValue = rightLabel(runGroup, PANEL_W, 104, 110, FONT_MID, UITheme::TEXT_LIGHT);
+    // The feed, or two lines when the connection is lost
+    feedRateLabel = label(runGroup, 0, 132, FONT_MID, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_size(feedRateLabel, PANEL_W, 44);
+    lv_label_set_long_mode(feedRateLabel, LV_LABEL_LONG_WRAP);
+    divider(runGroup, 0, 180, PANEL_W, 1);
 
-    // The feed override; CONTINUE takes its place at a prompt
-    overrideGroup = group(runGroup, 0, 192, PANEL_W, 92);
+    // The feed override, 100 in the middle; CONTINUE takes its place at a prompt
+    overrideGroup = group(runGroup, 0, 190, PANEL_W, 84);
     label(overrideGroup, 0, 0, FONT_MID, UITheme::TEXT_MEDIUM, "Feed override");
-    feedValue = rightLabel(overrideGroup, PANEL_W, 0, 80, FONT_MID, UITheme::TEXT_LIGHT);
-    const char *const feedTexts[3] = {"-10", "+10", "100"};
-    const MachineService::FeedOverride feedSteps[3] = {MachineService::FEED_MINUS_10, MachineService::FEED_PLUS_10,
-                                                       MachineService::FEED_RESET};
+    feedValue = rightLabel(overrideGroup, PANEL_W, 0, 60, FONT_MID, UITheme::TEXT_LIGHT);
+    const char *const feedTexts[3] = {"-10", "100", "+10"};
+    const MachineService::FeedOverride feedSteps[3] = {MachineService::FEED_MINUS_10, MachineService::FEED_RESET,
+                                                       MachineService::FEED_PLUS_10};
     for (int i = 0; i < 3; i++) {
-        feedButtons[i] = button(overrideGroup, i * 104, 28, 96, 64, feedTexts[i], FONT_BIG, onFeed,
+        feedButtons[i] = button(overrideGroup, i * 69, 30, 62, 52, feedTexts[i], FONT_BIG, onFeed,
                                 (void *)(intptr_t)feedSteps[i]);
     }
-    continueButton = button(runGroup, 0, 192, PANEL_W, 92, LV_SYMBOL_PLAY "  CONTINUE", FONT_HUGE, onContinue);
+    continueButton = button(runGroup, 0, 190, PANEL_W, 84, LV_SYMBOL_PLAY "  CONTINUE", FONT_LARGE, onContinue);
     setButtonColor(continueButton, UITheme::BTN_PLAY);
 
-    divider(runGroup, 0, 292, PANEL_W, 1);
-    pauseButton = button(runGroup, 0, 300, PANEL_W, 56, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
+    divider(runGroup, 0, 288, PANEL_W, 1);
+    pauseButton = button(runGroup, 0, 296, PANEL_W, 56, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
     setButtonColor(pauseButton, UITheme::STATE_HOLD);
 }
 
@@ -245,8 +247,8 @@ void createEnd(lv_obj_t *parent) {
     endDetail = label(endGroup, 0, 92, FONT_MID, UITheme::TEXT_LIGHT, "");
     lv_obj_set_width(endDetail, PANEL_W);
     lv_label_set_long_mode(endDetail, LV_LABEL_LONG_WRAP);
-    button(endGroup, 0, 280, 148, 72, "Run again", FONT_BIG, onAgain);
-    button(endGroup, 156, 280, 148, 72, "Back to Setup", FONT_MID, onBackToSetup);
+    button(endGroup, 0, 224, PANEL_W, 60, "Run again", FONT_BIG, onAgain);
+    button(endGroup, 0, 292, PANEL_W, 60, "Back to Setup", FONT_BIG, onBackToSetup);
 }
 
 // --- Updating -----------------------------------------------------------------------------
@@ -272,7 +274,7 @@ void updateRunGroup(JobService::RunState state, bool online) {
     if (online) {
         snprintf(text, sizeof(text), "feed %d mm/min", (int)s.feed_rate);
     } else {
-        snprintf(text, sizeof(text), "No connection; the job continues.");
+        snprintf(text, sizeof(text), "No connection; the job continues");
     }
     setText(feedRateLabel, text);
 

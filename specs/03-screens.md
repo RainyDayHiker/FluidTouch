@@ -162,23 +162,25 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 ## 4. Run
 
 ```
-+------------------------------------------------+-------------------------------+
-|                                                | op 24 of 90                   |
-|                                                | [=========>           ]  27%  |
-|            preview with progress               | Elapsed               0:35:12 |
-|              456 x 344 (D90)                   | Left                    ~1:35 |
-|                                                | feed 1200 mm/min              |
-|                                                |-------------------------------|
-|                                                | Feed override            100% |
-|                                                | [ -10 ]   [ +10 ]   [ 100 ]   |
-|                                                |-------------------------------|
-|                                                | [          PAUSE          ]   |
-+------------------------------------------------+-------------------------------+
++--------------------------------------------------------+---------------------+
+|                                                        | op 24 of 90         |
+|                                                        | [=========>  ]  27% |
+|                 preview with progress                  | Elapsed     0:35:12 |
+|                   568 x 344 (D91)                      | Left          ~1:35 |
+|                                                        | feed 1200 mm/min    |
+|                                                        |---------------------|
+|                                                        | Feed override  100% |
+|                                                        | [-10] [100] [+10]   |
+|                                                        |---------------------|
+|                                                        | [      PAUSE      ] |
++--------------------------------------------------------+---------------------+
 status bar: ... the message that follows the tool ...                  [ ABORT ]
 ```
 
-The panel (D90): no file line, no message (the status bar has it), no rapid override. The
-captions stay put and the times are right-aligned. During a job the status bar's STOP reads
+The panel (D90, D91): 200 px wide; no file line, no message (the status bar has it), no
+rapid override. The captions stay put and the times are right-aligned. The feed override
+buttons are 62 x 52 with 100 in the middle. Finished/Stopped puts Run again and Back to
+Setup one above the other. During a job the status bar's STOP reads
 ABORT and ends the job; the panel's PAUSE is the only hold.
 
 States of the right-hand panel:
@@ -198,7 +200,7 @@ States of the right-hand panel:
 | PAUSE / RESUME | `!` / `~` | |
 | CONTINUE | `~` | Only in Prompt |
 | ABORT | soft reset (0x18), then the alarm banner offers Unlock | The status bar's STOP, relabelled ABORT while a job is active (D90). Single press. Not a hold: the panel's PAUSE is |
-| Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
+| Feed override | realtime override commands | value, then [-10] [100] [+10] (D91); 10% steps only (D52); range 10 to 200% |
 | Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
 
 Notes:
@@ -214,7 +216,8 @@ Notes:
   it is). Running time leaves out the waits (a prompt, a pause), so time left stops while
   the job waits for you. A new estimate is taken every 5 s of running time and the one shown
   is the average of the last five, each counted down since it was taken, so it shifts slowly
-  (D90).
+  (D90). With a segment list, step 2 of 5c replaces this with [11 §7](11-preview.md#7-time-left)
+  (D91); the formula above stays for jobs without one.
 
 ## 5. Macros
 
