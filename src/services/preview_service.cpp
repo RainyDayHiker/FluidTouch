@@ -287,11 +287,6 @@ void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
     }
 }
 
-// TEMPORARY: when 1, also times analyse() without a sink and with an empty one before each real run
-#ifndef PROFILE_ANALYSE
-#define PROFILE_ANALYSE 1
-#endif
-
 // The packer, timed (the log splits analyse()'s time into reading, packing and the rest)
 class TimedPacker : public gcode::AnalysisSink {
 public:
@@ -421,22 +416,6 @@ void task(void *param) {
                     return !cancelFlag;
                 };
                 options.progressContext = &reader;
-#if PROFILE_ANALYSE
-                // TEMPORARY (5b timing on the device): the analysis without a sink and with an
-                // empty one, before the real run, in the same arena
-                for (int mode = 0; mode < 2 && !cancelFlag; mode++) {
-                    struct Empty : gcode::AnalysisSink {
-                    } empty;
-                    gcode::Analysis pa;
-                    reader.rewind();
-                    uint32_t r0 = reader.readMicros(), p0 = millis();
-                    gcode::analyse(reader, options, gcode::Arena{arena, ARENA_SIZE}, mode ? &empty : nullptr, pa);
-                    Serial.printf("PreviewService: profile, %s: %lu ms, SD reads %lu ms\n",
-                                  mode ? "empty sink" : "no sink", (unsigned long)(millis() - p0),
-                                  (unsigned long)((reader.readMicros() - r0) / 1000));
-                }
-                reader.rewind();
-#endif
                 const uint32_t readBefore = reader.readMicros();
                 gcode::Analysis a;
                 uint32_t t0 = millis();

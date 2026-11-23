@@ -150,6 +150,8 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    10 px and counts a third tap as triple), so the canvas detects them itself; the profile
    showed tokenising costs 0.25 s (no sink 8.06 s, empty sink 8.32 s) but the packer 3.2 s
    (1.36 s in its calls), so its hot functions now run from IRAM to test the cache theory.
+   IRAM halved the packing; then the CPU caches at their largest (D87) brought the analysis
+   to 7.3 s (6.4 s without the packer, as in 5a) and `PROFILE_ANALYSE` was removed.
    A second download write failure: errno 5 (I/O) at 175 KB, card 29 MB used of 7.4 GB.
    Still to check: the axis rates line on the real machine.
 4. The temporary machine picker (D57) is to be removed at the end of development.
