@@ -34,9 +34,11 @@ M5 is built and checked in three parts, each its own branch:
   preview when the job ends." and the download starts when it ends.
 - **During a cut, no copy:** Run's preview area offers the download with the confirm of
   [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
-- A fetch that fails (controller offline, the card full, a short download) deletes the
-  partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
-  on the controller's SD." for a 404). Cancel leaves "Preview cancelled." with Retry.
+- A fetch that fails (controller offline, a write to the display SD failing, a short
+  download) deletes the partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
+  on the controller's SD." for a 404). A write to the display SD that fails ("Writing to the
+  display SD failed.") is first retried once from the start, without a word (D86). Cancel
+  leaves "Preview cancelled." with Retry.
 - **Choosing another file** while one is downloaded or analysed cancels it and starts the new
   one. The library tests (Settings > Tools) take the preview's arena back while they run: the
   preview shows Retry afterwards.

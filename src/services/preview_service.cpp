@@ -153,9 +153,13 @@ Outcome fail(const char *text) {
     return Outcome::Failed;
 }
 
+// The last fetch failed writing to the display SD (an I/O error: worth one more try, D86)
+bool writeFailed = false;
+
 // HTTP GET http://<controller>/sd/<path> into localPath (05 §2, S1)
 Outcome fetch(const Request &req, const char *localPath, uint64_t &got) {
     got = 0;
+    writeFailed = false;
     String host = FluidNCClient::getMachineIP();
     if (!FluidNCClient::isConnected() || host.length() == 0) return fail("The controller is offline.");
     if (!clearWorkFolder()) return fail("The display SD's working folder could not be made.");
@@ -219,7 +223,8 @@ Outcome fetch(const Request &req, const char *localPath, uint64_t &got) {
                               "card %llu MB, used %llu MB\n",
                               (unsigned long long)got, (unsigned)wrote, n, err,
                               (unsigned long long)(SD.totalBytes() >> 20), (unsigned long long)(SD.usedBytes() >> 20));
-                outcome = fail("The display SD is full, or writing to it failed.");
+                writeFailed = true;
+                outcome = fail("Writing to the display SD failed.");
                 break;
             }
             got += (uint64_t)n;
@@ -382,6 +387,12 @@ void task(void *param) {
         uint32_t t0 = millis();
         uint64_t got = 0;
         outcome = fetch(req, localPath, got);
+        if (outcome == Outcome::Failed && writeFailed && !cancelFlag) {
+            // One write error on the display SD is retried from the start (D86)
+            Serial.printf("PreviewService: fetch %s: write failed at %llu bytes, trying again\n", req.path,
+                          (unsigned long long)got);
+            outcome = fetch(req, localPath, got);
+        }
         sum.fetchMs = millis() - t0;
         Serial.printf("PreviewService: fetch %s: %s, %llu bytes in %lu ms\n", req.path,
                       outcome == Outcome::Ok ? "ok" : outcome == Outcome::Cancelled ? "cancelled" : failText,
