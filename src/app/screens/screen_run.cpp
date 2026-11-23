@@ -1,17 +1,22 @@
 #include "app/screens/screens.h"
 #include "app/fonts.h"
 #include "app/frame.h"
+#include "app/preview_canvas.h"
 #include "app/widgets.h"
 #include "services/job_service.h"
 #include "services/machine_service.h"
+#include "services/preview_service.h"
+#include "services/run_follow.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
 #include <string.h>
 
 // The Run screen (specs/03-screens.md section 4). Content area 800 x 360:
 //
-//   x   8..464  preview (M5); until then the file and the current message
-//   x 488..792  the panel: START; or progress, overrides, PAUSE and ABORT
+//   x   8..464  the preview (specs/11-preview.md §6, D89): 456 x 316 with the file line
+//               under it, a box over its top half at a prompt; without a preview of this
+//               job, the file and the current message in large type
+//   x 488..792  the panel: START; or the message, progress, overrides, PAUSE and ABORT
 //               (CONTINUE at a prompt); or the result
 //
 // With no job chosen or running, one line and a button to the Job tab.
@@ -30,11 +35,25 @@ const lv_color_t COLOR_ABORT = LV_COLOR_MAKE(0xB0, 0x20, 0x20);
 
 const int LEFT_X = 16, LEFT_W = 440;
 const int PANEL_X = 488, PANEL_W = 304;
+const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 456, PREVIEW_H = 316;
 
 lv_obj_t *noneGroup;
 lv_obj_t *jobGroup;      // everything but noneGroup
 
-// Left: the file and the message
+// Left, with a preview of the running job: the canvas, Fit, the file line, the prompt box
+PreviewCanvas canvas;
+bool canvasOk = false;
+lv_obj_t *previewGroup;
+lv_obj_t *fitButton;
+lv_obj_t *fileLine;
+lv_obj_t *promptBox;
+lv_obj_t *promptText;
+uint32_t drawnReady = 0;   // PreviewService::readyGeneration() drawn
+uint32_t drawnRun = 0;     // RunFollow::runGeneration() drawn
+bool drawnOnce = false;
+
+// Left, without one: the file and the message
+lv_obj_t *textGroup;
 lv_obj_t *leftName;
 lv_obj_t *leftDetail;
 lv_obj_t *leftHeading;   // "Waiting for you" at a prompt
@@ -46,6 +65,8 @@ lv_obj_t *runGroup;
 lv_obj_t *endGroup;
 
 // Run group
+lv_obj_t *messageLabel;  // the current message, with a preview (on the left without one)
+lv_obj_t *opLabel;       // op N of M
 lv_obj_t *progressBar;
 lv_obj_t *percentLabel;
 lv_obj_t *timesLabel;
@@ -95,6 +116,10 @@ void divider(lv_obj_t *parent, int x, int y, int w, int h) {
 // --- Events ----------------------------------------------------------------------
 
 void onGoToJob(lv_event_t *) { Frame::show(Frame::SCREEN_JOB); }
+void onFit(lv_event_t *) {
+    canvas.fit();
+    canvas.draw();
+}
 void onStart(lv_event_t *) {
     if (!MachineService::canZero()) {
         Frame::notice(MachineService::busyReason());
@@ -131,11 +156,34 @@ void createNone(lv_obj_t *parent) {
     button(noneGroup, 300, 176, 200, 56, "Go to Job", FONT_BIG, onGoToJob);
 }
 
+void createPreview(lv_obj_t *parent) {
+    previewGroup = group(parent, 0, 0, 472, Frame::CONTENT_HEIGHT);
+    canvasOk = canvas.create(previewGroup, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, true);
+    fitButton = button(previewGroup, PREVIEW_X + PREVIEW_W - 76, PREVIEW_Y + 4, 72, 40, "Fit", FONT_MID, onFit);
+    lv_obj_set_style_bg_opa(fitButton, LV_OPA_80, 0);
+    fileLine = label(previewGroup, PREVIEW_X, PREVIEW_Y + PREVIEW_H + 8, FONT_MID, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_width(fileLine, PREVIEW_W);
+    lv_label_set_long_mode(fileLine, LV_LABEL_LONG_DOT);
+
+    // At a prompt: the message over the preview's top half, the tool still in view below
+    promptBox = group(previewGroup, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H / 2);
+    lv_obj_set_style_bg_color(promptBox, UITheme::BG_DARKER, 0);
+    lv_obj_set_style_bg_opa(promptBox, LV_OPA_90, 0);
+    lv_obj_set_style_border_color(promptBox, UITheme::STATE_HOLD, 0);
+    lv_obj_set_style_border_width(promptBox, 2, 0);
+    label(promptBox, 12, 8, FONT_MID, UITheme::STATE_HOLD, "Waiting for you");
+    promptText = label(promptBox, 12, 36, FONT_LARGE, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_size(promptText, PREVIEW_W - 24, PREVIEW_H / 2 - 44);
+    lv_label_set_long_mode(promptText, LV_LABEL_LONG_DOT);
+    lv_obj_add_flag(promptBox, LV_OBJ_FLAG_HIDDEN);
+}
+
 void createLeft(lv_obj_t *parent) {
-    leftName = label(parent, LEFT_X, 12, FONT_BIG, UITheme::TEXT_LIGHT, "");
-    leftDetail = label(parent, LEFT_X, 42, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
-    leftHeading = label(parent, LEFT_X, 92, FONT_MID, UITheme::STATE_HOLD, "Waiting for you");
-    leftMessage = label(parent, LEFT_X, 124, FONT_LARGE, UITheme::TEXT_LIGHT, "");
+    textGroup = group(parent, 0, 0, 472, Frame::CONTENT_HEIGHT);
+    leftName = label(textGroup, LEFT_X, 12, FONT_BIG, UITheme::TEXT_LIGHT, "");
+    leftDetail = label(textGroup, LEFT_X, 42, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    leftHeading = label(textGroup, LEFT_X, 92, FONT_MID, UITheme::STATE_HOLD, "Waiting for you");
+    leftMessage = label(textGroup, LEFT_X, 124, FONT_LARGE, UITheme::TEXT_LIGHT, "");
     for (lv_obj_t *l : {leftName, leftDetail, leftMessage}) lv_obj_set_width(l, LEFT_W);
     lv_label_set_long_mode(leftName, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(leftDetail, LV_LABEL_LONG_DOT);
@@ -152,19 +200,23 @@ void createStart(lv_obj_t *parent) {
 void createRun(lv_obj_t *parent) {
     runGroup = group(parent, PANEL_X, 0, PANEL_W, Frame::CONTENT_HEIGHT);
 
+    messageLabel = label(runGroup, 0, 4, FONT_MID, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_size(messageLabel, PANEL_W, 46);
+    lv_label_set_long_mode(messageLabel, LV_LABEL_LONG_DOT);
+    opLabel = label(runGroup, 0, 52, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
     progressBar = lv_bar_create(runGroup);
-    lv_obj_set_pos(progressBar, 0, 12);
-    lv_obj_set_size(progressBar, PANEL_W, 24);
+    lv_obj_set_pos(progressBar, 0, 76);
+    lv_obj_set_size(progressBar, PANEL_W, 20);
     lv_bar_set_range(progressBar, 0, 1000);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_BUTTON, 0);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_PROGRESS, LV_PART_INDICATOR);
-    percentLabel = label(runGroup, 0, 44, FONT_BIG, UITheme::TEXT_LIGHT, "");
-    timesLabel = label(runGroup, 0, 72, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
-    feedRateLabel = label(runGroup, 0, 94, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
-    divider(runGroup, 0, 124, PANEL_W, 1);
+    percentLabel = label(runGroup, 0, 102, FONT_BIG, UITheme::TEXT_LIGHT, "");
+    timesLabel = label(runGroup, 72, 106, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    feedRateLabel = label(runGroup, 0, 130, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    divider(runGroup, 0, 154, PANEL_W, 1);
 
     // Overrides; CONTINUE takes their place at a prompt
-    overrideGroup = group(runGroup, 0, 136, PANEL_W, 116);
+    overrideGroup = group(runGroup, 0, 164, PANEL_W, 116);
     label(overrideGroup, 0, 16, FONT_MID, UITheme::TEXT_MEDIUM, "Feed");
     feedButtons[0] = button(overrideGroup, 64, 0, 56, 52, "-10", FONT_MID, onFeed,
                             (void *)(intptr_t)MachineService::FEED_MINUS_10);
@@ -182,14 +234,14 @@ void createRun(lv_obj_t *parent) {
         rapidButtons[i] = button(overrideGroup, 64 + i * 80, 60, 72, 52, text, FONT_MID, onRapid,
                                  (void *)(intptr_t)RAPID_STEPS[i]);
     }
-    continueButton = button(runGroup, 0, 136, PANEL_W, 116, LV_SYMBOL_PLAY "  CONTINUE", FONT_HUGE, onContinue);
+    continueButton = button(runGroup, 0, 164, PANEL_W, 116, LV_SYMBOL_PLAY "  CONTINUE", FONT_HUGE, onContinue);
     setButtonColor(continueButton, UITheme::BTN_PLAY);
 
-    divider(runGroup, 0, 264, PANEL_W, 1);
+    divider(runGroup, 0, 286, PANEL_W, 1);
     // PAUSE and ABORT at opposite ends (S2)
-    pauseButton = button(runGroup, 0, 280, 168, 72, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
+    pauseButton = button(runGroup, 0, 296, 168, 60, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
     setButtonColor(pauseButton, UITheme::STATE_HOLD);
-    abortButton = button(runGroup, 192, 280, 112, 72, "ABORT", FONT_BIG, onAbort);
+    abortButton = button(runGroup, 192, 296, 112, 60, "ABORT", FONT_BIG, onAbort);
     setButtonColor(abortButton, COLOR_ABORT);
 }
 
@@ -218,7 +270,7 @@ void updateRunGroup(JobService::RunState state, bool online) {
     uint32_t leftMs = JobService::leftMs();
     if (leftMs) {
         formatDuration(left, sizeof(left), leftMs);
-        snprintf(text, sizeof(text), "%s elapsed     ~%s left", elapsed, left);
+        snprintf(text, sizeof(text), "%s elapsed   ~%s left", elapsed, left);
     } else {
         snprintf(text, sizeof(text), "%s elapsed", elapsed);
     }
@@ -268,11 +320,44 @@ void updateEndGroup(JobService::RunState state) {
     setText(endDetail, text);
 }
 
+// The preview of the running job, when there is one: true when it is shown
+bool updatePreview(JobService::RunState state, bool online) {
+    bool shown = canvasOk && RunFollow::following();
+    show(previewGroup, shown);
+    show(textGroup, !shown);
+    if (!shown) {
+        drawnOnce = false;
+        return false;
+    }
+    if (!drawnOnce || PreviewService::readyGeneration() != drawnReady || RunFollow::runGeneration() != drawnRun) {
+        drawnOnce = true;
+        drawnReady = PreviewService::readyGeneration();
+        drawnRun = RunFollow::runGeneration();
+        canvas.restart(RunFollow::doneRecord());
+    } else {
+        canvas.setDone(RunFollow::doneRecord());
+    }
+    const FluidNCStatus &s = MachineService::status();
+    canvas.setMarker(online && JobService::active(), s.wpos_x, s.wpos_y);
+
+    char size[16], text[FileService::NAME_LEN + 24];
+    formatSize(size, sizeof(size), JobService::runSize());
+    snprintf(text, sizeof(text), "%s     %s", JobService::runName(), size);
+    setText(fileLine, text);
+
+    bool prompt = state == JobService::RUN_PROMPT;
+    show(promptBox, prompt);
+    show(fitButton, !prompt);
+    if (prompt) setText(promptText, JobService::promptText());
+    return true;
+}
+
 }  // namespace
 
 void RunScreen::create(lv_obj_t *parent) {
     createNone(parent);
     jobGroup = group(parent, 0, 0, 800, Frame::CONTENT_HEIGHT);
+    createPreview(jobGroup);
     createLeft(jobGroup);
     createStart(jobGroup);
     createRun(jobGroup);
@@ -319,6 +404,11 @@ void RunScreen::update() {
         setText(leftMessage, "");
     }
     setTextColor(leftMessage, prompt ? UITheme::STATE_HOLD : UITheme::TEXT_LIGHT);
+
+    // With a preview the message is the panel's; without one it is on the left, in large type
+    bool preview = updatePreview(state, online);
+    show(messageLabel, preview);
+    if (preview) setText(messageLabel, JobService::active() && online ? MachineService::status().last_message : "");
 
     if (JobService::active()) updateRunGroup(state, online);
     if (ended) updateEndGroup(state);

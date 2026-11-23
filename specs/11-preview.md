@@ -74,8 +74,8 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
   last N word) and the estimate up to there (§5, filled by the estimate), so Run can start
   decoding at any checkpoint (§6) instead of from the start.
 - **Units:** inch files are converted to mm when packed.
-- **Capacity (D83):** one block, sized when a job is first chosen so that Run's second canvas
-  still fits beside it: the largest free PSRAM block less 400 KB, at most 640 KB (about 80,000
+- **Capacity (D83, D89):** one block, sized when a job is first chosen: the largest free
+  PSRAM block less 128 KB of headroom (Run's canvas is allocated at boot), at most 640 KB (about 80,000
   records; almost 6 times the reference job's 13,662). On Job and Run alike. A job with more records
   keeps those that fit, and the preview says "Preview shows the first 63% of the job" (by
   file offset). D30's file fallback is not built in M5.
@@ -170,14 +170,28 @@ The tool's record is found as follows, at every report:
    record at the `SD:` read position (checkpoints by byte offset). The match is the first
    record in the window whose move passes within 1 mm of the position in XY and 0.5 mm (or one Z level) in Z.
    No match keeps the last one. A path that retraces itself picks the earliest, which stays
-   right because the window only moves forward.
+   right because the window only moves forward. Where moves lie closer together than the
+   tolerances (a small helix, a raster under 1 mm apart) the match trails the tool by those
+   moves: the reference job's holes (a 0.64 mm helix, 0.2 mm down per quarter turn) by a
+   quarter turn or two, a fine raster by a pass. It never gets ahead.
 3. A position outside every move (a jog in a hold, a probe) keeps the last match.
 
 Then:
 
-- **Progress layer:** the records from the last drawn one up to the match are drawn bright onto
-  Run's second canvas, incrementally (D29). The marker (a cross) is at the reported position,
-  and follows the tool when zoomed in.
+- **Run's preview (D89):** one canvas, 456 x 316, left of the panel, with the file line under
+  it. The job is drawn as on Job (§4), and the moves before the match in one bright green over
+  it (rapids a lighter grey), incrementally (D29): each report draws the moves from the last
+  drawn one up to the match. A view change (Fit, zoom, drag, following) redraws the whole
+  canvas, the job then what is done. Fit, double tap and drag as on
+  Job (§4). The marker, a cross at the reported work position, is its own small object over
+  the canvas, so moving it draws nothing; hidden when outside the view. **Following:** when
+  zoomed in and the marker comes within 15% of an edge (or leaves the view), the view centres
+  on it. A drag stops following, so the view stays where the finger put it; Fit or a double
+  tap starts it again. Fit is hidden at a prompt (the prompt box covers its corner). On the
+  start panel the job is shown with nothing done. Without a preview of this job (no card, the analysis failed, a job started elsewhere,
+  a different file) the left side shows the file and the message in large type, as before M5.
+- **The tool's job:** Run follows the preview when its file is the running one: the same name
+  and size (§2).
 - **Op N of M:** the unit whose line range holds the matched line, from `structure`. Left out
   when the file has no structure.
 - **The message follows the tool (D65):** a `[MSG:...]` is stored with the `SD:` read position
@@ -220,7 +234,10 @@ at a doubled step runs on the worker task too.
   line, ends within one step (a repack rounds twice), an arc's middle point within 3 steps
   (for steps under 1 mm: the fuzz cases with kilometre steps only check ends), a reader from
   each checkpoint reading the same moves as one from the start, a job over 327 mm doubling the
-  step, a list too small truncating. 121 files, 0 failures (2026-11-22).
+  step, a list too small truncating. 121 files, 0 failures (2026-11-22). Run's tracker
+  (5c): the tool put at the middle of each move in turn, the match never goes back nor past
+  the tool's move; how often it is that very move is printed (100% in 82 files; the reference
+  job 46%, its helices; `perf-5mb` 14%, a fine raster). 121 files, 0 failures (2026-11-22).
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

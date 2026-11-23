@@ -20,11 +20,11 @@ namespace {
 
 // The library's arena, held while a job is selected (D77)
 constexpr size_t ARENA_SIZE = 512 * 1024;
-// The segment list: what is left once Run's second canvas would still fit (02 §6), at most
-// LIST_MAX (75,000 records, 5 times the reference job, D30)
+// The segment list: the largest free block less some headroom (Run's canvas is allocated at
+// boot, D89), at most LIST_MAX (about 80,000 records, almost 6 times the reference job, D30)
 constexpr size_t LIST_MAX = 640 * 1024;
 constexpr size_t LIST_MIN = 64 * 1024;
-constexpr size_t RUN_RESERVE = 400 * 1024;
+constexpr size_t RUN_RESERVE = 128 * 1024;
 // Download buffer and timeouts
 constexpr size_t FETCH_CHUNK = 16384;
 constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;
@@ -486,6 +486,8 @@ PreviewService::State PreviewService::state() { return current; }
 const PreviewService::Summary &PreviewService::summary() { return result; }
 const SegmentList *PreviewService::segments() { return current == READY && !taskRunning ? &list : nullptr; }
 uint32_t PreviewService::readyGeneration() { return readyGen; }
+const char *PreviewService::jobName() { return request.name; }
+int32_t PreviewService::jobSize() { return request.size; }
 
 void PreviewService::load(FileService::Card card, const char *path, const char *name, int32_t size) {
     request.card = card;
@@ -592,7 +594,7 @@ void PreviewService::start() {
     }
     if (!arena) arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (arena && !listMemory) {
-        // Sized so Run's second canvas still fits beside it (02 §6)
+        // The largest free block less some headroom (02 §6, D89)
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         size_t bytes = largest > RUN_RESERVE + LIST_MIN ? largest - RUN_RESERVE : 0;
         if (bytes > LIST_MAX) bytes = LIST_MAX;

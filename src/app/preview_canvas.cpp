@@ -22,14 +22,53 @@ const int MARGIN = 10;  // pixels around the job at Fit
 const int DRAG_START = 16;      // pixels a finger moves before a press is a drag
 const uint32_t DOUBLE_TAP_MS = 400;  // the second tap's release after the first's, at most
 const int DOUBLE_TAP_PX = 40;   // the second tap's distance from the first, at most
+// Run mode (D89): what is done in one bright colour over Job's picture
+const uint32_t CUT = 0x5BE37D;
+const uint32_t CUT_RAPID = 0x9A9A9A;
+const uint32_t MARKER = 0xFF4A3D;
+const int MARKER_SIZE = 21;     // pixels, odd so the cross has a middle
+const float FOLLOW_EDGE = 0.15f;  // zoomed in, the view centres when the tool comes this close to an edge
 
 uint16_t rgb(uint32_t hex) { return lv_color_to_u16(lv_color_hex(hex)); }
+
+}  // namespace
+
+namespace PreviewDraw {
 
 struct Target {
     uint16_t *pixels;
     int stride;  // pixels
     int w, h;
 };
+
+// The moves' colours: depth levels and rapids
+struct Palette {
+    uint16_t levels[8];
+    uint16_t rapid;
+};
+
+}  // namespace PreviewDraw
+
+using PreviewDraw::Palette;
+using PreviewDraw::Target;
+
+namespace {
+
+// Job's colours: depth levels, rapids grey
+Palette jobColours() {
+    Palette p;
+    for (int i = 0; i < 8; i++) p.levels[i] = rgb(LEVELS[i]);
+    p.rapid = rgb(RAPID);
+    return p;
+}
+
+// Run mode: what is done
+Palette cutColours() {
+    Palette p;
+    for (int i = 0; i < 8; i++) p.levels[i] = rgb(CUT);
+    p.rapid = rgb(CUT_RAPID);
+    return p;
+}
 
 inline void plot(const Target &t, int x, int y, uint16_t c) {
     if (x >= 0 && x < t.w && y >= 0 && y < t.h) t.pixels[y * t.stride + x] = c;
@@ -84,9 +123,10 @@ void line(const Target &t, float x0, float y0, float x1, float y1, uint16_t c, b
 
 }  // namespace
 
-bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h) {
+bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h, bool runMode) {
     width = w;
     height = h;
+    run = runMode;
     size_t bytes = LV_CANVAS_BUF_SIZE(w, h, 16, LV_DRAW_BUF_STRIDE_ALIGN);
     buffer = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!buffer) {
@@ -107,6 +147,7 @@ bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h) {
     lv_canvas_set_buffer(canvas, buffer, w, h, LV_COLOR_FORMAT_RGB565);
     lv_obj_set_pos(canvas, 0, 0);
     lv_obj_add_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLLABLE);
     // A drag moves the view, not whatever scrolls behind it
     lv_obj_clear_flag(canvas, LV_OBJ_FLAG_SCROLL_CHAIN);
     lv_obj_clear_flag(canvas, LV_OBJ_FLAG_GESTURE_BUBBLE);
@@ -115,6 +156,28 @@ bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h) {
     lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_RELEASED, this);
     lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESS_LOST, this);
     lv_canvas_fill_bg(canvas, lv_color_hex(BACKGROUND), LV_OPA_COVER);
+
+    if (run) {
+        // The tool: a cross, its own object so moving it draws nothing on the canvas. A child
+        // of the canvas, so a drag moves it with the picture
+        marker = lv_obj_create(canvas);
+        lv_obj_remove_style_all(marker);
+        lv_obj_set_size(marker, MARKER_SIZE, MARKER_SIZE);
+        lv_obj_clear_flag(marker, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_clear_flag(marker, LV_OBJ_FLAG_SCROLLABLE);
+        for (int i = 0; i < 2; i++) {
+            lv_obj_t *bar = lv_obj_create(marker);
+            lv_obj_remove_style_all(bar);
+            lv_obj_set_size(bar, i ? 5 : MARKER_SIZE, i ? MARKER_SIZE : 5);
+            lv_obj_set_pos(bar, i ? MARKER_SIZE / 2 - 2 : 0, i ? 0 : MARKER_SIZE / 2 - 2);
+            lv_obj_set_style_bg_color(bar, lv_color_hex(MARKER), 0);
+            lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+            lv_obj_set_style_border_color(bar, lv_color_hex(0x000000), 0);
+            lv_obj_set_style_border_width(bar, 1, 0);
+            lv_obj_clear_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+        }
+        lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
+    }
     return true;
 }
 
@@ -142,6 +205,7 @@ void PreviewCanvas::onEvent(lv_event_t *e) {
             lv_obj_set_pos(self->canvas, 0, 0);
             self->pan(p.x - self->pressAt.x, p.y - self->pressAt.y);
             self->dragging = false;
+            self->follow = false;
             self->haveTap = false;
             self->draw();
             return;
@@ -158,6 +222,7 @@ void PreviewCanvas::onEvent(lv_event_t *e) {
             lv_area_t a;
             lv_obj_get_coords(self->canvas, &a);
             self->zoomAt(self->pressAt.x - a.x1, self->pressAt.y - a.y1);
+            self->follow = true;
             self->draw();
         } else {
             self->haveTap = true;
@@ -210,6 +275,7 @@ void PreviewCanvas::computeFit() {
 
 void PreviewCanvas::fit() {
     zoomLevel = 1;
+    follow = true;
     if (PreviewService::summary().hasJob) computeFit();
 }
 
@@ -224,6 +290,104 @@ void PreviewCanvas::zoomAt(int px, int py) {
     keepInView();
 }
 
+void PreviewCanvas::drawMoves(const Target &t, uint32_t from, uint32_t to, const Palette &pal) {
+    const SegmentList *list = PreviewService::segments();
+    if (!list || from >= to) return;
+    const View v = view;
+    auto px = [&](float x) { return (x - v.ox) * v.scale; };
+    auto py = [&](float y) { return (height - 1) - (y - v.oy) * v.scale; };
+    const float top = list->hasCut() ? list->cutTop() : 0;
+    const float range = list->hasCut() ? list->cutTop() - list->cutBottom() : 0;
+    auto level = [&](float z) {
+        if (range < 0.01f) return pal.levels[4];
+        int i = (int)((top - z) / range * 8);
+        return pal.levels[i < 0 ? 0 : i > 7 ? 7 : i];
+    };
+
+    // File order: a later pass is drawn over an earlier one
+    SegmentList::Reader reader(*list, from / SegmentList::CHECKPOINT_EVERY);
+    SegmentList::Move m;
+    while (reader.next(m)) {
+        if (m.record < from) continue;
+        if (m.record >= to) break;
+        if (m.kind == SegmentList::RAPID || m.fixed) {
+            line(t, px(m.x0), py(m.y0), px(m.x1), py(m.y1), pal.rapid, false);
+            continue;
+        }
+        uint16_t c = level(m.z1);
+        if (m.kind == SegmentList::FEED) {
+            if (m.x0 == m.x1 && m.y0 == m.y1) {
+                // A plunge as a dot; a retract isn't drawn
+                if (m.z1 < m.z0) {
+                    int x = (int)floorf(px(m.x1) + 0.5f), y = (int)floorf(py(m.y1) + 0.5f);
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dx = -1; dx <= 1; dx++) plot(t, x + dx, y + dy, c);
+                    }
+                }
+                continue;
+            }
+            line(t, px(m.x0), py(m.y0), px(m.x1), py(m.y1), c, true);
+            continue;
+        }
+        // An arc, as chords within a quarter pixel of it
+        float rPx = m.r * v.scale;
+        float pcx = px(m.cx), pcy = py(m.cy);
+        if (pcx + rPx < -2 || pcx - rPx > width + 2 || pcy + rPx < -2 || pcy - rPx > height + 2) continue;
+        int n = 1;
+        if (rPx > 0.5f) {
+            float step = 2.0f * acosf(1.0f - 0.25f / rPx);
+            n = (int)ceilf(fabsf(m.sweep) / step);
+            if (n < 1) n = 1;
+            if (n > 720) n = 720;
+        }
+        float da = m.sweep / n;
+        float cosd = cosf(da), sind = sinf(da);
+        float vx = m.x0 - m.cx, vy = m.y0 - m.cy;
+        float lastX = px(m.x0), lastY = py(m.y0);
+        for (int i = 0; i < n; i++) {
+            float nx = vx * cosd - vy * sind;
+            float ny = vx * sind + vy * cosd;
+            vx = nx;
+            vy = ny;
+            float x = i == n - 1 ? px(m.x1) : px(m.cx + vx);
+            float y = i == n - 1 ? py(m.y1) : py(m.cy + vy);
+            line(t, lastX, lastY, x, y, c, true);
+            lastX = x;
+            lastY = y;
+        }
+    }
+}
+
+void PreviewCanvas::drawOverlays(const Target &t) {
+    const PreviewService::Summary &s = PreviewService::summary();
+    const View v = view;
+    auto px = [&](float x) { return (x - v.ox) * v.scale; };
+    auto py = [&](float y) { return (height - 1) - (y - v.oy) * v.scale; };
+    // The stock box dashed, job zero as a cross, the probe point as a ring
+    if (s.hasStock) {
+        const uint16_t sc = rgb(STOCK);
+        float x0 = px((float)s.stockMinX), x1 = px((float)s.stockMaxX);
+        float y0 = py((float)s.stockMinY), y1 = py((float)s.stockMaxY);
+        line(t, x0, y0, x1, y0, sc, false, 5);
+        line(t, x1, y0, x1, y1, sc, false, 5);
+        line(t, x1, y1, x0, y1, sc, false, 5);
+        line(t, x0, y1, x0, y0, sc, false, 5);
+    }
+    const uint16_t zc = rgb(ZERO);
+    float zx = px(0), zy = py(0);
+    line(t, zx - 7, zy, zx + 7, zy, zc, false);
+    line(t, zx, zy - 7, zx, zy + 7, zc, false);
+    if (s.hasProbe) {
+        const uint16_t pc = rgb(PROBE);
+        float cx = px(s.probeX), cy = py(s.probeY);
+        const int N = 24;
+        for (int i = 0; i < N; i++) {
+            float a0 = i * 2 * (float)M_PI / N, a1 = (i + 1) * 2 * (float)M_PI / N;
+            line(t, cx + 6 * cosf(a0), cy + 6 * sinf(a0), cx + 6 * cosf(a1), cy + 6 * sinf(a1), pc, true);
+        }
+    }
+}
+
 void PreviewCanvas::draw() {
     if (!canvas) return;
     uint32_t start = millis();
@@ -236,98 +400,72 @@ void PreviewCanvas::draw() {
     }
 
     const SegmentList *list = PreviewService::segments();
-    const PreviewService::Summary &s = PreviewService::summary();
-    if (list && s.hasJob) {
-        const View v = view;
-        auto px = [&](float x) { return (x - v.ox) * v.scale; };
-        auto py = [&](float y) { return (height - 1) - (y - v.oy) * v.scale; };
-
-        uint16_t levels[8];
-        for (int i = 0; i < 8; i++) levels[i] = rgb(LEVELS[i]);
-        const uint16_t rapid = rgb(RAPID);
-        const float top = list->hasCut() ? list->cutTop() : 0;
-        const float range = list->hasCut() ? list->cutTop() - list->cutBottom() : 0;
-        auto level = [&](float z) {
-            if (range < 0.01f) return levels[4];
-            int i = (int)((top - z) / range * 8);
-            return levels[i < 0 ? 0 : i > 7 ? 7 : i];
-        };
-
-        // File order: a later pass is drawn over an earlier one
-        SegmentList::Reader reader(*list);
-        SegmentList::Move m;
-        while (reader.next(m)) {
-            if (m.kind == SegmentList::RAPID || m.fixed) {
-                line(t, px(m.x0), py(m.y0), px(m.x1), py(m.y1), rapid, false);
-                continue;
-            }
-            uint16_t c = level(m.z1);
-            if (m.kind == SegmentList::FEED) {
-                if (m.x0 == m.x1 && m.y0 == m.y1) {
-                    // A plunge as a dot; a retract isn't drawn
-                    if (m.z1 < m.z0) {
-                        int x = (int)floorf(px(m.x1) + 0.5f), y = (int)floorf(py(m.y1) + 0.5f);
-                        for (int dy = -1; dy <= 1; dy++) {
-                            for (int dx = -1; dx <= 1; dx++) plot(t, x + dx, y + dy, c);
-                        }
-                    }
-                    continue;
-                }
-                line(t, px(m.x0), py(m.y0), px(m.x1), py(m.y1), c, true);
-                continue;
-            }
-            // An arc, as chords within a quarter pixel of it
-            float rPx = m.r * v.scale;
-            float pcx = px(m.cx), pcy = py(m.cy);
-            if (pcx + rPx < -2 || pcx - rPx > width + 2 || pcy + rPx < -2 || pcy - rPx > height + 2) continue;
-            int n = 1;
-            if (rPx > 0.5f) {
-                float step = 2.0f * acosf(1.0f - 0.25f / rPx);
-                n = (int)ceilf(fabsf(m.sweep) / step);
-                if (n < 1) n = 1;
-                if (n > 720) n = 720;
-            }
-            float da = m.sweep / n;
-            float cosd = cosf(da), sind = sinf(da);
-            float vx = m.x0 - m.cx, vy = m.y0 - m.cy;
-            float lastX = px(m.x0), lastY = py(m.y0);
-            for (int i = 0; i < n; i++) {
-                float nx = vx * cosd - vy * sind;
-                float ny = vx * sind + vy * cosd;
-                vx = nx;
-                vy = ny;
-                float x = i == n - 1 ? px(m.x1) : px(m.cx + vx);
-                float y = i == n - 1 ? py(m.y1) : py(m.cy + vy);
-                line(t, lastX, lastY, x, y, c, true);
-                lastX = x;
-                lastY = y;
-            }
-        }
-
-        // The stock box dashed, job zero as a cross, the probe point as a ring
-        if (s.hasStock) {
-            const uint16_t sc = rgb(STOCK);
-            float x0 = px((float)s.stockMinX), x1 = px((float)s.stockMaxX);
-            float y0 = py((float)s.stockMinY), y1 = py((float)s.stockMaxY);
-            line(t, x0, y0, x1, y0, sc, false, 5);
-            line(t, x1, y0, x1, y1, sc, false, 5);
-            line(t, x1, y1, x0, y1, sc, false, 5);
-            line(t, x0, y1, x0, y0, sc, false, 5);
-        }
-        const uint16_t zc = rgb(ZERO);
-        float zx = px(0), zy = py(0);
-        line(t, zx - 7, zy, zx + 7, zy, zc, false);
-        line(t, zx, zy - 7, zx, zy + 7, zc, false);
-        if (s.hasProbe) {
-            const uint16_t pc = rgb(PROBE);
-            float cx = px(s.probeX), cy = py(s.probeY);
-            const int N = 24;
-            for (int i = 0; i < N; i++) {
-                float a0 = i * 2 * (float)M_PI / N, a1 = (i + 1) * 2 * (float)M_PI / N;
-                line(t, cx + 6 * cosf(a0), cy + 6 * sinf(a0), cx + 6 * cosf(a1), cy + 6 * sinf(a1), pc, true);
-            }
-        }
+    if (list && PreviewService::summary().hasJob) {
+        drawMoves(t, 0, list->records(), jobColours());
+        // Run mode: what is done over it
+        if (run) drawMoves(t, 0, doneRecord, cutColours());
+        drawOverlays(t);
     }
     lv_obj_invalidate(canvas);
+    placeMarker();
     drawMs = millis() - start;
+}
+
+void PreviewCanvas::setDone(uint32_t record) {
+    if (record == doneRecord) return;
+    const SegmentList *list = PreviewService::segments();
+    if (!canvas || !list || !PreviewService::summary().hasJob) {
+        doneRecord = record;
+        return;
+    }
+    if (record < doneRecord) {
+        // A new run: the whole picture again
+        doneRecord = record;
+        draw();
+        return;
+    }
+    lv_draw_buf_t *buf = lv_canvas_get_draw_buf(canvas);
+    Target t = {(uint16_t *)buf->data, (int)(buf->header.stride / 2), width, height};
+    drawMoves(t, doneRecord, record, cutColours());
+    drawOverlays(t);
+    doneRecord = record;
+    lv_obj_invalidate(canvas);
+}
+
+void PreviewCanvas::setMarker(bool visible, float x, float y) {
+    if (!marker) return;
+    markerShown = visible;
+    markerX = x;
+    markerY = y;
+    if (visible && zoomLevel > 1 && follow && !dragging) {
+        // Following: the view centres on the tool when it comes near an edge
+        float mx = (x - view.ox) * view.scale, my = (height - 1) - (y - view.oy) * view.scale;
+        if (mx < width * FOLLOW_EDGE || mx > width * (1 - FOLLOW_EDGE) || my < height * FOLLOW_EDGE ||
+            my > height * (1 - FOLLOW_EDGE)) {
+            view.ox = x - (width * 0.5f) / view.scale;
+            view.oy = y - (height * 0.5f) / view.scale;
+            keepInView();
+            draw();  // places the marker too
+            return;
+        }
+    }
+    placeMarker();
+}
+
+void PreviewCanvas::placeMarker() {
+    if (!marker) return;
+    float mx = (markerX - view.ox) * view.scale, my = (height - 1) - (markerY - view.oy) * view.scale;
+    bool inside = markerShown && mx >= 0 && mx < width && my >= 0 && my < height;
+    if (!inside) {
+        lv_obj_add_flag(marker, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_obj_set_pos(marker, (int)floorf(mx + 0.5f) - MARKER_SIZE / 2, (int)floorf(my + 0.5f) - MARKER_SIZE / 2);
+    lv_obj_clear_flag(marker, LV_OBJ_FLAG_HIDDEN);
+}
+
+void PreviewCanvas::restart(uint32_t record) {
+    doneRecord = record;
+    fit();
+    draw();
 }

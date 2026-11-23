@@ -72,6 +72,9 @@ public:
     static const SegmentList *segments();
     // Moves on each time a job becomes READY: time to draw it (a new estimate doesn't move it)
     static uint32_t readyGeneration();
+    // The file the preview is of (when READY, the one segments() holds): its name and size
+    static const char *jobName();
+    static int32_t jobSize();
 
     // The worker task is running (fetch or analysis)
     static bool busy();

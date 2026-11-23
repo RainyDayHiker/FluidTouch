@@ -146,7 +146,12 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    31 KB, 175 KB and 718 KB, card nearly empty; the D86 retry recovered the last one on the
    device. Cause unknown; nearly every download so far was the first after a flash, so that
    says nothing. Merged 2026-11-22.
-   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79)) next, on `lrt/m5c-run`.
+   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79), branch
+   `lrt/m5c-run`), in four steps: (1) Run's preview with the cut so far, the marker, position
+   matching, zoom and following (D89; built, checked in the simulator with the fake's
+   playback and by the host test of `RunTracker`; not yet on the device); (2) the message
+   following the tool, op N of M, time left from the estimate; (3) `Ln:`; (4) the download
+   offer during a cut (D72).
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
    on the real machine; Jeffrey sends it when he can.
 4. The temporary machine picker (D57) is to be removed at the end of development.

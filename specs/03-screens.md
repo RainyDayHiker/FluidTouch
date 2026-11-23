@@ -166,13 +166,13 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 |                                                | T2 hole 12/45 X164 Y624: rough|
 |                                                | op 24 of 90                   |
 |            preview with progress               | [=========>        ] 27%      |
-|                 ~470 x 300                     | 0:35 elapsed   ~1:35 left     |
+|                 456 x 316 (D89)                | 0:35 elapsed   ~1:35 left     |
 |                                                | feed 1200 mm/min              |
 |                                                |-------------------------------|
 |                                                | Feed  [-10] 100% [+10] [100]  |
 |                                                | Rapid [25] [50] [100]         |
-|------------------------------------------------|-------------------------------|
-| Spoilboard_DogHoles.gcode                      | [  PAUSE  ]      [ ABORT ]    |
+|                                                |-------------------------------|
+| Spoilboard_DogHoles.gcode   789 KB             | [  PAUSE  ]      [ ABORT ]    |
 +------------------------------------------------+-------------------------------+
 ```
 
@@ -182,7 +182,7 @@ States of the right-hand panel:
 |-------|-------------|
 | Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5); they fill in when it finishes, and START doesn't wait for it (D75) |
 | Running | As drawn |
-| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") and one large CONTINUE button. Pause/Abort stay below |
+| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") in a box over the top half of the preview, headed "Waiting for you"; one large CONTINUE button in the overrides' place. Pause/Abort stay below (D89). Without a preview, the message in large type on the left as before |
 | Paused (HOLD by the user) | RESUME in place of PAUSE |
 | Probing | "Probing..." and the probe indicator |
 | Finished / Aborted | Result, total time, [Run again] [Back to Setup]. The job's final `M0` is a Prompt like the others; CONTINUE ends the file and Finished follows (D52) |
@@ -195,7 +195,7 @@ States of the right-hand panel:
 | ABORT | soft reset (0x18), then the alarm banner offers Unlock | Single press. Placed apart from PAUSE |
 | Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
 | Rapid override | realtime override commands | |
-| Preview | | Cut so far in a bright colour, the rest dim, marker at the work position. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
+| Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
 
 Notes:
 

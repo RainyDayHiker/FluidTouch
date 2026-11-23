@@ -6,7 +6,13 @@
 // Checked for each move: kind, line, end X/Y within one step and Z within one Z step (repacks
 // round twice), an arc's centre and sweep; that a reader started at any checkpoint reads the same
 // moves as one from the start; and a job larger than 327 mm doubles the step.
+//
+// RunTracker (§6): the tool is put at the middle of each move in turn; the match must never go
+// back and never pass the move the tool is on. How often it is that
+// very move is printed ("follow"): less than 100% where a path passes within the tolerance of
+// an earlier one still in the window (the match stays on the earlier pass).
 #include "gcode/analysis.h"
+#include "services/run_tracker.h"
 #include "services/segment_list.h"
 #include <math.h>
 #include <stdio.h>
@@ -142,12 +148,39 @@ void check(const char *name, const std::string &text, size_t listBytes, bool qui
         }
     }
 
+    // Following the tool along the moves
+    RunTracker tracker;
+    uint32_t last = 0, onMove = 0;
+    for (size_t k = 0; k < moves.size(); k++) {
+        const SegmentList::Move &mv = moves[k];
+        float x, y;
+        if (mv.kind == SegmentList::ARC_CW || mv.kind == SegmentList::ARC_CCW) {
+            float a = atan2f(mv.y0 - mv.cy, mv.x0 - mv.cx) + mv.sweep * 0.5f;
+            x = mv.cx + mv.r * cosf(a);
+            y = mv.cy + mv.r * sinf(a);
+        } else {
+            x = (mv.x0 + mv.x1) * 0.5f;
+            y = (mv.y0 + mv.y1) * 0.5f;
+        }
+        float z = (mv.z0 + mv.z1) * 0.5f;
+        tracker.update(list, x, y, z, RunTracker::READ_ALL);
+        if (!tracker.matched()) {
+            fail(name, "tracker: no match", (uint32_t)k, 0, 0);
+            break;
+        }
+        if (tracker.record() < last) fail(name, "tracker: went back", (uint32_t)k, tracker.record(), last);
+        if (tracker.record() > mv.record) fail(name, "tracker: ahead of the tool", (uint32_t)k, tracker.record(), mv.record);
+        last = tracker.record();
+        if (tracker.record() == mv.record) onMove++;
+    }
+    double follow = moves.empty() ? 100.0 : 100.0 * onMove / moves.size();
+
     SegmentList::Rates rates = {8000, 8000, 3000};
     SegmentList::Estimate est = list.estimate(rates);
     if (!quiet || failures != before) {
-        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s\n", name,
-               list.moves(), list.records(), list.truncated() ? "TRUNCATED" : "", list.xyStep(), list.zStep(), worstXY,
-               worstZ, worstArc, est.seconds, est.incomplete ? "+" : "", list.nUsable() ? "  N" : "");
+        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s  follow %.1f%%\n",
+               name, list.moves(), list.records(), list.truncated() ? "TRUNCATED" : "", list.xyStep(), list.zStep(),
+               worstXY, worstZ, worstArc, est.seconds, est.incomplete ? "+" : "", list.nUsable() ? "  N" : "", follow);
     }
 }
 
