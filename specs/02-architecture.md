@@ -33,6 +33,7 @@ Kept deliberately small, to stay mergeable (G11):
 | `ui/upload_manager.*` | Used by `FileService`. `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
 | `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
+| `core/display_driver.cpp` | LVGL's two draw buffers sized at the display's colour depth (2 bytes a pixel), not `sizeof(lv_color_t)` (3 bytes in LVGL 9): still two full-screen buffers, 750 KB less PSRAM (D88). Both UIs. |
 | `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. `custom_sdkconfig` sets the CPU caches to their largest, 32 KB instructions and 64 KB data (D87); a `platformio_local.ini` that replaces `custom_sdkconfig` must carry the same lines. |
 | `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` added with `add_subdirectory` and linked (its own flags for its own sources). The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
 
@@ -160,7 +161,11 @@ Measured on the device (spike S2, 2026-11-16; [06](06-test-and-spikes.md#s2-proc
 the new UI, connected, about **1.86 MB of PSRAM is free**, in one block of nearly that size.
 Internal heap had 169 KB free. The rest of the 8 MB goes to the code (the build runs from
 PSRAM, `CONFIG_SPIRAM_XIP_FROM_PSRAM`), LVGL's 1 MB pool, and the display's full-screen
-buffers (two 768 KB LVGL draw buffers in `display_driver.cpp`, plus the panel's own).
+buffers (two LVGL draw buffers in `display_driver.cpp`, plus the panel's own 750 KB).
+Measured again on the device 2026-11-22 (heap map, Job screen, connected, before the
+arena): 1.27 MB free in one block. The draw buffers were 1.15 MB each, not 768 KB, because
+LVGL 9's `lv_color_t` is 3 bytes; sized at 2 bytes a pixel they are 750 KB each (D88), which
+gives about 750 KB back. The code's share (XIP) grows with the firmware.
 
 Budget for the preview, replacing the earlier targets (which added up to 3.7 MB):
 
