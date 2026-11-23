@@ -133,34 +133,22 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    (Jeffrey): the reference job analysed in 6.5 s with the outline (D75 expected about 7.7 s
    from 06's `perf`), Cancel and Retry, a display SD file analysed in place, and the library
    tests all passing with a job chosen. The download time wasn't noted. Merged.
-   **Part 5b** (segment list, Job preview, info line and estimate; branch `lrt/m5b-preview`;
-   D83 layout and list size, D84 record changes) is built and checked in the simulator (the
-   reference jobs, an inch job, a 2 MB job truncated at 80%, zoom to 16x and Fit, the
-   warnings, Cancel and Retry in the new layout, the axis rates read from the fake) and by the
-   host test of the packing (121 files). On the device 2026-11-22 (Jeffrey): DogHoles drawn
-   in 0.2 s, tap zoom and Fit work; one download failed at 31,592 bytes ("display SD full",
-   not repeated: a retry worked; the failure now logs errno and card space). Found: the
-   analysis took 12.4 s against 5a's 6.5 s (SD reads 1.3 s, packing 1.4 s, the library the
-   rest: a sink makes it tokenise every line); the packer now reads tokens only on lines with
-   F, N or P and rounds in float. `PROFILE_ANALYSE` in `preview_service.cpp` (on, TEMPORARY)
-   times the analysis without a sink and with an empty one before each real run: take its
-   numbers, then remove it before merging. The segment list got 311 KB (largest free block
-   720 KB), not about 600 KB: to look at. Then D85: double tap zooms, drag moves when zoomed
-   in. Second device run: many double taps missed (LVGL's double click wants the taps within
-   10 px and counts a third tap as triple), so the canvas detects them itself; the profile
-   showed tokenising costs 0.25 s (no sink 8.06 s, empty sink 8.32 s) but the packer 3.2 s
-   (1.36 s in its calls), so its hot functions now run from IRAM to test the cache theory.
-   IRAM halved the packing; then the CPU caches at their largest (D87) brought the analysis
-   to 7.3 s (6.4 s without the packer, as in 5a) and `PROFILE_ANALYSE` was removed.
-   The 311 KB list is the sizing rule working (largest block 720 KB less 400 KB).
-   A temporary heap map showed 1.27 MB free in one block, and LVGL's draw buffers at
-   1.15 MB each; D88 sizes them at 2 bytes a pixel. Checked on the device (Jeffrey): buffers
-   768 KB each, 2.09 MB free before the arena, the list 640 KB, both UIs as before. The map
-   was removed. A third download write error (errno 5 at
-   718 KB): the D86 retry recovered it on the device. Nearly every download so far was the
-   first after a flash, so that says nothing about the cause.
-   A second download write failure: errno 5 (I/O) at 175 KB, card 29 MB used of 7.4 GB.
-   Still to check: the axis rates line on the real machine.
+   **Part 5b** (segment list, Job preview, info line and estimate; D83 to D88) is checked
+   in the simulator (the reference jobs, an inch job, a 2 MB job truncated at 80%, zoom and
+   Fit, the warnings, Cancel and Retry, the axis rates from the fake), by the host test of
+   the packing (121 files), and on the device 2026-11-22 (Jeffrey): DogHoles downloads in
+   1.6 s, analyses in 7.4 s (SD reads 1.2 s, packing 0.5 s), draws in 0.2 s; double tap
+   zooms, drag moves when zoomed in (D85), Fit. Found and fixed on the device: the packer was
+   slow from PSRAM (hot code in IRAM, tokens only on lines with F, N or P), the CPU caches
+   at their largest (D87: the library back to 5a's 6.4 s), and LVGL's draw buffers 1.15 MB
+   each instead of 768 KB (D88: the segment list now gets its 640 KB, 2.09 MB free before
+   the arena). Download writes to the display SD failed three times with errno 5 (I/O) at
+   31 KB, 175 KB and 718 KB, card nearly empty; the D86 retry recovered the last one on the
+   device. Cause unknown; nearly every download so far was the first after a flash, so that
+   says nothing. Merged 2026-11-22.
+   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79)) next, on `lrt/m5c-run`.
+   Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
+   on the real machine; Jeffrey sends it when he can.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
    (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the
