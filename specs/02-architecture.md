@@ -33,7 +33,7 @@ Kept deliberately small, to stay mergeable (G11):
 | `ui/upload_manager.*` | Used by `FileService`. `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
 | `main.cpp` | After the settings auto-import, `setup()` reads the UI mode: `app` starts `LrtApp::begin()` and returns; `classic` registers the classic listener and continues as before. `loop()` hands over to `LrtApp::loop()` when the app is running. Done in M1. |
 | `ui/ui_common.cpp` | The System Options dialog is 70 px taller and has one more button, "Restart into new UI (LowRider Touch)". Done in M1. |
-| `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. |
+| `platformio.ini` | Adds `lib/gcode` and `src/app`, `src/services` to the build. `custom_sdkconfig` sets the CPU caches to their largest, 32 KB instructions and 64 KB data (D87); a `platformio_local.ini` that replaces `custom_sdkconfig` must carry the same lines. |
 | `sim/` | `CMakeLists.txt`: `src/` on the include path (headers of `src/app` and `src/services` live next to their sources and are included as `"app/..."`, `"services/..."`; PlatformIO already has `src/` on the path), `lib/gcode` added with `add_subdirectory` and linked (its own flags for its own sources). The forced include is named without a directory so a checkout path with a space builds. Fake FluidNC extended ([06](06-test-and-spikes.md)). |
 
 ## 3. UI mode
