@@ -165,7 +165,8 @@ buffers (two LVGL draw buffers in `display_driver.cpp`, plus the panel's own 750
 Measured again on the device 2026-11-22 (heap map, Job screen, connected, before the
 arena): 1.27 MB free in one block. The draw buffers were 1.15 MB each, not 768 KB, because
 LVGL 9's `lv_color_t` is 3 bytes; sized at 2 bytes a pixel they are 750 KB each (D88), which
-gives about 750 KB back. The code's share (XIP) grows with the firmware.
+gives about 750 KB back: measured, 2.09 MB free before the arena, and the segment list
+gets its 640 KB with about 860 KB left over. The code's share (XIP) grows with the firmware.
 
 Budget for the preview, replacing the earlier targets (which added up to 3.7 MB):
 

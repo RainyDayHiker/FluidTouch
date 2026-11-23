@@ -287,52 +287,6 @@ void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
     }
 }
 
-// TEMPORARY (5b, the segment list got 311 KB, not 640): the PSRAM heap's blocks of 16 KB or
-// more, logged once when the first job is chosen (device only)
-#if __has_include(<esp_attr.h>)
-void logPsramMap(const char *when) {
-    struct Block {
-        uintptr_t at;
-        uint32_t size;
-        bool used;
-    };
-    struct Map {
-        Block blocks[48];
-        int count = 0;
-        uint32_t smallUsed = 0, smallFree = 0, smallUsedCount = 0;
-    };
-    static Map map;  // filled under the heap's lock, printed after
-    map = Map();
-    heap_caps_walk(
-        MALLOC_CAP_SPIRAM,
-        [](walker_heap_into_t, walker_block_info_t b, void *user) -> bool {
-            Map &m = *(Map *)user;
-            if (b.size < 16384) {
-                if (b.used) {
-                    m.smallUsed += b.size;
-                    m.smallUsedCount++;
-                } else {
-                    m.smallFree += b.size;
-                }
-            } else if (m.count < 48) {
-                m.blocks[m.count++] = {(uintptr_t)b.ptr, (uint32_t)b.size, b.used};
-            }
-            return true;
-        },
-        &map);
-    Serial.printf("PreviewService: PSRAM %s: free %u, largest %u; under 16 KB: %u used in %u blocks, %u free\n", when,
-                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM), (unsigned)map.smallUsed,
-                  (unsigned)map.smallUsedCount, (unsigned)map.smallFree);
-    for (int i = 0; i < map.count; i++) {
-        Serial.printf("PreviewService:   %08x %7u %s\n", (unsigned)map.blocks[i].at, (unsigned)map.blocks[i].size,
-                      map.blocks[i].used ? "used" : "free");
-    }
-}
-#else
-void logPsramMap(const char *) {}
-#endif
-
 // The packer, timed (the log splits analyse()'s time into reading, packing and the rest)
 class TimedPacker : public gcode::AnalysisSink {
 public:
@@ -636,10 +590,7 @@ void PreviewService::start() {
             return;
         }
     }
-    if (!arena) {
-        logPsramMap("before the arena");  // TEMPORARY, see logPsramMap
-        arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    }
+    if (!arena) arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (arena && !listMemory) {
         // Sized so Run's second canvas still fits beside it (02 §6)
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);

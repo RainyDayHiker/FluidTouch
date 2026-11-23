@@ -153,11 +153,10 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    IRAM halved the packing; then the CPU caches at their largest (D87) brought the analysis
    to 7.3 s (6.4 s without the packer, as in 5a) and `PROFILE_ANALYSE` was removed.
    The 311 KB list is the sizing rule working (largest block 720 KB less 400 KB).
-   `logPsramMap` in `preview_service.cpp` (TEMPORARY) logs PSRAM's blocks of 16 KB or more
-   when the first job is chosen: remove it before merging. It showed 1.27 MB free in one
-   block, and LVGL's draw buffers at 1.15 MB each; D88 sizes them at 2 bytes a pixel (to
-   check on the device: the list gets 640 KB, and both UIs look and redraw as before; the
-   simulator doesn't build `display_driver.cpp`). A third download write error (errno 5 at
+   A temporary heap map showed 1.27 MB free in one block, and LVGL's draw buffers at
+   1.15 MB each; D88 sizes them at 2 bytes a pixel. Checked on the device (Jeffrey): buffers
+   768 KB each, 2.09 MB free before the arena, the list 640 KB, both UIs as before. The map
+   was removed. A third download write error (errno 5 at
    718 KB): the D86 retry recovered it on the device. Nearly every download so far was the
    first after a flash, so that says nothing about the cause.
    A second download write failure: errno 5 (I/O) at 175 KB, card 29 MB used of 7.4 GB.
