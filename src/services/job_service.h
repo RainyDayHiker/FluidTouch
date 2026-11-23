@@ -55,7 +55,11 @@ public:
     static void dismiss();   // FINISHED / ABORTED: back to READY (or NONE)
 
     static uint32_t elapsedMs();
-    // Rough time left from the SD: percent, or 0 while unknown (D51)
+    // The time the job has been running, without the waits (prompts, pauses)
+    static uint32_t runningMs();
+    // Rough time left from the SD: percent, or 0 while unknown (D51). It stops while the job
+    // waits, and is the average of the last LEFT_SAMPLES estimates, one every LEFT_SAMPLE_MS
+    // of running time, each counted down since it was taken (D90)
     static uint32_t leftMs();
     static float percent();
     // The M0 message at a prompt
@@ -89,6 +93,16 @@ private:
     static char prompt[128];
     static char endReason[128];
     static float lastPercent;
+    // Running time: what was counted before, and since when it runs now (0 when it doesn't)
+    static uint32_t runDoneMs;
+    static uint32_t runSinceMs;
+    // Time-left estimates: the estimate and the running time it was taken at
+    static const int LEFT_SAMPLES = 5;
+    static const uint32_t LEFT_SAMPLE_MS = 5000;
+    static uint32_t leftEstimate[LEFT_SAMPLES];
+    static uint32_t leftTakenAt[LEFT_SAMPLES];
+    static int leftCount;
+    static void sampleLeft();
 };
 
 #endif // LRT_JOB_SERVICE_H

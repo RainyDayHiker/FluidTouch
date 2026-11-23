@@ -163,18 +163,23 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 
 ```
 +------------------------------------------------+-------------------------------+
-|                                                | T2 hole 12/45 X164 Y624: rough|
 |                                                | op 24 of 90                   |
-|            preview with progress               | [=========>        ] 27%      |
-|                 456 x 316 (D89)                | 0:35 elapsed   ~1:35 left     |
+|                                                | [=========>           ]  27%  |
+|            preview with progress               | Elapsed               0:35:12 |
+|              456 x 344 (D90)                   | Left                    ~1:35 |
 |                                                | feed 1200 mm/min              |
 |                                                |-------------------------------|
-|                                                | Feed  [-10] 100% [+10] [100]  |
-|                                                | Rapid [25] [50] [100]         |
+|                                                | Feed override            100% |
+|                                                | [ -10 ]   [ +10 ]   [ 100 ]   |
 |                                                |-------------------------------|
-| Spoilboard_DogHoles.gcode   789 KB             | [  PAUSE  ]      [ ABORT ]    |
+|                                                | [          PAUSE          ]   |
 +------------------------------------------------+-------------------------------+
+status bar: ... the message that follows the tool ...                  [ ABORT ]
 ```
+
+The panel (D90): no file line, no message (the status bar has it), no rapid override. The
+captions stay put and the times are right-aligned. During a job the status bar's STOP reads
+ABORT and ends the job; the panel's PAUSE is the only hold.
 
 States of the right-hand panel:
 
@@ -182,7 +187,7 @@ States of the right-hand panel:
 |-------|-------------|
 | Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5); they fill in when it finishes, and START doesn't wait for it (D75) |
 | Running | As drawn |
-| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") in a box over the top half of the preview, headed "Waiting for you"; one large CONTINUE button in the overrides' place. Pause/Abort stay below (D89). Without a preview, the message in large type on the left as before |
+| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") in a box over the top half of the preview, headed "Waiting for you"; one large CONTINUE button in the feed override's place. PAUSE stays below (D89, D90). Without a preview, the message in large type on the left as before |
 | Paused (HOLD by the user) | RESUME in place of PAUSE |
 | Probing | "Probing..." and the probe indicator |
 | Finished / Aborted | Result, total time, [Run again] [Back to Setup]. The job's final `M0` is a Prompt like the others; CONTINUE ends the file and Finished follows (D52) |
@@ -192,9 +197,8 @@ States of the right-hand panel:
 |---------|-------|-------|
 | PAUSE / RESUME | `!` / `~` | |
 | CONTINUE | `~` | Only in Prompt |
-| ABORT | soft reset (0x18), then the alarm banner offers Unlock | Single press. Placed apart from PAUSE |
+| ABORT | soft reset (0x18), then the alarm banner offers Unlock | The status bar's STOP, relabelled ABORT while a job is active (D90). Single press. Not a hold: the panel's PAUSE is |
 | Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
-| Rapid override | realtime override commands | |
 | Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
 
 Notes:
@@ -204,10 +208,13 @@ Notes:
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
 - Until the preview exists (M5), the preview area shows the file name and the current
   FluidNC message in large type (D51).
-- Time left: "~1:35 left" = elapsed x (100 - percent) / percent, from the controller's
+- Time left: "~1:35" = running time x (100 - percent) / percent, from the controller's
   `SD:` percent (by file position, so rough). Hidden for the first minute and below 2%
   (D51). Replaced by an estimate from the file once M5 has one (D64; S3 showed how rough
-  it is).
+  it is). Running time leaves out the waits (a prompt, a pause), so time left stops while
+  the job waits for you. A new estimate is taken every 5 s of running time and the one shown
+  is the average of the last five, each counted down since it was taken, so it shifts slowly
+  (D90).
 
 ## 5. Macros
 

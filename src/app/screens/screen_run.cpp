@@ -13,11 +13,12 @@
 
 // The Run screen (specs/03-screens.md section 4). Content area 800 x 360:
 //
-//   x   8..464  the preview (specs/11-preview.md §6, D89): 456 x 316 with the file line
-//               under it, a box over its top half at a prompt; without a preview of this
-//               job, the file and the current message in large type
-//   x 488..792  the panel: START; or the message, progress, overrides, PAUSE and ABORT
-//               (CONTINUE at a prompt); or the result
+//   x   8..464  the preview (specs/11-preview.md §6, D89, D90): 456 x 344, a box over its
+//               top half at a prompt; without a preview of this job, the file and the
+//               current message in large type
+//   x 488..792  the panel: START; or op N of M, progress, times, feed override and PAUSE
+//               (CONTINUE at a prompt; ABORT is the status bar's STOP during a job, D90);
+//               or the result
 //
 // With no job chosen or running, one line and a button to the Job tab.
 
@@ -31,21 +32,18 @@ const lv_font_t *const FONT_BIG = &lrt_font_20;
 const lv_font_t *const FONT_MID = &lrt_font_18;
 const lv_font_t *const FONT_SMALL = &lrt_font_14;
 
-const lv_color_t COLOR_ABORT = LV_COLOR_MAKE(0xB0, 0x20, 0x20);
-
 const int LEFT_X = 16, LEFT_W = 440;
 const int PANEL_X = 488, PANEL_W = 304;
-const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 456, PREVIEW_H = 316;
+const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 456, PREVIEW_H = 344;
 
 lv_obj_t *noneGroup;
 lv_obj_t *jobGroup;      // everything but noneGroup
 
-// Left, with a preview of the running job: the canvas, Fit, the file line, the prompt box
+// Left, with a preview of the running job: the canvas, Fit, the prompt box
 PreviewCanvas canvas;
 bool canvasOk = false;
 lv_obj_t *previewGroup;
 lv_obj_t *fitButton;
-lv_obj_t *fileLine;
 lv_obj_t *promptBox;
 lv_obj_t *promptText;
 uint32_t drawnReady = 0;   // PreviewService::readyGeneration() drawn
@@ -65,25 +63,22 @@ lv_obj_t *runGroup;
 lv_obj_t *endGroup;
 
 // Run group
-lv_obj_t *messageLabel;  // the current message, with a preview (on the left without one)
 lv_obj_t *opLabel;       // op N of M
 lv_obj_t *progressBar;
 lv_obj_t *percentLabel;
-lv_obj_t *timesLabel;
+lv_obj_t *elapsedValue;
+lv_obj_t *leftCaption;
+lv_obj_t *leftValue;
 lv_obj_t *feedRateLabel;
 lv_obj_t *overrideGroup;
 lv_obj_t *feedValue;
 lv_obj_t *feedButtons[3];
-lv_obj_t *rapidButtons[3];
 lv_obj_t *continueButton;
 lv_obj_t *pauseButton;
-lv_obj_t *abortButton;
 
 // End group
 lv_obj_t *endTitle;
 lv_obj_t *endDetail;
-
-const int RAPID_STEPS[3] = {25, 50, 100};
 
 lv_obj_t *group(lv_obj_t *parent, int x, int y, int w, int h) {
     lv_obj_t *g = lv_obj_create(parent);
@@ -135,11 +130,9 @@ void onPause(lv_event_t *) {
     }
 }
 void onContinue(lv_event_t *) { JobService::resume(); }
-void onAbort(lv_event_t *) { JobService::abort(); }
 void onFeed(lv_event_t *e) {
     MachineService::feedOverride((MachineService::FeedOverride)(intptr_t)lv_event_get_user_data(e));
 }
-void onRapid(lv_event_t *e) { MachineService::rapidOverride((int)(intptr_t)lv_event_get_user_data(e)); }
 void onAgain(lv_event_t *) { JobService::again(); }
 void onBackToSetup(lv_event_t *) {
     JobService::dismiss();
@@ -161,9 +154,6 @@ void createPreview(lv_obj_t *parent) {
     canvasOk = canvas.create(previewGroup, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H, true);
     fitButton = button(previewGroup, PREVIEW_X + PREVIEW_W - 76, PREVIEW_Y + 4, 72, 40, "Fit", FONT_MID, onFit);
     lv_obj_set_style_bg_opa(fitButton, LV_OPA_80, 0);
-    fileLine = label(previewGroup, PREVIEW_X, PREVIEW_Y + PREVIEW_H + 8, FONT_MID, UITheme::TEXT_LIGHT, "");
-    lv_obj_set_width(fileLine, PREVIEW_W);
-    lv_label_set_long_mode(fileLine, LV_LABEL_LONG_DOT);
 
     // At a prompt: the message over the preview's top half, the tool still in view below
     promptBox = group(previewGroup, PREVIEW_X, PREVIEW_Y, PREVIEW_W, PREVIEW_H / 2);
@@ -197,52 +187,56 @@ void createStart(lv_obj_t *parent) {
     setButtonColor(start, UITheme::BTN_PLAY);
 }
 
+// A label right-aligned so its right edge stays at `right`, whatever the text's width
+lv_obj_t *rightLabel(lv_obj_t *parent, int right, int y, int w, const lv_font_t *font, lv_color_t color) {
+    lv_obj_t *l = label(parent, right - w, y, font, color, "");
+    lv_obj_set_width(l, w);
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_RIGHT, 0);
+    return l;
+}
+
 void createRun(lv_obj_t *parent) {
     runGroup = group(parent, PANEL_X, 0, PANEL_W, Frame::CONTENT_HEIGHT);
 
-    messageLabel = label(runGroup, 0, 4, FONT_MID, UITheme::TEXT_LIGHT, "");
-    lv_obj_set_size(messageLabel, PANEL_W, 46);
-    lv_label_set_long_mode(messageLabel, LV_LABEL_LONG_DOT);
-    opLabel = label(runGroup, 0, 52, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    // op N of M; the bar with the percent at its right
+    opLabel = label(runGroup, 0, 8, FONT_MID, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_width(opLabel, PANEL_W);
+    lv_label_set_long_mode(opLabel, LV_LABEL_LONG_DOT);
     progressBar = lv_bar_create(runGroup);
-    lv_obj_set_pos(progressBar, 0, 76);
-    lv_obj_set_size(progressBar, PANEL_W, 20);
+    lv_obj_set_pos(progressBar, 0, 40);
+    lv_obj_set_size(progressBar, PANEL_W - 76, 28);
     lv_bar_set_range(progressBar, 0, 1000);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_BUTTON, 0);
     lv_obj_set_style_bg_color(progressBar, UITheme::BG_PROGRESS, LV_PART_INDICATOR);
-    percentLabel = label(runGroup, 0, 102, FONT_BIG, UITheme::TEXT_LIGHT, "");
-    timesLabel = label(runGroup, 72, 106, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
-    feedRateLabel = label(runGroup, 0, 130, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
-    divider(runGroup, 0, 154, PANEL_W, 1);
+    percentLabel = rightLabel(runGroup, PANEL_W, 42, 140, FONT_BIG, UITheme::TEXT_LIGHT);
 
-    // Overrides; CONTINUE takes their place at a prompt
-    overrideGroup = group(runGroup, 0, 164, PANEL_W, 116);
-    label(overrideGroup, 0, 16, FONT_MID, UITheme::TEXT_MEDIUM, "Feed");
-    feedButtons[0] = button(overrideGroup, 64, 0, 56, 52, "-10", FONT_MID, onFeed,
-                            (void *)(intptr_t)MachineService::FEED_MINUS_10);
-    feedValue = label(overrideGroup, 124, 16, FONT_MID, UITheme::TEXT_LIGHT, "");
-    lv_obj_set_width(feedValue, 56);
-    lv_obj_set_style_text_align(feedValue, LV_TEXT_ALIGN_CENTER, 0);
-    feedButtons[1] = button(overrideGroup, 184, 0, 56, 52, "+10", FONT_MID, onFeed,
-                            (void *)(intptr_t)MachineService::FEED_PLUS_10);
-    feedButtons[2] = button(overrideGroup, 248, 0, 56, 52, "100", FONT_MID, onFeed,
-                            (void *)(intptr_t)MachineService::FEED_RESET);
-    label(overrideGroup, 0, 76, FONT_MID, UITheme::TEXT_MEDIUM, "Rapid");
+    // The times: captions where they are, values right-aligned
+    label(runGroup, 0, 84, FONT_BIG, UITheme::TEXT_MEDIUM, "Elapsed");
+    elapsedValue = rightLabel(runGroup, PANEL_W, 84, 160, FONT_BIG, UITheme::TEXT_LIGHT);
+    leftCaption = label(runGroup, 0, 116, FONT_BIG, UITheme::TEXT_MEDIUM, "Left");
+    leftValue = rightLabel(runGroup, PANEL_W, 116, 160, FONT_BIG, UITheme::TEXT_LIGHT);
+    feedRateLabel = label(runGroup, 0, 150, FONT_MID, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_width(feedRateLabel, PANEL_W);
+    lv_label_set_long_mode(feedRateLabel, LV_LABEL_LONG_DOT);
+    divider(runGroup, 0, 182, PANEL_W, 1);
+
+    // The feed override; CONTINUE takes its place at a prompt
+    overrideGroup = group(runGroup, 0, 192, PANEL_W, 92);
+    label(overrideGroup, 0, 0, FONT_MID, UITheme::TEXT_MEDIUM, "Feed override");
+    feedValue = rightLabel(overrideGroup, PANEL_W, 0, 80, FONT_MID, UITheme::TEXT_LIGHT);
+    const char *const feedTexts[3] = {"-10", "+10", "100"};
+    const MachineService::FeedOverride feedSteps[3] = {MachineService::FEED_MINUS_10, MachineService::FEED_PLUS_10,
+                                                       MachineService::FEED_RESET};
     for (int i = 0; i < 3; i++) {
-        char text[8];
-        snprintf(text, sizeof(text), "%d", RAPID_STEPS[i]);
-        rapidButtons[i] = button(overrideGroup, 64 + i * 80, 60, 72, 52, text, FONT_MID, onRapid,
-                                 (void *)(intptr_t)RAPID_STEPS[i]);
+        feedButtons[i] = button(overrideGroup, i * 104, 28, 96, 64, feedTexts[i], FONT_BIG, onFeed,
+                                (void *)(intptr_t)feedSteps[i]);
     }
-    continueButton = button(runGroup, 0, 164, PANEL_W, 116, LV_SYMBOL_PLAY "  CONTINUE", FONT_HUGE, onContinue);
+    continueButton = button(runGroup, 0, 192, PANEL_W, 92, LV_SYMBOL_PLAY "  CONTINUE", FONT_HUGE, onContinue);
     setButtonColor(continueButton, UITheme::BTN_PLAY);
 
-    divider(runGroup, 0, 286, PANEL_W, 1);
-    // PAUSE and ABORT at opposite ends (S2)
-    pauseButton = button(runGroup, 0, 296, 168, 60, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
+    divider(runGroup, 0, 292, PANEL_W, 1);
+    pauseButton = button(runGroup, 0, 300, PANEL_W, 56, LV_SYMBOL_PAUSE "  PAUSE", FONT_BIG, onPause);
     setButtonColor(pauseButton, UITheme::STATE_HOLD);
-    abortButton = button(runGroup, 192, 296, 112, 60, "ABORT", FONT_BIG, onAbort);
-    setButtonColor(abortButton, COLOR_ABORT);
 }
 
 void createEnd(lv_obj_t *parent) {
@@ -260,25 +254,25 @@ void createEnd(lv_obj_t *parent) {
 void updateRunGroup(JobService::RunState state, bool online) {
     const FluidNCStatus &s = MachineService::status();
     char text[96];
-    char elapsed[16], left[16];
 
     float pct = JobService::percent();
     lv_bar_set_value(progressBar, (int32_t)(pct * 10), LV_ANIM_OFF);
     snprintf(text, sizeof(text), "%d%%", (int)pct);
     setText(percentLabel, state == JobService::RUN_STARTING ? "Starting..." : text);
-    formatDuration(elapsed, sizeof(elapsed), JobService::elapsedMs());
+    formatDuration(text, sizeof(text), JobService::elapsedMs());
+    setText(elapsedValue, text);
     uint32_t leftMs = JobService::leftMs();
+    show(leftCaption, leftMs != 0);
+    show(leftValue, leftMs != 0);
     if (leftMs) {
-        formatDuration(left, sizeof(left), leftMs);
-        snprintf(text, sizeof(text), "%s elapsed   ~%s left", elapsed, left);
-    } else {
-        snprintf(text, sizeof(text), "%s elapsed", elapsed);
+        text[0] = '~';
+        formatDuration(text + 1, sizeof(text) - 1, leftMs);
+        setText(leftValue, text);
     }
-    setText(timesLabel, text);
     if (online) {
         snprintf(text, sizeof(text), "feed %d mm/min", (int)s.feed_rate);
     } else {
-        snprintf(text, sizeof(text), "No connection; the job continues on the controller.");
+        snprintf(text, sizeof(text), "No connection; the job continues.");
     }
     setText(feedRateLabel, text);
 
@@ -291,18 +285,12 @@ void updateRunGroup(JobService::RunState state, bool online) {
     setText(feedValue, online ? text : "-");
     bool overrides = online && state != JobService::RUN_STARTING;
     for (lv_obj_t *b : feedButtons) setEnabled(b, overrides);
-    for (int i = 0; i < 3; i++) {
-        setEnabled(rapidButtons[i], overrides);
-        setButtonColor(rapidButtons[i], online && (int)s.rapid_override == RAPID_STEPS[i] ? UITheme::ACCENT_PRIMARY
-                                                                                        : UITheme::BG_BUTTON);
-    }
 
     bool paused = state == JobService::RUN_PAUSED;
     lv_obj_t *pauseLabel = lv_obj_get_child(pauseButton, 0);
     setText(pauseLabel, paused ? LV_SYMBOL_PLAY "  RESUME" : LV_SYMBOL_PAUSE "  PAUSE");
     setButtonColor(pauseButton, paused ? UITheme::BTN_PLAY : UITheme::STATE_HOLD);
     setEnabled(pauseButton, online && (state == JobService::RUN_RUNNING || paused));
-    setEnabled(abortButton, online);
 }
 
 void updateEndGroup(JobService::RunState state) {
@@ -339,11 +327,6 @@ bool updatePreview(JobService::RunState state, bool online) {
     }
     const FluidNCStatus &s = MachineService::status();
     canvas.setMarker(online && JobService::active(), s.wpos_x, s.wpos_y);
-
-    char size[16], text[FileService::NAME_LEN + 24];
-    formatSize(size, sizeof(size), JobService::runSize());
-    snprintf(text, sizeof(text), "%s     %s", JobService::runName(), size);
-    setText(fileLine, text);
 
     bool prompt = state == JobService::RUN_PROMPT;
     show(promptBox, prompt);
@@ -405,10 +388,9 @@ void RunScreen::update() {
     }
     setTextColor(leftMessage, prompt ? UITheme::STATE_HOLD : UITheme::TEXT_LIGHT);
 
-    // With a preview the message is the panel's; without one it is on the left, in large type
-    bool preview = updatePreview(state, online);
-    show(messageLabel, preview);
-    if (preview) setText(messageLabel, JobService::active() && online ? MachineService::status().last_message : "");
+    // With a preview the message is the status bar's; without one it is also on the left, in
+    // large type
+    updatePreview(state, online);
 
     if (JobService::active()) updateRunGroup(state, online);
     if (ended) updateEndGroup(state);

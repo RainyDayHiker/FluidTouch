@@ -3,6 +3,7 @@
 #include "app/screens/screens.h"
 #include "app/ui_mode.h"
 #include "app/widgets.h"
+#include "services/job_service.h"
 #include "services/machine_service.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
@@ -29,6 +30,7 @@ lv_obj_t *workLabels[3];
 lv_obj_t *machineLabels[3];
 lv_obj_t *wifiLabel;
 lv_obj_t *messageLabel;
+lv_obj_t *stopLabel;  // STOP, or ABORT during a job (D90)
 
 // The message row shows FluidNC's last message, or for a while a notice of
 // the display's own
@@ -178,8 +180,9 @@ void Frame::createStatusBar(lv_obj_t *root) {
 
     wifiLabel = textAt(statusBar, 664, &lrt_font_18, UITheme::STATE_ALARM, LV_SYMBOL_WIFI);
 
-    // STOP: feed hold, or jog cancel while jogging (S1). The bar is lower than
-    // the 56 px touch target, so the touch area extends beyond the button.
+    // STOP: feed hold, or jog cancel while jogging (S1); during a job it reads ABORT and
+    // ends the job (D90). The bar is lower than the 56 px touch target, so the touch area
+    // extends beyond the button.
     lv_obj_t *stop = lv_btn_create(statusBar);
     lv_obj_set_size(stop, 104, 52);
     lv_obj_align(stop, LV_ALIGN_RIGHT_MID, -6, 0);
@@ -187,7 +190,7 @@ void Frame::createStatusBar(lv_obj_t *root) {
     lv_obj_set_style_shadow_width(stop, 0, 0);
     lv_obj_set_ext_click_area(stop, 10);
     lv_obj_add_event_cb(stop, onStopClicked, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t *stopLabel = lv_label_create(stop);
+    stopLabel = lv_label_create(stop);
     lv_label_set_text(stopLabel, "STOP");
     lv_obj_set_style_text_font(stopLabel, &lrt_font_20, 0);
     lv_obj_center(stopLabel);
@@ -244,6 +247,7 @@ void Frame::show(ScreenId id) {
 void Frame::update() {
     updateBanner();
     updateStatusBar();
+    Widgets::setText(stopLabel, JobService::active() ? "ABORT" : "STOP");
 
     if (MachineService::jobActive()) {
         lv_obj_clear_flag(runDot, LV_OBJ_FLAG_HIDDEN);
@@ -409,7 +413,11 @@ void Frame::onTabClicked(lv_event_t *e) {
 }
 
 void Frame::onStopClicked(lv_event_t *e) {
-    MachineService::stop();
+    if (JobService::active()) {
+        JobService::abort();
+    } else {
+        MachineService::stop();
+    }
 }
 
 void Frame::onBannerButtonClicked(lv_event_t *e) {

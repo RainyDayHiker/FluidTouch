@@ -178,8 +178,7 @@ The tool's record is found as follows, at every report:
 
 Then:
 
-- **Run's preview (D89):** one canvas, 456 x 316, left of the panel, with the file line under
-  it. The job is drawn as on Job (§4), and the moves before the match in one bright green over
+- **Run's preview (D89, D90):** one canvas, 456 x 344, left of the panel. The job is drawn as on Job (§4), and the moves before the match in one bright green over
   it (rapids a lighter grey), incrementally (D29): each report draws the moves from the last
   drawn one up to the match. A view change (Fit, zoom, drag, following) redraws the whole
   canvas, the job then what is done. Fit, double tap and drag as on

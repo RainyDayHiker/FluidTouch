@@ -19,6 +19,11 @@ bool JobService::abortRequested = false;
 char JobService::prompt[128] = "";
 char JobService::endReason[128] = "";
 float JobService::lastPercent = 0;
+uint32_t JobService::runDoneMs = 0;
+uint32_t JobService::runSinceMs = 0;
+uint32_t JobService::leftEstimate[JobService::LEFT_SAMPLES];
+uint32_t JobService::leftTakenAt[JobService::LEFT_SAMPLES];
+int JobService::leftCount = 0;
 
 namespace {
 
@@ -121,7 +126,16 @@ void JobService::enter(RunState next) {
         userPaused = false;
         lastPercent = 0;
         endReason[0] = '\0';
+        runDoneMs = 0;
+        runSinceMs = 0;
+        leftCount = 0;
     }
+    // Running time counts only while RUNNING: not at a prompt, paused, or before the start
+    if (state == RUN_RUNNING && runSinceMs) {
+        runDoneMs += now - runSinceMs;
+        runSinceMs = 0;
+    }
+    if (next == RUN_RUNNING) runSinceMs = now ? now : 1;
     if (next == RUN_FINISHED || next == RUN_ABORTED) endMs = now;
     if (next == RUN_PROMPT) {
         // The M0's (MSG ...) arrives when its line is read, before the hold
@@ -168,11 +182,36 @@ uint32_t JobService::elapsedMs() {
 
 float JobService::percent() { return state == RUN_FINISHED ? 100.0f : lastPercent; }
 
-uint32_t JobService::leftMs() {
+uint32_t JobService::runningMs() { return runDoneMs + (runSinceMs ? millis() - runSinceMs : 0); }
+
+void JobService::sampleLeft() {
+    if (state != RUN_RUNNING) return;
+    uint32_t run = runningMs();
+    if (leftCount && run - leftTakenAt[leftCount - 1] < LEFT_SAMPLE_MS) return;
     float p = lastPercent;
-    uint32_t e = elapsedMs();
-    if (!active() || e < LEFT_AFTER_MS || p < LEFT_AFTER_PERCENT) return 0;
-    return (uint32_t)(e * (100.0f - p) / p);
+    if (run < LEFT_AFTER_MS || p < LEFT_AFTER_PERCENT) return;
+    if (leftCount == LEFT_SAMPLES) {
+        memmove(leftEstimate, leftEstimate + 1, sizeof(leftEstimate[0]) * (LEFT_SAMPLES - 1));
+        memmove(leftTakenAt, leftTakenAt + 1, sizeof(leftTakenAt[0]) * (LEFT_SAMPLES - 1));
+        leftCount--;
+    }
+    leftEstimate[leftCount] = (uint32_t)(run * (100.0f - p) / p);
+    leftTakenAt[leftCount] = run;
+    leftCount++;
+}
+
+uint32_t JobService::leftMs() {
+    if (!active() || !leftCount) return 0;
+    // Each estimate counted down by the running time since it was taken: at a prompt or
+    // paused, running time stands still and so does the time left
+    uint32_t run = runningMs();
+    double sum = 0;
+    for (int i = 0; i < leftCount; i++) {
+        double left = (double)leftEstimate[i] - (double)(run - leftTakenAt[i]);
+        sum += left > 0 ? left : 0;
+    }
+    uint32_t left = (uint32_t)(sum / leftCount);
+    return left ? left : 1;
 }
 
 void JobService::poll() {
@@ -209,6 +248,7 @@ void JobService::poll() {
     const FluidNCStatus &s = MachineService::status();
     uint32_t now = millis();
     if (s.is_sd_printing) lastPercent = s.sd_percent;
+    sampleLeft();
 
     switch (state) {
         case RUN_NONE:

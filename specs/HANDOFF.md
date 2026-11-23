@@ -149,7 +149,9 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79), branch
    `lrt/m5c-run`), in four steps: (1) Run's preview with the cut so far, the marker, position
    matching, zoom and following (D89; built, checked in the simulator with the fake's
-   playback and by the host test of `RunTracker`; not yet on the device); (2) the message
+   playback and by the host test of `RunTracker`; not yet on the device), then D90 after
+   Jeffrey's look at the screenshots (no file line, panel message or rapid override; STOP
+   reads ABORT during a job; time left averaged and stopped while waiting); (2) the message
    following the tool, op N of M, time left from the estimate; (3) `Ln:`; (4) the download
    offer during a cut (D72).
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
