@@ -19,7 +19,9 @@ const uint32_t ZERO = 0xE8E8E8;
 const uint32_t PROBE = 0xFB8C00;
 const int MAX_ZOOM = 16;
 const int MARGIN = 10;  // pixels around the job at Fit
-const int DRAG_START = 8;  // pixels a finger moves before a press is a drag
+const int DRAG_START = 16;      // pixels a finger moves before a press is a drag
+const uint32_t DOUBLE_TAP_MS = 400;  // the second tap's release after the first's, at most
+const int DOUBLE_TAP_PX = 40;   // the second tap's distance from the first, at most
 
 uint16_t rgb(uint32_t hex) { return lv_color_to_u16(lv_color_hex(hex)); }
 
@@ -112,7 +114,6 @@ bool PreviewCanvas::create(lv_obj_t *parent, int x, int y, int w, int h) {
     lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESSING, this);
     lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_RELEASED, this);
     lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_PRESS_LOST, this);
-    lv_obj_add_event_cb(canvas, onEvent, LV_EVENT_DOUBLE_CLICKED, this);
     lv_canvas_fill_bg(canvas, lv_color_hex(BACKGROUND), LV_OPA_COVER);
     return true;
 }
@@ -127,7 +128,6 @@ void PreviewCanvas::onEvent(lv_event_t *e) {
     if (code == LV_EVENT_PRESSED) {
         self->pressAt = p;
         self->dragging = false;
-        self->dragEnded = false;
     } else if (code == LV_EVENT_PRESSING) {
         // Only zoomed in: at Fit the whole job is already shown
         int dx = p.x - self->pressAt.x, dy = p.y - self->pressAt.y;
@@ -142,15 +142,28 @@ void PreviewCanvas::onEvent(lv_event_t *e) {
             lv_obj_set_pos(self->canvas, 0, 0);
             self->pan(p.x - self->pressAt.x, p.y - self->pressAt.y);
             self->dragging = false;
-            self->dragEnded = true;
+            self->haveTap = false;
             self->draw();
+            return;
         }
-    } else if (code == LV_EVENT_DOUBLE_CLICKED) {
-        if (self->dragEnded) return;  // the second touch was a drag
-        lv_area_t a;
-        lv_obj_get_coords(self->canvas, &a);
-        self->zoomAt(p.x - a.x1, p.y - a.y1);
-        self->draw();
+        if (code == LV_EVENT_PRESS_LOST) return;
+        // A tap. Two within DOUBLE_TAP_MS and DOUBLE_TAP_PX of each other are a double tap (not
+        // LVGL's DOUBLE_CLICKED: its 10 px limit misses many finger taps, and a quick third and
+        // fourth tap count as triple and single, not as a second double tap)
+        uint32_t now = lv_tick_get();
+        int dx = self->pressAt.x - self->tapAt.x, dy = self->pressAt.y - self->tapAt.y;
+        if (self->haveTap && lv_tick_diff(now, self->tapMs) <= DOUBLE_TAP_MS &&
+            dx * dx + dy * dy <= DOUBLE_TAP_PX * DOUBLE_TAP_PX) {
+            self->haveTap = false;
+            lv_area_t a;
+            lv_obj_get_coords(self->canvas, &a);
+            self->zoomAt(self->pressAt.x - a.x1, self->pressAt.y - a.y1);
+            self->draw();
+        } else {
+            self->haveTap = true;
+            self->tapAt = self->pressAt;
+            self->tapMs = now;
+        }
     }
 }
 

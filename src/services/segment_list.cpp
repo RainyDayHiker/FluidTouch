@@ -4,6 +4,15 @@
 #include <math.h>
 #include <string.h>
 
+// The packing runs once per line of the analysis: in internal RAM on the device, so it doesn't
+// push the library's code out of the instruction cache (code runs from PSRAM, XIP)
+#if __has_include(<esp_attr.h>)
+#include <esp_attr.h>
+#define PACK_HOT IRAM_ATTR
+#else
+#define PACK_HOT
+#endif
+
 namespace {
 
 const double kPi = 3.14159265358979323846;
@@ -19,7 +28,7 @@ int16_t half(int32_t v) {
     return (int16_t)h;
 }
 
-double wordValue(const gcode::Line &l, const gcode::Token &t) {
+PACK_HOT double wordValue(const gcode::Line &l, const gcode::Token &t) {
     uint32_t end = (uint32_t)t.start + t.length;
     if (t.valueStart >= end || end > l.length) return NAN;
     return gcode::parseDecimal(l.data + t.valueStart, end - t.valueStart);
@@ -37,13 +46,13 @@ void SegmentList::attach(void *memory, size_t bytes) {
 
 void SegmentList::detach() { *this = SegmentList(); }
 
-bool SegmentList::room(uint32_t n) const {
+PACK_HOT bool SegmentList::room(uint32_t n) const {
     uint64_t recordsAfter = (uint64_t)count + n;
     uint64_t checkpointsAfter = (recordsAfter + CHECKPOINT_EVERY - 1) / CHECKPOINT_EVERY;
     return recordsAfter * RECORD_BYTES + checkpointsAfter * sizeof(Checkpoint) <= size;
 }
 
-void SegmentList::put(int16_t a, int16_t b, int16_t c, uint16_t meta) {
+PACK_HOT void SegmentList::put(int16_t a, int16_t b, int16_t c, uint16_t meta) {
     if (count % CHECKPOINT_EVERY == 0) {
         Checkpoint &cp = cps()[-(int32_t)cpCount - 1];
         memset(&cp, 0, sizeof(cp));
@@ -60,17 +69,17 @@ void SegmentList::put(int16_t a, int16_t b, int16_t c, uint16_t meta) {
     recs()[count++] = Record{a, b, c, meta};
 }
 
-void SegmentList::putExtra(Extra kind, int16_t a, int16_t b, int16_t c) {
+PACK_HOT void SegmentList::putExtra(Extra kind, int16_t a, int16_t b, int16_t c) {
     put(a, b, c, (uint16_t)((EXTRA_MARK << 11) | kind));
 }
 
-void SegmentList::putExtra32(Extra kind, uint32_t v, int16_t c) {
+PACK_HOT void SegmentList::putExtra32(Extra kind, uint32_t v, int16_t c) {
     putExtra(kind, (int16_t)(uint16_t)(v & 0xFFFF), (int16_t)(uint16_t)(v >> 16), c);
 }
 
 // In float: the ESP32-S3's FPU has no doubles
-int32_t SegmentList::toXY(double mm) const { return (int32_t)lroundf((float)mm / xy); }
-int32_t SegmentList::toZ(double mm) const { return (int32_t)lroundf(((float)mm - z0) / zs); }
+PACK_HOT int32_t SegmentList::toXY(double mm) const { return (int32_t)lroundf((float)mm / xy); }
+PACK_HOT int32_t SegmentList::toZ(double mm) const { return (int32_t)lroundf(((float)mm - z0) / zs); }
 
 void SegmentList::doubleXY() {
     xy *= 2;
@@ -118,13 +127,13 @@ void SegmentList::doubleZ() {
 
 // --- Packing --------------------------------------------------------------------------------
 
-void SegmentList::Packer::segment(const gcode::Segment &s) {
+PACK_HOT void SegmentList::Packer::segment(const gcode::Segment &s) {
     // The line's tokens and state come in line(), just after: the move is packed there
     seg = s;
     pending = true;
 }
 
-void SegmentList::Packer::line(const gcode::Line &l, const gcode::Token *tokens, uint16_t tokenCount,
+PACK_HOT void SegmentList::Packer::line(const gcode::Line &l, const gcode::Token *tokens, uint16_t tokenCount,
                                const gcode::LineState &st) {
     SegmentList &L = list;
     const double unit = st.units == gcode::UnitsMode::G20 ? 25.4 : 1.0;
@@ -180,7 +189,7 @@ void SegmentList::Packer::line(const gcode::Line &l, const gcode::Token *tokens,
     if (dwell > 0) L.pendingDwell += (float)dwell;
 }
 
-void SegmentList::add(const gcode::Segment &s, const gcode::LineState &st, uint32_t n, bool hasN) {
+PACK_HOT void SegmentList::add(const gcode::Segment &s, const gcode::LineState &st, uint32_t n, bool hasN) {
     const double unit = st.units == gcode::UnitsMode::G20 ? 25.4 : 1.0;
     double x0 = s.x0 * unit, y0 = s.y0 * unit, sz0 = s.z0 * unit;
     double x1 = s.x1 * unit, y1 = s.y1 * unit, sz1 = s.z1 * unit;

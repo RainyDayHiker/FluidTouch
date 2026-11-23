@@ -102,7 +102,9 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
 - **Order:** file order, so a later pass is drawn over an earlier one.
 - **Fit** fits the job's extents (`jobExtents`), with the stock box if there is one, 10 px
   in from the edges, and keeps the aspect ratio. **Double tap** zooms in 2x centred on the
-  tap, up to 16x; at 16x it centres. A single tap does nothing. **Drag**, only when zoomed in,
+  tap, up to 16x; at 16x it centres. Two taps are a double tap when the second ends within
+  400 ms of the first and 40 px from it (not LVGL's own double click, which missed finger taps
+  on the device). A single tap does nothing. A press is a drag once it has moved 16 px. **Drag**, only when zoomed in,
   moves the view: the picture already drawn follows the finger, and it is drawn again when the
   finger lifts; at least 20 px of what Fit shows stays in view. Zooming out is Fit only (D85).
   The Fit button is in the preview's top right corner (its row is M6's). A redraw takes 0.2 s

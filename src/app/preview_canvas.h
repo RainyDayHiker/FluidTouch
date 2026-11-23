@@ -51,5 +51,8 @@ private:
     // A drag: where the finger went down, and whether it has moved far enough to be one
     lv_point_t pressAt = {0, 0};
     bool dragging = false;
-    bool dragEnded = false;  // the last release ended a drag (not a tap)
+    // The last tap, for a double tap
+    bool haveTap = false;
+    lv_point_t tapAt = {0, 0};
+    uint32_t tapMs = 0;
 };
