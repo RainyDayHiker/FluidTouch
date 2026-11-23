@@ -108,21 +108,22 @@ previews that file, transforms it, and hands it to Run (D48).
 +--------------------------------------------------------------------------------+
 | Spoilboard_DogHoles.gcode    789 KB    Controller SD  /jobs           [Change] |
 |--------------------------------------------------------------------------------|
-|                                                                                |
-|                          preview  ~784 x 220   (M5)                            |
+|                                                                         [Fit]  |
+|                          preview  784 x 204   (M5)                             |
 |                                                                                |
 |--------------------------------------------------------------------------------|
-| 520 x 864 mm  Z -19..15  T2  90 ops  ~2h10                               (M5)  |
-| [Rot L][Rot R][Flip H][Flip V] [Outline] [Fit] [Undo]  (M6)    [Use this job >]|
+| 520 x 864 mm  Z -19..15  T2  90 ops  ~2h10  (M5)          +-----------------+  |
+| Preview shows the first 63% of the job   (warnings, M5)   | Use this job  > |  |
 +--------------------------------------------------------------------------------+
+  M6 adds [Rot L][Rot R][Flip H][Flip V] [Outline] [Undo]; the preview gives up a row for them
 ```
 
 | Control | Behaviour |
 |---------|-----------|
 | File line | Name, size, card and folder of the chosen file. With none chosen: "No job chosen. Tap to choose a file." Tapping it, or Change, opens the picker |
 | Use this job | A file on the controller's SD: chosen, and Run opens on its start panel. A file on the display SD: uploaded first to `/sd/fluidtouch/uploads/` (D53) with a progress bar and Cancel; a file of that name already there is overwritten after a confirm ([05 §5](05-file-workflow.md#5-on-the-controller)); the upload counts once the controller lists it at the right size (S6); then Run's start panel. Greyed out while a job runs (S3) |
-| Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Tap = zoom in at that point; Fit = whole job ([11 §4](11-preview.md#4-the-job-preview)) |
-| Info line (M5) | Extents, Z range, tools, operation count, time estimate from feeds (D80), warnings (tap for the list) ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate)) |
+| Preview (M5) | Top view. Cuts coloured by depth, rapids thin and dim, stock box, job zero, probe point. Double tap = zoom in at that point; drag (zoomed in) = move; Fit (its corner) = whole job ([11 §4](11-preview.md#4-the-job-preview)). Without a picture it says why, or shows the download and analysis with a bar and Cancel |
+| Info line (M5) | Left of Use this job (D83): extents, Z range, tools, operation count, time estimate (D80); the preview's own warnings on the line under it (P3, D82; the transform report's come in M6) ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate)) |
 | Rot L / Rot R (M6) | Rotate 90 CCW / CW per CNC-Tools spec 06 |
 | Flip H / Flip V (M6) | Mirror per CNC-Tools spec 12. "Flip only", with the climb/conventional warning (W-FLIP) shown and confirmed (D70). "Flip and reverse cuts" once CNC-Tools ports it (its C4) |
 | Move (later, D70) | Enter X and Y shift in mm. Preview shows the result against the stock box. Comes once Move is a G-code Editor feature with a device contract |
@@ -133,7 +134,6 @@ previews that file, transforms it, and hands it to Run (D48).
 
 With transforms (M6), "Use this job" uploads the working copy under a new name
 (`name.r90.gcode`, `name.fh.gcode`; Move's later) into the same uploads folder.
-Until M5 the preview area shows the file line's details in large type.
 
 ### File picker
 

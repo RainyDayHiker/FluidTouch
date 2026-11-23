@@ -10,7 +10,8 @@ It speaks just enough of the FluidNC websocket protocol for FluidTouch:
 status reports (polled "?" or $Report/Interval auto-reports), $G parser
 state, jogging ($J=), homing ($H/$HX..), zeroing (G10 L20), feed hold /
 resume / reset, overrides, unlock, $Files/ListGcode and $SD/Delete (on the
-folder given with --sd, or a few sample files). Anything else gets "ok".
+folder given with --sd, or a few sample files), and the axis rates
+($/axes/x/max_rate_mm_per_min: the rapid rate). Anything else gets "ok".
 
 It also runs jobs: $SD/Run=<path> (or $LocalFS/Run=) plays a G-code file from
 the --sd folder, or a built-in sample job when no folder is given. The
@@ -616,6 +617,11 @@ class Session:
             for axis, value in re.findall(r"([XYZA])(-?[\d.]+)", up):
                 i = AXES.index(axis)
                 m.wco[i] = m.mpos[i] - float(value)
+            self.send("ok")
+        elif up.startswith("$/AXES/") and up.endswith("/MAX_RATE_MM_PER_MIN") and up[7:8] in "XYZA":
+            # The config's axis rates, as FluidNC answers $/path: the fake moves every axis at
+            # its rapid rate
+            self.send(f"$/axes/{line[7:8].lower()}/max_rate_mm_per_min={RAPID_RATE:.3f}")
             self.send("ok")
         elif up.startswith("$FILES/LISTGCODE"):
             path = line.split("=", 1)[1].strip() if "=" in line else "/sd/"

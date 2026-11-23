@@ -35,6 +35,8 @@ public:
     // wait, and a task on core 0 that doesn't yield starves the idle task until the task
     // watchdog reboots the device (seen on the device, 2026-11-19).
     static void yieldNow();
+    // Time spent in SD reads since construction, microseconds
+    uint32_t readMicros() const { return readUs; }
 
 private:
     bool fill();
@@ -47,5 +49,6 @@ private:
     uint32_t pass = 1;
     uint64_t offset = 0;
     bool readError = false;
+    uint32_t readUs = 0;
     bool stopped = false;
 };

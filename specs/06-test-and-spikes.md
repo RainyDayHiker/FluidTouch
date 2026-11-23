@@ -4,7 +4,7 @@
 
 | Level | What | Where |
 |-------|------|-------|
-| Library | Proven equal to the TS core in CNC-Tools' CI; here, its device suite on the device for each release ([04 §2](04-gcode-library.md#2-the-device-test-suite)); unit tests for segment packing | Test firmware on the device; PC |
+| Library | Proven equal to the TS core in CNC-Tools' CI; here, its device suite on the device for each release ([04 §2](04-gcode-library.md#2-the-device-test-suite)); the segment packing's host test against the library's segments for every case of the device data (`tools/host_tests/run.sh`, [11 §10](11-preview.md#10-testing)) | Test firmware on the device; PC |
 | Services | MachineService and JobService against the fake FluidNC, scripted | Simulator, headless |
 | Screens | Each screen driven in the simulator with `--script`, screenshots compared by eye at review | Simulator |
 | Device | Checklist per milestone on the CrowPanel and the LowRider | By hand |
@@ -28,7 +28,8 @@ session (for the `$sim/...` helpers, since the new UI has no terminal yet), and 
 (`!`) behaves as on FluidNC: it ends a jog and is ignored when idle. G-code lines sent
 directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38.2` and
 `G90` back to back); before M2 a line that arrived while another ran was dropped. `$SD/Delete`
-deletes a file from the served folder (M3).
+deletes a file from the served folder (M3). `$/axes/<axis>/max_rate_mm_per_min` answers the
+fake's rapid rate, 5,000 mm/min, as `$/axes/x/max_rate_mm_per_min=5000.000` (M5).
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
 that the Run screen has to cope with. S3 measured them on the controller (2026-11-18,

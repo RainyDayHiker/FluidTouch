@@ -92,7 +92,9 @@ bool SdReader::fill() {
     if (at < have) return true;
     size_t pos = file.position();
     if (pos >= size) return false;
+    uint32_t t0 = micros();
     have = file.read(chunk, CHUNK);
+    readUs += micros() - t0;
     at = 0;
     if (have == 0) readError = true;  // short of the end: an SD error
     return have > 0;

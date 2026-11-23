@@ -26,6 +26,13 @@ extern bool g_serialMuted;
 #define LOG_PRINTLN(...)  do { if (!g_serialMuted) Serial.println(__VA_ARGS__); } while (0)
 #define LOG_PRINTF(...)   do { if (!g_serialMuted) Serial.printf(__VA_ARGS__);  } while (0)
 
+// The lines FluidNCClient prints for each status report and parser state (several a second
+// while connected). Off unless built with -DLOG_FLUIDNC_STATUS=1.
+#ifndef LOG_FLUIDNC_STATUS
+#define LOG_FLUIDNC_STATUS 0
+#endif
+#define LOG_STATUS_PRINTF(...) do { if (LOG_FLUIDNC_STATUS) LOG_PRINTF(__VA_ARGS__); } while (0)
+
 // Stop the logging that writes to UART0 without going through Serial: the
 // Arduino core's log_e()/log_w() (via ets_printf) and ESP-IDF's ESP_LOGx.
 // Needed when FluidNC is wired to UART0, where any such line would arrive as

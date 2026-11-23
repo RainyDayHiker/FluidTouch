@@ -1,7 +1,7 @@
 # 11 — Preview and progress (M5)
 
 How a chosen job is fetched, analysed and drawn on Job, and how Run follows the tool.
-Milestone M5 ([08](08-milestones.md)); decisions D79 to D82, D28 to D30. The screens are
+Milestone M5 ([08](08-milestones.md)); decisions D79 to D84, D28 to D30. The screens are
 [03 §3](03-screens.md#3-job) and [03 §4](03-screens.md#4-run); memory and threads are
 [02 §6, §7](02-architecture.md#6-memory); the analysis is the library's (`analyse()` with the
 outline, D75, D77).
@@ -19,7 +19,7 @@ M5 is built and checked in three parts, each its own branch:
 | Part | Delivers | Checked by |
 |------|----------|------------|
 | 5a | Working folder, fetch from the Controller SD, the analysis on the worker task with a progress bar and Cancel: `PreviewService` (`src/services/preview_service.*`), `Fetching -> Analysing -> Ready`. Built 2026-11-21; on the device 2026-11-22: the reference job analysed in 6.5 s | Simulator with the fake FluidNC; device: the reference job fetched and analysed, times against D75 |
-| 5b | Segment list (§3), the Job preview (§4), the info line with the time estimate (§5) | Simulator; device: the reference jobs look like the editor's top view |
+| 5b | Segment list (§3, `src/services/segment_list.*`), the Job preview (§4, `src/app/preview_canvas.*`), the info line with the time estimate (§5). Built 2026-11-22 | Simulator; host test of the packing; device: the reference jobs look like the editor's top view |
 | 5c | Run: progress layer, tool marker, the tool's line (§6), op N of M, the message following the tool, time left from the estimate (§7) | Fake FluidNC playback; device: a real cut |
 
 ## 2. Fetch and the working folder
@@ -34,9 +34,11 @@ M5 is built and checked in three parts, each its own branch:
   preview when the job ends." and the download starts when it ends.
 - **During a cut, no copy:** Run's preview area offers the download with the confirm of
   [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
-- A fetch that fails (controller offline, the card full, a short download) deletes the
-  partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
-  on the controller's SD." for a 404). Cancel leaves "Preview cancelled." with Retry.
+- A fetch that fails (controller offline, a write to the display SD failing, a short
+  download) deletes the partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
+  on the controller's SD." for a 404). A write to the display SD that fails ("Writing to the
+  display SD failed.") is first retried once from the start, without a word (D86). Cancel
+  leaves "Preview cancelled." with Retry.
 - **Choosing another file** while one is downloaded or analysed cancels it and starts the new
   one. The library tests (Settings > Tools) take the preview's arena back while they run: the
   preview shows Retry afterwards.
@@ -45,13 +47,20 @@ M5 is built and checked in three parts, each its own branch:
 
 ## 3. The segment list
 
-The analysis sink receives every segment (`AnalysisSink::segment`, CNC-Tools 15 §5.2) and
-packs it into 8-byte records in PSRAM, one per segment, laid out as D30 says:
+The analysis sink receives every segment (`AnalysisSink::segment`, CNC-Tools 15 §5.2), and
+the line hook (`AnalysisSink::line`) the line's tokens and state just after it; the move is
+packed there into 8-byte records in PSRAM, one per segment, laid out as D30 says with the
+changes of D84:
 
 | Record | Bytes |
 |--------|-------|
-| Move (one per segment) | end X and end Y as signed 16-bit steps; for an arc its radius as a signed 16-bit step count (negative for more than 180°), else 0; 16 bits of meta: kind (rapid, feed, arc CW, arc CCW, 2 bits), fixed move (1), Z as a depth level (8 bits), the line's distance from the previous record's line (5 bits, 0 to 30) |
-| Extra, rare | a full circle's centre (start and end are the same point, so the radius doesn't place it); the absolute line when the distance is over 30; F when the feed changes (mm/min as a float; G93 inverse time flagged) |
+| Move (one per segment) | end X and end Y as signed 16-bit steps from work zero; for an arc the centre's signed distance from the chord's middle (left of the chord positive) in 16-bit steps, else 0; 16 bits of meta: kind (rapid, feed, arc CW, arc CCW, 2 bits), fixed move (1), Z as a depth level (8 bits), the line's distance from the previous move's line (5 bits, 0 to 30) |
+| Extra, rare (meta's line distance 31) | the centre of a full circle, or of an arc whose ends round to the same step; the absolute line when the distance is over 30 or goes back; F when the feed changes (mm/min, or 1/min under G93, as a float; the mode flagged: G94, G93, G95 or no F yet); a dwell (G4 P, seconds); a jump: where the next move starts when that isn't the last move's end (G92, G28, a move after an unknown position), not drawn; the next move's N word (D79); padding, so a move and its extras never straddle a checkpoint |
+
+An arc stored by its radius (D30) puts a half circle's centre off by up to √(2·r·step): 0.3 mm
+for a 5 mm radius at 0.01 mm. The centre's distance from the chord is exact for a half circle,
+and fits the same 16 bits (D84). An arc smaller than a step is stored as a straight move; a
+G18/G19 arc, or one the library couldn't interpret, as a straight move to its end.
 
 - **XY step:** starts at 0.01 mm, so ±327 mm. A value that doesn't fit doubles the step and
   repacks the records so far (a pass over the list, a few times at most per job). The final
@@ -60,31 +69,48 @@ packs it into 8-byte records in PSRAM, one per segment, laid out as D30 says:
 - **Z level:** signed 8-bit steps from the first Z, starting at 0.1 mm and doubled the same
   way (the reference job, Z -19 to 15, ends at 0.2 mm). Enough for the depth colours and for
   matching the tool's Z (§6).
-- **Checkpoints:** every 256 records, the record index, its line, its byte offset and its
-  absolute position, so Run can search by line or offset (§6) without decoding from the start.
+- **Checkpoints:** every 256 records, from the top of the same memory down (32 bytes each):
+  the state before that record (the last move's line, its byte offset and end, the feed, the
+  last N word) and the estimate up to there (§5, filled by the estimate), so Run can start
+  decoding at any checkpoint (§6) instead of from the start.
 - **Units:** inch files are converted to mm when packed.
-- **Capacity:** about 1.0 MB on Job, 0.6 MB on Run (02 §6): about 75,000 records on Run, over
-  5 times the reference job's segments (G8), as D30 planned. A job with more records keeps those that fit,
-  and the preview says "Preview shows the first 63% of the job." D30's file fallback is not
-  built in M5.
-- **Line numbers (D79):** when the line hook (`AnalysisSink::line`) sees an N word, its value
-  and line go into an N table in the same memory, 8 bytes per numbered line. The table is only
-  used if the N words increase through the file; otherwise it is dropped and position
-  matching is used (§6).
+- **Capacity (D83):** one block, sized when a job is first chosen so that Run's second canvas
+  still fits beside it: the largest free PSRAM block less 400 KB, at most 640 KB (about 80,000
+  records; almost 6 times the reference job's 13,662). On Job and Run alike. A job with more records
+  keeps those that fit, and the preview says "Preview shows the first 63% of the job" (by
+  file offset). D30's file fallback is not built in M5.
+- **Line numbers (D79):** when the line hook sees an N word on a line that moves, its value goes
+  into an extra record before the move (8 bytes per numbered move). The N words are only used
+  if they increase through the file: from the first one that doesn't, no more are stored and
+  position matching is used (§6).
+- **Measured (host, 2026-11-22):** the reference job packs into 13,662 records (107 KB, step
+  0.04 mm, Z step 0.2 mm), every end within 0.035 mm of the library's; the escape wheel 2,953
+  records at 0.01 mm.
 
 ## 4. The Job preview
 
-- **Canvas:** the preview area, about 784 x 220, RGB565, drawn by the display's own
-  rasteriser into the buffer (D28; `draw_test.cpp` is the starting point).
-- **What is drawn:** rapids thin and dim; feeds and arcs 2 px, coloured by their end Z, from
-  the job's top cut depth (light) to its deepest (dark), in 8 levels (P4, D82);
-  plunges as a dot; the stock box (`Analysis::stockBox`), dashed; job zero as a cross; the
-  probe point (`fixedMoves`, kind Probe) as a ring. Fixed moves are drawn as rapids.
+- **Layout (D83):** the preview area is 784 x 204 under the file line (content y 80 to 284);
+  the info line and the warnings under it are left of Use this job (y 296 to 352). With no
+  picture the area says why: "Choose a job to see its preview.", the download or analysis
+  with its bar and Cancel, the upload, the reasons of §2 with Retry, "No XY moves to draw."
+- **Canvas:** RGB565, drawn by the display's own rasteriser into the buffer (D28; from
+  `draw_test.cpp`), allocated once when the Job screen is built (313 KB).
+- **What is drawn:** rapids 1 px grey; feeds and arcs 2 px, coloured by their end Z, from the
+  top of the cutting moves' Z range (light) to its bottom (dark), in 8 blues (P4, D82); the
+  cutting moves are the feeds and arcs that move in XY, so retracts at feed don't stretch the
+  range. A plunge (a feed down with XY unchanged) is a dot; a feed up isn't drawn. The stock
+  box (`Analysis::stockBox`) dashed; job zero as a cross; the probe point (`fixedMoves`, kind
+  Probe) as an orange ring. Fixed moves are drawn as rapids.
 - **Order:** file order, so a later pass is drawn over an earlier one.
-- **Fit** fits the job's extents (`jobExtents`), with the stock box if there is one, and
-  keeps the aspect ratio. **Tap** zooms in 2x centred on the tap, up to 16x. The Fit button
-  moves into the preview's corner (its row is M6's). A redraw takes about 0.3 s for the
-  reference job (S2, D28).
+- **Fit** fits the job's extents (`jobExtents`), with the stock box if there is one, 10 px
+  in from the edges, and keeps the aspect ratio. **Double tap** zooms in 2x centred on the
+  tap, up to 16x; at 16x it centres. Two taps are a double tap when the second ends within
+  400 ms of the first and 40 px from it (not LVGL's own double click, which missed finger taps
+  on the device). A single tap does nothing. A press is a drag once it has moved 16 px. **Drag**, only when zoomed in,
+  moves the view: the picture already drawn follows the finger, and it is drawn again when the
+  finger lifts; at least 20 px of what Fit shows stays in view. Zooming out is Fit only (D85).
+  The Fit button is in the preview's top right corner (its row is M6's). A redraw takes 0.2 s
+  for the reference job on the device (5b); 3 ms in the simulator.
 - **While analysing:** the preview area shows the progress bar, Cancel and the file line's
   details. The preview, the info line, the extents and the first tool on Run's start panel
   fill in when the analysis finishes (D75).
@@ -102,7 +128,17 @@ packs it into 8-byte records in PSRAM, one per segment, laid out as D30 says:
 | Tools | `structure.labelTools` ("T1 T2"); left out when the file has none |
 | Ops | enabled units in `structure`; left out when `structure.kind` isn't Ok |
 | Time | the estimate below, "~" and hours:minutes |
-| Warnings | P3 (D82) |
+| Warnings | P3 (D82): on the line under it, in orange |
+
+Lengths are whole mm when they are within 0.05 of one, else to a tenth; an inch file's in
+inches to a hundredth. Each part is left out when there's nothing for it (no XY moves, no
+structure, no segments). The time is "~2h10" from an hour, "~25 min" below, at least
+"~1 min".
+
+"Some moves had an unknown position and aren't drawn" is shown when a move in XY got no
+segment from the library (an unknown position, Z included) and something is missing from the
+picture: not when only its start was unknown, the first move of most files from wherever the
+machine is, nor for a Z move after a probe (whose Z is unknown until the probe).
 
 **The time estimate (D80)** is computed by the display from the segment list, not by the
 library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait for CNC-Tools.
@@ -113,7 +149,11 @@ library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait f
 - Every move, rapids included, is capped by the machine's axis rates: the time is at least
   each axis's distance over its `max_rate_mm_per_min`, read once from the controller's config
   (`$/axes/x/max_rate_mm_per_min` and likewise for Y and Z) on connect. Without them a rapid
-  is taken at 5,000 mm/min and the estimate is marked "+".
+  is taken at 5,000 mm/min and the estimate is marked "+". FileService asks for them 2 s after
+  each connect, one at a time (the answer is `$/axes/x/max_rate_mm_per_min=8000.000`; an
+  `error:` leaves that axis unknown), and keeps them in MachineService. An arc is capped by
+  the slower of X and Y over its length. Rates that arrive after the analysis start the
+  estimate again (a pass over the list, a few ms).
 - `G4 P` dwells add their time; prompts (`M0`) add nothing, being waits for the user.
 - No acceleration: the estimate is short on jobs of many tiny moves. The S3 log gives a
   first check of how short; the reference job's real time on the device gives a second.
@@ -176,7 +216,11 @@ at a doubled step runs on the worker task too.
   messages following the tool, time left. The fake FluidNC gains `Ln:` for files with N words
   and its config's axis rates.
 - **Host test:** the record packing and unpacking round trip against the library's segments for
-  the golden set, within half a step.
+  every case of the release's device data (`tools/host_tests/run.sh <cases folder>`): kind,
+  line, ends within one step (a repack rounds twice), an arc's middle point within 3 steps
+  (for steps under 1 mm: the fuzz cases with kilometre steps only check ends), a reader from
+  each checkpoint reading the same moves as one from the start, a job over 327 mm doubling the
+  step, a list too small truncating. 121 files, 0 failures (2026-11-22).
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

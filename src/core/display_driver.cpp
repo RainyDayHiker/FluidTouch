@@ -312,22 +312,25 @@ bool DisplayDriver::init() {
     // Initialize LVGL
     lv_init();
     
-    // Allocate display buffers in PSRAM (dual buffering for smooth rendering)
+    // Allocate display buffers in PSRAM (dual buffering for smooth rendering).
+    // Sized by the display's colour depth: lv_color_t is always 3 bytes in LVGL 9, which
+    // made each buffer a third larger than LV_COLOR_DEPTH 16 uses (LowRider Touch D88).
     uint32_t buf_size = SCREEN_WIDTH * BUFFER_LINES;
-    disp_draw_buf = (lv_color_t *)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
-    disp_draw_buf2 = (lv_color_t *)heap_caps_malloc(buf_size * sizeof(lv_color_t), MALLOC_CAP_SPIRAM);
+    const uint32_t buf_bytes = buf_size * ((LV_COLOR_DEPTH + 7) / 8);
+    disp_draw_buf = (lv_color_t *)heap_caps_malloc(buf_bytes, MALLOC_CAP_SPIRAM);
+    disp_draw_buf2 = (lv_color_t *)heap_caps_malloc(buf_bytes, MALLOC_CAP_SPIRAM);
     
     if (!disp_draw_buf || !disp_draw_buf2) {
         Serial.println("ERROR: Failed to allocate display buffers in PSRAM!");
         return false;
     }
     
-    Serial.printf("Display buffers allocated in PSRAM: 2 x %lu bytes\n", buf_size * sizeof(lv_color_t));
+    Serial.printf("Display buffers allocated in PSRAM: 2 x %lu bytes\n", buf_bytes);
     
     // Create LVGL display
     disp = lv_display_create(SCREEN_WIDTH, SCREEN_HEIGHT);
     lv_display_set_flush_cb(disp, my_disp_flush);
-    lv_display_set_buffers(disp, disp_draw_buf, disp_draw_buf2, buf_size * sizeof(lv_color_t), LV_DISPLAY_RENDER_MODE_PARTIAL);
+    lv_display_set_buffers(disp, disp_draw_buf, disp_draw_buf2, buf_bytes, LV_DISPLAY_RENDER_MODE_PARTIAL);
     
     // Store lcd instance in display user data for flush callback
     lv_display_set_user_data(disp, &lcd);

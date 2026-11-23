@@ -86,11 +86,13 @@ public:
     static bool displayCardBusy();
 
 private:
-    enum Request { REQUEST_NONE, REQUEST_LIST, REQUEST_CHECK, REQUEST_VERIFY };
+    enum Request { REQUEST_NONE, REQUEST_LIST, REQUEST_CHECK, REQUEST_VERIFY, REQUEST_RATES };
 
     static void listDisplay(const char *folder);
     static void requestController(Request request, const char *folder);
     static void onLine(const char *line);
+    static void requestRate(int axis);
+    static void onRateLine(const char *line);
     static void finishRequest(bool ok, const char *error);
     static int parseListing(const char *json, Entry *out, int max, bool &truncated, char *error, int errorLen);
     static void sortEntries();
@@ -111,6 +113,11 @@ private:
     static bool collecting;
     static bool relistPending;
     static uint32_t relistAtMs;
+    // The axis rates for the preview's estimate, asked for one at a time after a connect
+    static bool ratesWanted;
+    static bool wasConnected;
+    static uint32_t connectedAtMs;
+    static int rateAxis;
 
     static UploadState uploadStateValue;
     static char uploadLocalPath[PATH_LEN];

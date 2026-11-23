@@ -132,8 +132,23 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    spaces, a 404, no card, a choice during a cut). Checked on the device 2026-11-22
    (Jeffrey): the reference job analysed in 6.5 s with the outline (D75 expected about 7.7 s
    from 06's `perf`), Cancel and Retry, a display SD file analysed in place, and the library
-   tests all passing with a job chosen. The download time wasn't noted. Until 5b the Job
-   screen shows the analysis's line count, size and time under the file.
+   tests all passing with a job chosen. The download time wasn't noted. Merged.
+   **Part 5b** (segment list, Job preview, info line and estimate; D83 to D88) is checked
+   in the simulator (the reference jobs, an inch job, a 2 MB job truncated at 80%, zoom and
+   Fit, the warnings, Cancel and Retry, the axis rates from the fake), by the host test of
+   the packing (121 files), and on the device 2026-11-22 (Jeffrey): DogHoles downloads in
+   1.6 s, analyses in 7.4 s (SD reads 1.2 s, packing 0.5 s), draws in 0.2 s; double tap
+   zooms, drag moves when zoomed in (D85), Fit. Found and fixed on the device: the packer was
+   slow from PSRAM (hot code in IRAM, tokens only on lines with F, N or P), the CPU caches
+   at their largest (D87: the library back to 5a's 6.4 s), and LVGL's draw buffers 1.15 MB
+   each instead of 768 KB (D88: the segment list now gets its 640 KB, 2.09 MB free before
+   the arena). Download writes to the display SD failed three times with errno 5 (I/O) at
+   31 KB, 175 KB and 718 KB, card nearly empty; the D86 retry recovered the last one on the
+   device. Cause unknown; nearly every download so far was the first after a flash, so that
+   says nothing. Merged 2026-11-22.
+   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79)) next, on `lrt/m5c-run`.
+   Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
+   on the real machine; Jeffrey sends it when he can.
 4. The temporary machine picker (D57) is to be removed at the end of development.
 5. Checked on the device 2026-11-18 (Jeffrey): a Controller SD file downloads during a cut
    (FluidNC serves `/sd/` through WebDAV, which ignores `$HTTP/BlockDuringMotion`; the

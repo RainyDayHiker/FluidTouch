@@ -6,3 +6,6 @@
 # Copies from CNC-Tools releases (specs/04 §1, D69): byte-exact, checked against SHA256SUMS
 lib/gcode/** -text
 src/services/gcode_device/** -text
+
+# Shell scripts run in Git Bash / MSYS2: LF, or bash stumbles on the CR
+*.sh text eol=lf
