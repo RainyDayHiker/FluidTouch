@@ -134,6 +134,7 @@ sent it; the new UI has no terminal yet):
 | `$sim/state=Door:0` | Report any state string, e.g. `Door:0`, `Sleep`, or an unknown one to test "DISCONNECTED" |
 
 | `$sim/speed=20` | Play jobs 20 times faster (also `--speed 20` on the command line) |
+| `$sim/ln=0` | Reports without `Ln:`, as with FluidNC's `use_line_numbers` off (`1`, the default, to put it back) |
 | `$sim/probemiss=1` | The next `G38.2` finds nothing: `[PRB:...:0]` and `ALARM:5` (`0` to clear) |
 | `$sim/drop=5` | Close every connection and refuse new ones for 5 seconds; a running job continues |
 | `$sim/httprate=100` | Limit HTTP transfers to 100 KB/s, to watch progress or try a cancel (`0` = no limit) |
@@ -158,6 +159,9 @@ probe, two operations and a final prompt, like a LowRider job.
   still running.
 - `(MSG text)` comments arrive as `[MSG:INFO: MSG,text]` when their line is
   read, so a message can appear a few moves early.
+- While a line with an `N` word moves, reports carry `Ln:<n>`, as FluidNC's do
+  with `use_line_numbers` on (the N of the block it is executing; nothing for a
+  line without one, a dwell or a hold). On by default; `$sim/ln=0` turns it off.
 - `M0` holds until cycle start (`~`). `G38.2` makes contact at 60% of its
   travel and sends `[PRB:x,y,z:1]`. Feed hold pauses; a reset aborts, with
   `ALARM:3` if the machine was moving.

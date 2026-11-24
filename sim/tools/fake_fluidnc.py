@@ -21,6 +21,9 @@ carry SD:<percent>,<path>, where the percent is how far FluidNC has *read*
 the file: up to 15 lines ahead of the motion, stopping at lines that wait for
 motion to finish (M0, G4, G10, G38), and gone once the last line is read.
 (MSG text) comments are sent as [MSG:INFO: MSG,text] when their line is read,
+With use_line_numbers on ($sim/ln, on by default), a report sent while a
+line with an N word is moving carries |Ln:<n>, as FluidNC's does (the N of the
+block it executes; nothing for a line without one, a dwell or a hold).
 M0 holds until cycle start (~), G38.2 probes (contact at 60% of the travel)
 and sends [PRB:x,y,z:1], feed hold pauses, and a reset aborts (ALARM:3 if it
 was moving). Motion lines sent directly are played the same way, so a probe
@@ -47,6 +50,7 @@ session as if that client had sent it):
     $sim/probe=1|0   set probe pin
     $sim/state=Door:0  report any state string (e.g. Door:0, Sleep, Bogus)
     $sim/speed=<n>   play jobs n times faster (also --speed)
+    $sim/ln=1|0      use_line_numbers: |Ln: in the reports (on by default)
     $sim/probemiss=1|0  G38.2 finds nothing: [PRB:...:0] and ALARM:5
     $sim/drop=<s>    close every connection and refuse new ones for s seconds
                      (a running job continues)
@@ -100,6 +104,8 @@ class Machine:
         self.feed = 1000.0         # mm/min
         self.feed_now = 0.0        # reported in FS:
         self.speed = 1.0           # playback speed-up, for tests
+        self.use_line_numbers = True
+        self.line_n = 0            # N word of the line moving, reported as Ln:
         self.probe_miss = False
         self.probe_hit_until = 0.0
         self.drop_until = 0.0
@@ -119,6 +125,8 @@ class Machine:
         pins = self.limits + ("P" if probe else "")
         report = (f"<{self.state}|MPos:{mpos}|FS:{self.feed_now:.0f},0|WCO:{wco}"
                   f"|Ov:{self.feed_ov},{self.rapid_ov},{self.spindle_ov}")
+        if self.use_line_numbers and self.line_n > 0:
+            report += f"|Ln:{self.line_n}"
         if pins:
             report += f"|Pn:{pins}"
         sd = self.job.sd_field() if self.job else None
@@ -229,6 +237,7 @@ async def run_job(m, job):
                 return
     finally:
         m.job = None
+        m.line_n = 0
         m.feed_now = 0.0
         m.holding = False
         if m.state != "Alarm":
@@ -243,6 +252,9 @@ async def execute_line(m, raw):
     gs = [float(v) for letter, v in words if letter == "G"]
     ms = [int(float(v)) for letter, v in words if letter == "M"]
     vals = {letter: float(v) for letter, v in words if letter not in "GMN"}
+    ns = [int(float(v)) for letter, v in words if letter == "N"]
+    # The planner's current block: this line's N while it moves; none in a dwell or a hold
+    m.line_n = 0
 
     for g in gs:
         if g == 20: m.inches = True
@@ -272,6 +284,7 @@ async def execute_line(m, raw):
 
     probing = any(38 <= g < 39 for g in gs)
     if probing or any(axis in vals for axis in AXES):
+        m.line_n = ns[0] if ns else 0
         target = list(m.mpos)
         for i, axis in enumerate(AXES):
             if axis in vals:
@@ -283,6 +296,7 @@ async def execute_line(m, raw):
             await arc_move(m, target, vals, unit, clockwise=m.motion == 2)
         else:
             await linear_move(m, target, rapid=m.motion == 0)
+        m.line_n = 0
         if m.abort:
             return
 
@@ -652,6 +666,9 @@ class Session:
         elif up.startswith("$SIM/SPEED="):
             m.speed = max(0.01, float(line.split("=", 1)[1] or 1))
             self.send("ok")
+        elif up.startswith("$SIM/LN="):
+            m.use_line_numbers = line.split("=", 1)[1].strip() == "1"
+            self.send("ok")
         elif up.startswith("$SIM/PROBEMISS="):
             m.probe_miss = line.split("=", 1)[1].strip() == "1"
             self.send("ok")
@@ -684,7 +701,7 @@ class Session:
                 espnow_server.command(self, up[len("$ESPNOW/"):])
             else:
                 self.send("error:3")
-        elif up[0] in "GMXYZF" and (m.direct_running or (not m.busy() and m.state in ("Idle", "Jog"))):
+        elif up[0] in "GMXYZFN" and (m.direct_running or (not m.busy() and m.state in ("Idle", "Jog"))):
             # A G-code line sent directly is played like a one-line job.
             # Lines sent while one runs queue behind it, as in FluidNC
             # (e.g. "G91" then "G38.2 ..." from a probe button).

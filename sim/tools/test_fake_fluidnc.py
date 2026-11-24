@@ -52,6 +52,15 @@ async def main():
     session.handle_realtime(0x18); await asyncio.sleep(0.15)
     assert m.state == "Alarm" and "ALARM:3" in out and not m.busy(), (m.state, out)
     session.handle_line("$X"); assert m.state == "Idle"
+    # Ln: the moving line's N word, with use_line_numbers; none for a line without one
+    session.handle_line("N55 G1 X150 F600"); await asyncio.sleep(0.2)
+    assert m.state == "Run" and re.search(r"\|Ln:55[|>]", m.status()), m.status()
+    session.handle_line("$sim/ln=0"); assert "Ln:" not in m.status(), m.status()
+    session.handle_line("$sim/ln=1"); session.handle_realtime(0x18); await asyncio.sleep(0.15)
+    session.handle_line("$X"); assert "Ln:" not in m.status(), m.status()
+    session.handle_line("G1 X160 F600"); await asyncio.sleep(0.2)
+    assert m.state == "Run" and "Ln:" not in m.status(), m.status()
+    session.handle_realtime(0x18); await asyncio.sleep(0.15); session.handle_line("$X")
     # probe miss
     out.clear(); m.speed = 50; session.handle_line("$sim/probemiss=1"); session.handle_line("G38.2 Z-10 F100")
     await asyncio.sleep(0.5)
