@@ -476,19 +476,23 @@ double SegmentList::moveSeconds(const Move &m, const Rates &rates, bool &incompl
 }
 
 SegmentList::Estimate SegmentList::estimate(const Rates &rates) {
-    Estimate e = {0, false};
+    Estimate e = {0, 0, false};
     Reader reader(*this);
     Move m;
     uint32_t nextCp = 0;
     while (reader.next(m)) {
         while (nextCp < cpCount && nextCp * CHECKPOINT_EVERY <= m.record) {
             cps()[-(int32_t)nextCp - 1].seconds = (float)e.seconds;
+            cps()[-(int32_t)nextCp - 1].feedSeconds = (float)e.feedSeconds;
             nextCp++;
         }
-        e.seconds += moveSeconds(m, rates, e.incomplete);
+        double s = moveSeconds(m, rates, e.incomplete);
+        e.seconds += s;
+        e.feedSeconds += feedPart(m, s);
     }
     while (nextCp < cpCount) {
         cps()[-(int32_t)nextCp - 1].seconds = (float)e.seconds;
+        cps()[-(int32_t)nextCp - 1].feedSeconds = (float)e.feedSeconds;
         nextCp++;
     }
     e.seconds += reader.trailingDwell() + pendingDwell;

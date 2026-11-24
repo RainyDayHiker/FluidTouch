@@ -1,6 +1,7 @@
 #pragma once
 
 #include "services/file_service.h"
+#include "services/job_notes.h"
 #include "services/segment_list.h"
 #include <stdint.h>
 
@@ -52,6 +53,7 @@ public:
         uint8_t shownPercent;  // 100, or how much of the job the list holds
         uint32_t moves;
         double estimateSeconds;
+        double estimateFeedSeconds;  // of which feeds and arcs (the feed override's part)
         bool estimateIncomplete;
     };
 
@@ -70,6 +72,11 @@ public:
     static const Summary &summary();
     // READY: the packed segments; otherwise null
     static const SegmentList *segments();
+    // READY: the file's messages and operations (D92); otherwise null
+    static const JobNotes *notes();
+    // The axis rates the estimate uses, and a count that moves on each time it is made again
+    static SegmentList::Rates rates();
+    static uint32_t estimateGeneration();
     // Moves on each time a job becomes READY: time to draw it (a new estimate doesn't move it)
     static uint32_t readyGeneration();
     // The file the preview is of (when READY, the one segments() holds): its name and size

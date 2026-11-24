@@ -71,8 +71,8 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
   matching the tool's Z (§6).
 - **Checkpoints:** every 256 records, from the top of the same memory down (32 bytes each):
   the state before that record (the last move's line, its byte offset and end, the feed, the
-  last N word) and the estimate up to there (§5, filled by the estimate), so Run can start
-  decoding at any checkpoint (§6) instead of from the start.
+  last N word) and the estimate up to there with its feeds' share (§5, §7, filled by the
+  estimate), so Run can start decoding at any checkpoint (§6) instead of from the start.
 - **Units:** inch files are converted to mm when packed.
 - **Capacity (D83, D89):** one block, sized when a job is first chosen: the largest free
   PSRAM block less 128 KB of headroom (Run's canvas is allocated at boot), at most 640 KB (about 80,000
@@ -191,11 +191,21 @@ Then:
   a different file) the left side shows the file and the message in large type, as before M5.
 - **The tool's job:** Run follows the preview when its file is the running one: the same name
   and size (§2).
-- **Op N of M:** the unit whose line range holds the matched line, from `structure`. Left out
-  when the file has no structure.
-- **The message follows the tool (D65):** a `[MSG:...]` is stored with the `SD:` read position
-  at which it arrived, and shown when the match passes that position. A prompt (`M0` HOLD) is
-  shown when it happens, since FluidNC holds when the tool gets there.
+- **Op N of M:** the enabled unit whose lines (its body or one of its fixtures, from
+  `structure`) hold the matched move's line, numbered among the enabled ones; between
+  operations (a tool change) the last one stays. Left out before the first and when the file
+  has no structure (D92).
+- **The message follows the tool (D65, D92):** the analysis keeps the file's `(MSG ...)`
+  comments with their lines, read as FluidNC reads them (a comment holding `MSG`, from its
+  fifth character; `;` ends the line), in 16 KB (the reference job's 93 take 4 KB; when full,
+  later ones are left out). While Run follows a running job and the controller's last message
+  is one of the file's, the status bar shows the file's last message at or before the matched
+  line instead; before the first match, at a prompt (`M0` HOLD: FluidNC holds where the tool
+  is, so its message is the current one), and for the controller's own messages, the
+  controller's. A message is the file's when its text, spaces ignored, matches one kept, also
+  shifted by a character (a FluidNC that drops a comment's spaces before cutting the first
+  four). This replaces storing each `[MSG]` with the `SD:` position it arrived at, which needed
+  a listener event in upstream code and lost messages that arrived together.
 
 ## 7. Time left
 
@@ -215,6 +225,15 @@ How it is shown (D91), so it is steady and still corrects itself:
   second of running time, and stops while the job waits (prompt, pause; D90).
 - **No jumps.** A new target moves the shown value toward it a part of the way each second,
   not all at once.
+
+The target counts down from the match but never below the plan after the matched move x the
+factor, so a long move that takes longer than planned doesn't run it to zero. Constants
+(`TimeLeft`, D92): the factor settles with a 60 s time constant of running time and stays
+within 0.5 to 5; the shown value closes on the target with a 20 s time constant. Feeds and
+arcs are scaled by the feed override, rapids and dwells by the rapid override; the part done
+is summed at the overrides it ran at, so a change of override doesn't spoil the factor. New
+axis rates (§5) make the estimate again; the position is taken over in the new numbers.
+Not with a truncated list (the plan doesn't reach the end): the percent formula.
 
 The usual alternatives, compared 2026-11-23: extrapolating from percent (D51, D90: noisy,
 because bytes aren't time); FigUI's planned time counted down by the clock (steady, but never
@@ -254,6 +273,14 @@ at a doubled step runs on the worker task too.
   (5c): the tool put at the middle of each move in turn, the match never goes back nor past
   the tool's move; how often it is that very move is printed (100% in 82 files; the reference
   job 46%, its helices; `perf-5mb` 14%, a fine raster). 121 files, 0 failures (2026-11-22).
+  Messages (step 2): in line order, each recognised as sent with and without its spaces and
+  shifted by one, a controller message not taken for the file's. Time left (step 2), every job
+  of a minute or more "run" with each move taking 1.25 x its estimate + 0.05 s, a report every
+  0.25 s: the reference job within 1% from a quarter of the way on, steady after the factor
+  settles (about 5 minutes in: it shows the plan uncorrected for the first 2 minutes, then
+  climbs); the escape wheel within 4 to 6%; with the feed override going to 150% at 40%, 3 to
+  13%. Jobs of a few long moves end low (the tool's progress within a move isn't known).
+  121 files, 0 failures (2026-11-23).
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

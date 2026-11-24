@@ -25,6 +25,8 @@ constexpr size_t ARENA_SIZE = 512 * 1024;
 constexpr size_t LIST_MAX = 640 * 1024;
 constexpr size_t LIST_MIN = 64 * 1024;
 constexpr size_t RUN_RESERVE = 128 * 1024;
+// The file's messages and operations (D92): the reference job's 93 messages take 4 KB
+constexpr size_t NOTES_BYTES = 16 * 1024;
 // Download buffer and timeouts
 constexpr size_t FETCH_CHUNK = 16384;
 constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;
@@ -47,8 +49,11 @@ void *arena = nullptr;
 void *listMemory = nullptr;
 size_t listBytes = 0;
 SegmentList list;
+void *notesMemory = nullptr;
+JobNotes notes;
 uint32_t readyGen = 0;
 uint32_t estimateRatesGen = 0;
+uint32_t estimateGen = 0;
 
 // The service's state; the task writes it only for its own generation
 volatile PreviewService::State current = PreviewService::NONE;
@@ -287,7 +292,8 @@ void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
     }
 }
 
-// The packer, timed (the log splits analyse()'s time into reading, packing and the rest)
+// The packer, timed (the log splits analyse()'s time into reading, packing and the rest); it
+// also collects the file's messages
 class TimedPacker : public gcode::AnalysisSink {
 public:
     explicit TimedPacker(SegmentList::Packer &p) : packer(p) {}
@@ -299,6 +305,7 @@ public:
     void line(const gcode::Line &l, const gcode::Token *t, uint16_t n, const gcode::LineState &st) override {
         uint32_t t0 = micros();
         packer.line(l, t, n, st);
+        notes.scanLine(l.index, l.data, l.length);
         us += micros() - t0;
     }
     uint32_t us = 0;
@@ -346,8 +353,16 @@ void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t 
     if (a.structure.kind == gcode::StructureKind::Ok) {
         sum.ops = 0;
         for (uint32_t i = 0; i < a.structure.unitCount; i++) {
-            if (a.structure.units[i].enabled) sum.ops++;
+            const gcode::Unit &u = a.structure.units[i];
+            if (!u.enabled) continue;
+            sum.ops++;
+            // Its lines: the body and its fixtures (D92)
+            notes.addOp(u.body.start, u.body.end, (uint16_t)sum.ops);
+            for (uint32_t f = 0; f < u.fixtureCount; f++) {
+                notes.addOp(u.fixtures[f].start, u.fixtures[f].end, (uint16_t)sum.ops);
+            }
         }
+        notes.finishOps();
     }
     sum.unitsAssumed = a.unitsAssumed;
     sum.unitsMixed = a.unitsMixed;
@@ -360,6 +375,7 @@ void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t 
     sum.moves = list.moves();
     SegmentList::Estimate e = list.estimate(currentRates());
     sum.estimateSeconds = e.seconds;
+    sum.estimateFeedSeconds = e.feedSeconds;
     sum.estimateIncomplete = e.incomplete;
 }
 
@@ -421,6 +437,7 @@ void task(void *param) {
                 uint32_t t0 = millis();
                 activeReader = &reader;
                 list.attach(listMemory, listBytes);
+                notes.attach(notesMemory, NOTES_BYTES);
                 SegmentList::Packer packer(list);
                 TimedPacker timed(packer);
                 estimateRatesGen = MachineService::ratesGeneration();
@@ -460,6 +477,8 @@ void task(void *param) {
                               (unsigned long)list.moves(), (unsigned long)list.records(), (unsigned long)listBytes,
                               list.xyStep(), list.zStep(), list.truncated() ? ", truncated" : "",
                               sum.estimateSeconds, sum.estimateIncomplete ? "+" : "");
+                Serial.printf("PreviewService: %lu messages%s, %d ops\n", (unsigned long)notes.messages(),
+                              notes.full() ? " (no room for more)" : "", sum.ops);
             }
         }
     }
@@ -485,6 +504,9 @@ void task(void *param) {
 PreviewService::State PreviewService::state() { return current; }
 const PreviewService::Summary &PreviewService::summary() { return result; }
 const SegmentList *PreviewService::segments() { return current == READY && !taskRunning ? &list : nullptr; }
+const JobNotes *PreviewService::notes() { return current == READY && !taskRunning ? &::notes : nullptr; }
+SegmentList::Rates PreviewService::rates() { return currentRates(); }
+uint32_t PreviewService::estimateGeneration() { return estimateGen; }
 uint32_t PreviewService::readyGeneration() { return readyGen; }
 const char *PreviewService::jobName() { return request.name; }
 int32_t PreviewService::jobSize() { return request.size; }
@@ -593,6 +615,7 @@ void PreviewService::start() {
         }
     }
     if (!arena) arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!notesMemory) notesMemory = heap_caps_malloc(NOTES_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (arena && !listMemory) {
         // The largest free block less some headroom (02 §6, D89)
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -603,7 +626,7 @@ void PreviewService::start() {
         Serial.printf("PreviewService: segment list %lu bytes (largest free block %lu)\n", (unsigned long)listBytes,
                       (unsigned long)largest);
     }
-    if (!arena || !listMemory) {
+    if (!arena || !listMemory || !notesMemory) {
         current = FAILED;
         std::lock_guard<std::mutex> g(lock);
         copy(failText, sizeof(failText), "Not enough free memory for the preview.");
@@ -634,6 +657,8 @@ void PreviewService::poll() {
         estimateRatesGen = MachineService::ratesGeneration();
         SegmentList::Estimate e = list.estimate(currentRates());
         result.estimateSeconds = e.seconds;
+        result.estimateFeedSeconds = e.feedSeconds;
         result.estimateIncomplete = e.incomplete;
+        estimateGen++;
     }
 }

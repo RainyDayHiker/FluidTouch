@@ -154,7 +154,11 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    reads ABORT during a job; time left averaged and stopped while waiting), then D91 (panel
    200 px, preview 568 x 344, override buttons -10 100 +10; ABORT pressed in the simulator
    ends the job); (2) the message following the tool, op N of M, time left from the estimate
-   as D91 describes it (11 §7); (3) `Ln:`; (4) the download
+   as D91 describes it (11 §7): done as D92, without the planned listener event (the file's
+   own messages instead); checked in the simulator (a job with a message per move: the status
+   bar on the tool's step while the controller had read 7 ahead; DogHoles' op numbers) and by
+   the host test; the time model's accuracy only against simulated runs, so the device's
+   first real job is its test; (3) `Ln:`; (4) the download
    offer during a cut (D72).
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
    on the real machine; Jeffrey sends it when he can.

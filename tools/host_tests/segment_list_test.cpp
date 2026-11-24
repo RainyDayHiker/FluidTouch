@@ -11,9 +11,22 @@
 // back and never pass the move the tool is on. How often it is that
 // very move is printed ("follow"): less than 100% where a path passes within the tolerance of
 // an earlier one still in the window (the match stays on the earlier pass).
+//
+// JobNotes (D92): the file's messages come in line order, each is recognised as FluidNC sends
+// it (as written, or with the comment's spaces dropped and shifted by one), and a message of the
+// controller's own is not. Printed: "msgs".
+//
+// TimeLeft (§7, D91), for jobs of a minute or more: the job is "run" with each move taking 1.25 x
+// its estimate + 0.05 s (no acceleration in the estimate), the feed override going to 150% at
+// 40% of the moves in a second run; a report every 0.25 s. Printed: the error of the time left
+// shown against the true one at 25, 50, 75 and 90% of the run ("left err"), the largest move of
+// the value in one report beyond its countdown ("jump"), and the second run's errors at 75 and
+// 90%. TRACE=<part of a name> prints that job's first run every 30 s, then every 5 minutes.
 #include "gcode/analysis.h"
+#include "services/job_notes.h"
 #include "services/run_tracker.h"
 #include "services/segment_list.h"
+#include "services/time_left.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +46,7 @@ struct Exact {
 // Records the library's segments, and passes everything on to the packer
 class Tee : public gcode::AnalysisSink {
 public:
-    explicit Tee(SegmentList::Packer &p) : packer(p) {}
+    Tee(SegmentList::Packer &p, JobNotes &n) : packer(p), notes(n) {}
     void segment(const gcode::Segment &s) override {
         last = s;
         have = true;
@@ -46,11 +59,13 @@ public:
         }
         have = false;
         packer.line(l, t, n, st);
+        notes.scanLine(l.index, l.data, l.length);
     }
     std::vector<Exact> exact;
 
 private:
     SegmentList::Packer &packer;
+    JobNotes &notes;
     gcode::Segment last = {};
     bool have = false;
 };
@@ -67,13 +82,125 @@ bool same(const SegmentList::Move &a, const SegmentList::Move &b) {
            a.y0 == b.y0 && a.feed == b.feed && a.cx == b.cx && a.cy == b.cy;
 }
 
+// The messages as FluidNC may send them, and one of its own
+void checkNotes(const char *name, const JobNotes &notes) {
+    for (uint32_t i = 0; i < notes.messages(); i++) {
+        if (i && notes.messageLine(i) < notes.messageLine(i - 1)) fail(name, "message order", i, notes.messageLine(i), 0);
+        const char *text = notes.messageText(i);
+        if (!notes.isFileMessage(text)) fail(name, "message not recognised", i, 0, 0);
+        std::string packed;
+        for (const char *c = text; *c; c++) {
+            if (*c != ' ' && *c != '\t') packed += *c;
+        }
+        if (!notes.isFileMessage(packed.c_str())) fail(name, "message without spaces not recognised", i, 0, 0);
+        if (packed.size() > 1 && !notes.isFileMessage(packed.c_str() + 1)) fail(name, "shifted message not recognised", i, 0, 0);
+        if (strcmp(notes.messageAt(notes.messageLine(i)), text) != 0 &&
+            (i + 1 >= notes.messages() || notes.messageLine(i + 1) != notes.messageLine(i))) {
+            fail(name, "messageAt", i, notes.messageLine(i), 0);
+        }
+    }
+    if (notes.isFileMessage("Report/Interval=250")) fail(name, "controller message taken as the file's", 0, 0, 0);
+}
+
+// RunFollow's planAt, without the services: planned seconds before `record`
+TimeLeft::Plan planAt(const SegmentList &list, uint32_t record, const SegmentList::Estimate &est,
+                      const SegmentList::Rates &rates) {
+    TimeLeft::Plan p = {0, 0, 0, 0, est.feedSeconds, est.seconds - est.feedSeconds};
+    if (!list.checkpoints()) return p;
+    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
+    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
+    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
+    SegmentList::Reader reader(list, cp);
+    SegmentList::Move m;
+    bool incomplete = false;
+    bool more;
+    while ((more = reader.next(m)) && m.record < record) {
+        double s = SegmentList::moveSeconds(m, rates, incomplete);
+        total += s;
+        feed += SegmentList::feedPart(m, s);
+    }
+    p.feedDone = p.feedAfter = feed;
+    p.otherDone = p.otherAfter = total - feed;
+    if (more && m.record == record) {
+        // The matched move itself
+        double s = SegmentList::moveSeconds(m, rates, incomplete);
+        p.feedAfter += SegmentList::feedPart(m, s);
+        p.otherAfter += s - SegmentList::feedPart(m, s);
+    }
+    return p;
+}
+
+// One run of the time model; `errors` at 25, 50, 75 and 90% of it, in percent of the true time
+// left; returns the largest move in one report beyond the countdown
+double runTimeModel(const char *name, const SegmentList &list, const std::vector<SegmentList::Move> &moves,
+                    const SegmentList::Estimate &est, const SegmentList::Rates &rates, bool override,
+                    double errors[4]) {
+    // Each move's actual time
+    const size_t overrideAt = override ? moves.size() * 4 / 10 : moves.size();
+    std::vector<double> actual(moves.size());
+    double total = 0;
+    for (size_t k = 0; k < moves.size(); k++) {
+        bool inc = false;
+        double s = SegmentList::moveSeconds(moves[k], rates, inc);
+        double feed = SegmentList::feedPart(moves[k], s);
+        double scaled = k >= overrideAt ? feed / 1.5 : feed;
+        actual[k] = (s - feed + scaled) * 1.25 + 0.05;
+        total += actual[k];
+    }
+    const char *trace = getenv("TRACE");
+    bool tracing = trace && strstr(name, trace) && !override;
+    TimeLeft tl;
+    double t = 0, moveEnd = actual.empty() ? 0 : actual[0], prevShown = -1, lastFs = 1.0, nextTrace = 0;
+    size_t k = 0, lastK = (size_t)-1;
+    const double marks[4] = {0.25, 0.5, 0.75, 0.9};
+    for (int i = 0; i < 4; i++) errors[i] = NAN;
+    double jump = 0;
+    for (; k < moves.size(); t += 0.25) {
+        while (k < moves.size() && t >= moveEnd) {
+            k++;
+            if (k < moves.size()) moveEnd += actual[k];
+        }
+        if (k >= moves.size()) break;
+        double fs = k >= overrideAt ? 1.5 : 1.0;
+        if (k != lastK || fs != lastFs) {
+            tl.match(t, planAt(list, moves[k].record, est, rates), fs, 1.0);
+            lastK = k;
+            lastFs = fs;
+        }
+        tl.tick(t);
+        if (prevShown >= 0) jump = fmax(jump, fabs(tl.seconds() - (prevShown - 0.25)));
+        prevShown = tl.seconds();
+        double trueLeft = total - t;
+        for (int i = 0; i < 4; i++) {
+            if (isnan(errors[i]) && t >= marks[i] * total) errors[i] = (tl.seconds() - trueLeft) / trueLeft * 100;
+        }
+        if (tracing && t >= nextTrace) {
+            printf("    t %6.0f s  shown %6.0f s  true %6.0f s  factor %.2f\n", t, tl.seconds(), trueLeft, tl.factor());
+            nextTrace += t < 600 ? 30 : 300;
+        }
+    }
+    return jump;
+}
+
+void timeModel(const char *name, const SegmentList &list, const std::vector<SegmentList::Move> &moves,
+               const SegmentList::Estimate &est, const SegmentList::Rates &rates, char *out, size_t outLen) {
+    double e[4], o[4];
+    double jump = runTimeModel(name, list, moves, est, rates, false, e);
+    runTimeModel(name, list, moves, est, rates, true, o);
+    snprintf(out, outLen, "  left err %+.0f%% %+.0f%% %+.0f%% %+.0f%%, jump %.1f s; 150%% at 40%%: %+.0f%% %+.0f%%", e[0],
+             e[1], e[2], e[3], jump, o[2], o[3]);
+}
+
 void check(const char *name, const std::string &text, size_t listBytes, bool quiet) {
     static std::vector<char> arena(8 << 20);
     std::vector<char> mem(listBytes);
     SegmentList list;
     list.attach(mem.data(), mem.size());
     SegmentList::Packer packer(list);
-    Tee tee(packer);
+    static std::vector<char> notesMem(16 * 1024);
+    JobNotes notes;
+    notes.attach(notesMem.data(), notesMem.size());
+    Tee tee(packer, notes);
     gcode::MemoryLineReader reader(text.data(), text.size());
     gcode::AnalysisOptions options;
     options.maxLineLength = 4096;
@@ -177,10 +304,14 @@ void check(const char *name, const std::string &text, size_t listBytes, bool qui
 
     SegmentList::Rates rates = {8000, 8000, 3000};
     SegmentList::Estimate est = list.estimate(rates);
+    checkNotes(name, notes);
+    char timing[160] = "";
+    if (!list.truncated() && est.seconds >= 60) timeModel(name, list, moves, est, rates, timing, sizeof(timing));
     if (!quiet || failures != before) {
-        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s  follow %.1f%%\n",
+        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s  follow %.1f%%  msgs %u%s\n",
                name, list.moves(), list.records(), list.truncated() ? "TRUNCATED" : "", list.xyStep(), list.zStep(),
-               worstXY, worstZ, worstArc, est.seconds, est.incomplete ? "+" : "", list.nUsable() ? "  N" : "", follow);
+               worstXY, worstZ, worstArc, est.seconds, est.incomplete ? "+" : "", list.nUsable() ? "  N" : "", follow,
+               notes.messages(), timing);
     }
 }
 

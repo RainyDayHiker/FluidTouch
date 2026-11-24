@@ -5,6 +5,7 @@
 #include "app/widgets.h"
 #include "services/job_service.h"
 #include "services/machine_service.h"
+#include "services/run_follow.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
 
@@ -297,7 +298,8 @@ void Frame::updateStatusBar() {
     static bool noticeShown = false;
     bool showNotice = noticeText[0] && millis() - noticeAtMs < NOTICE_MS;
     if (!showNotice) noticeText[0] = '\0';
-    setText(messageLabel, showNotice ? noticeText : s.last_message);
+    // While Run follows the tool, the file's messages follow it too (D65, D92)
+    setText(messageLabel, showNotice ? noticeText : RunFollow::message(s.last_message));
     if (showNotice != noticeShown) {
         noticeShown = showNotice;
         lv_obj_set_style_text_color(messageLabel, showNotice ? UITheme::UI_NOTE : UITheme::TEXT_LIGHT, 0);

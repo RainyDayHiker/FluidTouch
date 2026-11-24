@@ -26,7 +26,7 @@ message on the second (D39).
 |---------|-----------|
 | State | IDLE, RUN, HOLD, JOG, HOME, ALARM, OFFLINE; colour coded |
 | Position | Work position and machine position, both always visible, in the status bar |
-| Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
+| Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. While Run follows a running job, a message from the file is replaced by the file's message at the tool ([11 §6](11-preview.md#6-run-following-the-tool-d79), D92). A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
 | STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 52; its touch area extends 10 px beyond it on every side. The 104 x 40 button in the 48 px bar was checked on the device: good |
 | Alarm banner | Replaces the status bar: alarm text + Unlock (`$X`). On every screen |
 | Offline banner | Replaces the status bar. The text says whether an attempt is under way or when the next one starts. During an attempt: "Connecting to <machine>..." before the first connection, "Connection lost. Reconnecting..." after a drop; Reconnect is greyed out, because it could do nothing. Between attempts: "No answer from <machine>. Next attempt in N s." or "Connection lost. Next attempt in N s.", counting down; Reconnect starts the attempt at once. Once the retries are used up (after 5, 5, 10 and 10 s, D46): "No answer from <machine>. Press Reconnect to try again." or "Connection lost. Press Reconnect to try again."; Reconnect starts again with the same back-off. While joining WiFi: "Connecting to WiFi <ssid>..." (or "WiFi lost. Reconnecting to <ssid>..."). If a job was running when the link dropped, a second line "The job continues on the controller." Retries happen on their own until then ([02 §4](02-architecture.md#4-services)) |
@@ -205,7 +205,7 @@ States of the right-hand panel:
 
 Notes:
 
-- The current operation text is the last `[MSG:...]` received; "op N of M" comes from the file's operation list. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); from M5 the text follows the tool's line instead (D65).
+- The current operation text is in the status bar. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); with a preview of the job the status bar shows the file's message at the tool's line instead (D65, D92). "op N of M" is the operation the tool is in, from the file's operation list (D92).
 - The router is switched by hand; the display does not show spindle speed or spindle override.
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
 - Until the preview exists (M5), the preview area shows the file name and the current

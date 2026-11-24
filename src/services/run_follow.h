@@ -18,5 +18,17 @@ public:
     // Moves on with each new run (START, Run again, a job started elsewhere): time to redraw
     static uint32_t runGeneration();
 
+    // The operation the tool is in, 1-based (the last one it was in between operations); 0 before
+    // the first, or when the file has no structure (D92)
+    static int op();
+    // The message to show for the controller's last one (D65, D92): while the tool is followed,
+    // a message from the file is replaced by the file's message at the tool's line; anything else
+    // (the controller's own messages, a prompt) is shown as it is
+    static const char *message(const char *controllerMessage);
+    // Time left comes from the plan (11 §7, D91): following a running job whose list is whole
+    static bool plansTime();
+    // That time left in ms; 0 until the first match
+    static uint32_t leftMs();
+
     static void poll();
 };

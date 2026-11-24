@@ -257,13 +257,22 @@ void updateRunGroup(JobService::RunState state, bool online) {
     const FluidNCStatus &s = MachineService::status();
     char text[96];
 
+    int ops = PreviewService::summary().ops, op = RunFollow::op();
+    if (ops > 0 && op > 0) {
+        snprintf(text, sizeof(text), "op %d of %d", op, ops);
+    } else {
+        text[0] = '\0';
+    }
+    setText(opLabel, text);
+
     float pct = JobService::percent();
     lv_bar_set_value(progressBar, (int32_t)(pct * 10), LV_ANIM_OFF);
     snprintf(text, sizeof(text), "%d%%", (int)pct);
     setText(percentLabel, state == JobService::RUN_STARTING ? "Starting..." : text);
     formatDuration(text, sizeof(text), JobService::elapsedMs());
     setText(elapsedValue, text);
-    uint32_t leftMs = JobService::leftMs();
+    // From the plan while the tool is followed (11 §7, D91), else from the percent (D90)
+    uint32_t leftMs = RunFollow::plansTime() ? RunFollow::leftMs() : JobService::leftMs();
     show(leftCaption, leftMs != 0);
     show(leftValue, leftMs != 0);
     if (leftMs) {
