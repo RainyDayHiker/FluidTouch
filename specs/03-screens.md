@@ -201,7 +201,7 @@ States of the right-hand panel:
 | CONTINUE | `~` | Only in Prompt |
 | ABORT | soft reset (0x18), then the alarm banner offers Unlock | The status bar's STOP, relabelled ABORT while a job is active (D90). Single press. Not a hold: the panel's PAUSE is |
 | Feed override | realtime override commands | value, then [-10] [100] [+10] (D91); 10% steps only (D52); range 10 to 200% |
-| Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
+| Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting, from a "Download preview" button under the message; a copy of the right size left in the working folder is used without asking ([05 §2](05-file-workflow.md), D72, D94) |
 
 Notes:
 

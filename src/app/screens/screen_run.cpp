@@ -7,6 +7,7 @@
 #include "services/machine_service.h"
 #include "services/preview_service.h"
 #include "services/run_follow.h"
+#include "services/run_preview.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
 #include <string.h>
@@ -15,7 +16,8 @@
 //
 //   x   8..576  the preview (specs/11-preview.md §6, D89, D91): 568 x 344, a box over its
 //               top half at a prompt; without a preview of this job, the file and the
-//               current message in large type
+//               current message in large type, and during a cut the offer to download it
+//               (D72, D94)
 //   x 592..792  the panel (D91): START; or op N of M, progress, times, feed override and PAUSE
 //               (CONTINUE at a prompt; ABORT is the status bar's STOP during a job, D90);
 //               or the result
@@ -57,6 +59,10 @@ lv_obj_t *leftName;
 lv_obj_t *leftDetail;
 lv_obj_t *leftHeading;   // "Waiting for you" at a prompt
 lv_obj_t *leftMessage;
+lv_obj_t *downloadButton;  // the offer (D72, D94)
+lv_obj_t *downloadText;    // its progress, or why the last try failed
+lv_obj_t *downloadDialog;
+lv_obj_t *downloadDialogText;
 
 // Panel groups, one shown at a time
 lv_obj_t *startGroup;
@@ -134,6 +140,29 @@ void onContinue(lv_event_t *) { JobService::resume(); }
 void onFeed(lv_event_t *e) {
     MachineService::feedOverride((MachineService::FeedOverride)(intptr_t)lv_event_get_user_data(e));
 }
+void onDownloadOffer(lv_event_t *) {
+    // The confirm of 05 §2 (D72), with the size when the listing gave it
+    char size[16] = "";
+    if (RunPreview::size() >= 0) {
+        char s[12];
+        formatSize(s, sizeof(s), RunPreview::size());
+        snprintf(size, sizeof(size), " (%s)", s);
+    }
+    char other[FileService::NAME_LEN + 48] = "";
+    if (RunPreview::otherChosen()) snprintf(other, sizeof(other), "\n\nIt replaces %s as the chosen job.", RunPreview::otherName());
+    char text[FileService::NAME_LEN * 2 + 320];
+    snprintf(text, sizeof(text),
+             "Download %s%s now, while the machine is cutting?\n\nThe controller reads its SD card for the "
+             "download as well as for the job. It worked on a small file; a large one has not been tried.%s",
+             JobService::runName(), size, other);
+    setText(downloadDialogText, text);
+    showDialog(downloadDialog, true);
+}
+void onDownloadConfirmed(lv_event_t *) {
+    showDialog(downloadDialog, false);
+    RunPreview::download();
+}
+void onDownloadNotNow(lv_event_t *) { showDialog(downloadDialog, false); }
 void onAgain(lv_event_t *) { JobService::again(); }
 void onBackToSetup(lv_event_t *) {
     JobService::dismiss();
@@ -179,7 +208,50 @@ void createLeft(lv_obj_t *parent) {
     lv_label_set_long_mode(leftName, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(leftDetail, LV_LABEL_LONG_DOT);
     lv_label_set_long_mode(leftMessage, LV_LABEL_LONG_WRAP);
+    lv_obj_set_height(leftMessage, 160);  // clear of the offer below
+    // The offer, at the bottom (D94)
+    downloadButton = button(textGroup, LEFT_X, 288, 240, 56, LV_SYMBOL_DOWNLOAD "  Download preview", FONT_BIG,
+                            onDownloadOffer);
+    downloadText = label(textGroup, LEFT_X + 256, 288, FONT_SMALL, UITheme::TEXT_MEDIUM, "");
+    lv_obj_set_size(downloadText, LEFT_W - 256, 56);
+    lv_label_set_long_mode(downloadText, LV_LABEL_LONG_WRAP);
     divider(parent, LEFT_GROUP_W, 8, 1, Frame::CONTENT_HEIGHT - 16);
+}
+
+void createDownloadDialog(lv_obj_t *parent) {
+    downloadDialog = dialog(parent, 600, 300);
+    downloadDialogText = label(downloadDialog, 16, 16, FONT_MID, UITheme::TEXT_LIGHT, "");
+    lv_obj_set_size(downloadDialogText, 568, 196);
+    lv_label_set_long_mode(downloadDialogText, LV_LABEL_LONG_WRAP);
+    button(downloadDialog, 16, 228, 276, 56, LV_SYMBOL_DOWNLOAD "  Download", FONT_BIG, onDownloadConfirmed);
+    button(downloadDialog, 308, 228, 276, 56, "Not now", FONT_BIG, onDownloadNotNow);
+}
+
+// The offer under the file and message (D72, D94): the button, and the download's progress
+// or why it failed
+void updateOffer() {
+    RunPreview::State st = RunPreview::state();
+    show(downloadButton, st == RunPreview::OFFER);
+    char text[200] = "";
+    if (st == RunPreview::LOADING) {
+        PreviewService::State ps = PreviewService::state();
+        snprintf(text, sizeof(text), "%s the preview: %d%%",
+                 ps == PreviewService::FETCHING ? "Downloading" : "Analysing", (int)(PreviewService::progress() * 100));
+    } else if (st == RunPreview::OFFER && RunPreview::failure()[0]) {
+        snprintf(text, sizeof(text), "%s", RunPreview::failure());
+    }
+    show(downloadText, text[0] != '\0');
+    setText(downloadText, text);
+    // Beside the button, or in its place while it is hidden
+    int x = st == RunPreview::OFFER ? LEFT_X + 256 : LEFT_X;
+    if (lv_obj_get_x(downloadText) != x) {
+        lv_obj_set_x(downloadText, x);
+        lv_obj_set_width(downloadText, LEFT_GROUP_W - x - 16);
+    }
+    if (st != RunPreview::OFFER) {
+        lv_obj_t *layer = lv_obj_get_parent(downloadDialog);
+        if (!lv_obj_has_flag(layer, LV_OBJ_FLAG_HIDDEN)) showDialog(downloadDialog, false);
+    }
 }
 
 void createStart(lv_obj_t *parent) {
@@ -356,6 +428,7 @@ void RunScreen::create(lv_obj_t *parent) {
     createStart(jobGroup);
     createRun(jobGroup);
     createEnd(jobGroup);
+    createDownloadDialog(parent);
     update();  // one panel shown from the start
 }
 
@@ -402,6 +475,7 @@ void RunScreen::update() {
     // With a preview the message is the status bar's; without one it is also on the left, in
     // large type
     updatePreview(state, online);
+    updateOffer();
 
     if (JobService::active()) updateRunGroup(state, online);
     if (ended) updateEndGroup(state);

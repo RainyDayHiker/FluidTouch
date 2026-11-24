@@ -13,6 +13,7 @@
 #include "services/position_log.h"
 #include "services/preview_service.h"
 #include "services/run_follow.h"
+#include "services/run_preview.h"
 
 bool LrtApp::running = false;
 
@@ -35,6 +36,7 @@ void LrtApp::loop() {
     JobService::poll();
     PreviewService::poll();
     RunFollow::poll();
+    RunPreview::poll();
     MacroService::poll();
     PositionLog::poll();
 

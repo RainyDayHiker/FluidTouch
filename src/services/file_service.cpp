@@ -34,6 +34,10 @@ uint32_t FileService::connectedAtMs = 0;
 int FileService::rateAxis = 0;
 
 FileService::UploadState FileService::uploadStateValue = FileService::UPLOAD_IDLE;
+FileService::SizeState FileService::sizeStateValue = FileService::SIZE_IDLE;
+bool FileService::sizeWanted = false;
+char FileService::sizePathValue[FileService::PATH_LEN] = "";
+int32_t FileService::sizeValue = -1;
 char FileService::uploadLocalPath[PATH_LEN] = "";
 char FileService::uploadName[NAME_LEN] = "";
 char FileService::uploadRemotePath[PATH_LEN] = "";
@@ -357,6 +361,15 @@ void FileService::finishRequest(bool ok, const char *error) {
         } else {
             upload(uploadLocalPath, true);
         }
+    } else if (done == REQUEST_SIZE) {
+        int32_t size = -1;
+        if (ok && findInListing(baseName(sizePathValue), size) && size >= 0) {
+            sizeValue = size;
+            sizeStateValue = SIZE_KNOWN;
+        } else {
+            sizeStateValue = SIZE_FAILED;
+        }
+        Serial.printf("FileService: size of %s: %ld\n", sizePathValue, (long)sizeValue);
     } else if (done == REQUEST_VERIFY) {
         int32_t size = -2;
         if (!ok || !findInListing(uploadName, size)) {
@@ -371,6 +384,15 @@ void FileService::finishRequest(bool ok, const char *error) {
         }
     }
     jsonBuffer = "";
+}
+
+// --- One file's size -----------------------------------------------------------------
+
+void FileService::sizeOf(const char *path) {
+    copy(sizePathValue, sizeof(sizePathValue), path);
+    sizeValue = -1;
+    sizeStateValue = SIZE_LOADING;
+    sizeWanted = true;  // asked for in poll(), once no other request is under way
 }
 
 // --- Deleting ------------------------------------------------------------------------
@@ -480,6 +502,17 @@ void FileService::poll() {
     if (ratesWanted && connected && request == REQUEST_NONE && now - connectedAtMs >= RATES_DELAY_MS) {
         ratesWanted = false;
         requestRate(0);
+    }
+
+    if (sizeWanted && request == REQUEST_NONE) {
+        sizeWanted = false;
+        if (!connected) {
+            sizeStateValue = SIZE_FAILED;
+        } else {
+            char folder[PATH_LEN];
+            parent(folder, sizeof(folder), CARD_CONTROLLER, sizePathValue);
+            requestController(REQUEST_SIZE, folder);
+        }
     }
 
     if (relistPending && request == REQUEST_NONE && (int32_t)(now - relistAtMs) >= 0) {

@@ -60,6 +60,21 @@ void JobService::choose(FileService::Card card, const char *folder, const FileSe
     PreviewService::load(card, chosen.path, chosen.name, chosen.size);
 }
 
+void JobService::chooseRunning(int32_t size, bool download) {
+    chosen.set = true;
+    chosen.card = FileService::CARD_CONTROLLER;
+    copy(chosen.path, sizeof(chosen.path), job.path);
+    copy(chosen.name, sizeof(chosen.name), job.name);
+    chosen.size = size;
+    if (prepState == PREP_FAILED) prepState = PREP_IDLE;
+    learnRunSize(job.path, size);
+    PreviewService::loadForRun(chosen.path, chosen.name, size, download);
+}
+
+void JobService::learnRunSize(const char *path, int32_t size) {
+    if (size >= 0 && job.size < 0 && strcmp(job.path, path) == 0) job.size = size;
+}
+
 void JobService::forget(FileService::Card card, const char *path) {
     if (chosen.set && chosen.card == card && strcmp(chosen.path, path) == 0) {
         chosen.set = false;

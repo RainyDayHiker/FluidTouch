@@ -34,7 +34,8 @@ public:
         bool hasExtents;
         double minX, maxX, minY, maxY;  // displayExtents, in the file's units
         bool outline;         // the Outline Check is there
-        uint32_t fetchMs;     // 0 for a display SD file
+        uint32_t fetchMs;     // 0 for a display SD file, or the working folder's copy
+        uint64_t fileBytes;   // the analysed file's size
         uint32_t analyseMs;
         uint32_t arenaPeak;   // bytes
 
@@ -59,6 +60,10 @@ public:
 
     // A file was chosen (JobService::choose): starts over for it
     static void load(FileService::Card card, const char *path, const char *name, int32_t size);
+    // The running job's Controller SD file, during the cut (Run, D72, D94): `download` fetches
+    // it now instead of waiting for the job to end; otherwise the working folder's copy, which
+    // the caller found to be that size, is analysed without a download
+    static void loadForRun(const char *path, const char *name, int32_t size, bool download);
     // Nothing chosen any more
     static void clear();
     static void cancel();
@@ -79,7 +84,9 @@ public:
     static uint32_t estimateGeneration();
     // Moves on each time a job becomes READY: time to draw it (a new estimate doesn't move it)
     static uint32_t readyGeneration();
-    // The file the preview is of (when READY, the one segments() holds): its name and size
+    // The file the preview is of (when READY, the one segments() holds): its path, name and
+    // size (when the size wasn't known before, the analysed file's once READY)
+    static const char *jobPath();
     static const char *jobName();
     static int32_t jobSize();
 
@@ -95,5 +102,7 @@ public:
     static void poll();
 
 private:
+    static void loadRequest(FileService::Card card, const char *path, const char *name, int32_t size, bool duringJob,
+                            bool useCopy);
     static void start();
 };

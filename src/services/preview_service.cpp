@@ -37,6 +37,8 @@ struct Request {
     char path[FileService::PATH_LEN];
     char name[FileService::NAME_LEN];
     int32_t size;
+    bool duringJob;  // Run asked for it during the cut (D72): no waiting for the end
+    bool useCopy;    // the working folder's copy, no download (D94)
 };
 
 Request request = {};       // the chosen file
@@ -393,7 +395,10 @@ void task(void *param) {
 
     char localPath[FileService::PATH_LEN];
     Outcome outcome = Outcome::Ok;
-    if (req.card == FileService::CARD_CONTROLLER) {
+    if (req.card == FileService::CARD_CONTROLLER && req.useCopy) {
+        FileService::join(localPath, sizeof(localPath), PreviewService::WORK_FOLDER, req.name);
+        Serial.printf("PreviewService: %s: the working folder's copy, no download\n", req.path);
+    } else if (req.card == FileService::CARD_CONTROLLER) {
         FileService::join(localPath, sizeof(localPath), PreviewService::WORK_FOLDER, req.name);
         uint32_t t0 = millis();
         uint64_t got = 0;
@@ -465,6 +470,7 @@ void task(void *param) {
                     sum.maxY = a.displayExtents.maxY;
                     sum.outline = a.outlineStatus == gcode::Status::Ok;
                     sum.arenaPeak = (uint32_t)a.arenaPeak;
+                    sum.fileBytes = reader.fileSize();
                     summarise(sum, a, reader.fileSize());
                 }
                 Serial.printf("PreviewService: analyse %s: status %d, %lu lines in %lu ms, outline %d, peak %lu bytes\n",
@@ -508,10 +514,25 @@ const JobNotes *PreviewService::notes() { return current == READY && !taskRunnin
 SegmentList::Rates PreviewService::rates() { return currentRates(); }
 uint32_t PreviewService::estimateGeneration() { return estimateGen; }
 uint32_t PreviewService::readyGeneration() { return readyGen; }
+const char *PreviewService::jobPath() { return request.path; }
 const char *PreviewService::jobName() { return request.name; }
-int32_t PreviewService::jobSize() { return request.size; }
+int32_t PreviewService::jobSize() {
+    if (request.size < 0 && current == READY && !taskRunning) return (int32_t)result.fileBytes;
+    return request.size;
+}
 
 void PreviewService::load(FileService::Card card, const char *path, const char *name, int32_t size) {
+    loadRequest(card, path, name, size, false, false);
+}
+
+void PreviewService::loadForRun(const char *path, const char *name, int32_t size, bool download) {
+    loadRequest(FileService::CARD_CONTROLLER, path, name, size, true, !download);
+}
+
+void PreviewService::loadRequest(FileService::Card card, const char *path, const char *name, int32_t size,
+                                 bool duringJob, bool useCopy) {
+    request.duringJob = duringJob;
+    request.useCopy = useCopy;
     request.card = card;
     copy(request.path, sizeof(request.path), path);
     copy(request.name, sizeof(request.name), name);
@@ -522,7 +543,7 @@ void PreviewService::load(FileService::Card card, const char *path, const char *
     doneBytes = 0;
     totalBytes = size > 0 ? (uint64_t)size : 0;
     passNumber = 1;
-    current = card == FileService::CARD_CONTROLLER ? FETCHING : ANALYSING;
+    current = card == FileService::CARD_CONTROLLER && !useCopy ? FETCHING : ANALYSING;
     poll();
 }
 
@@ -543,7 +564,7 @@ void PreviewService::cancel() {
 
 void PreviewService::retry() {
     if (current == FAILED || current == CANCELLED || current == WAITING_FOR_JOB) {
-        load(request.card, request.path, request.name, request.size);
+        loadRequest(request.card, request.path, request.name, request.size, request.duringJob, request.useCopy);
     }
 }
 
@@ -602,12 +623,12 @@ void PreviewService::start() {
         return;
     }
     if (request.card == FileService::CARD_CONTROLLER) {
-        if (MachineService::jobActive()) {
+        if (MachineService::jobActive() && !request.duringJob) {
             // Reading the controller's card during a cut takes its time (D72): wait for the end
             current = WAITING_FOR_JOB;
             return;
         }
-        if (!MachineService::online()) {
+        if (!MachineService::online() && !request.useCopy) {
             current = FAILED;
             std::lock_guard<std::mutex> g(lock);
             copy(failText, sizeof(failText), "The controller is offline.");
@@ -632,7 +653,7 @@ void PreviewService::start() {
         copy(failText, sizeof(failText), "Not enough free memory for the preview.");
         return;
     }
-    current = request.card == FileService::CARD_CONTROLLER ? FETCHING : ANALYSING;
+    current = request.card == FileService::CARD_CONTROLLER && !request.useCopy ? FETCHING : ANALYSING;
     doneBytes = 0;
     passNumber = 1;
     cancelFlag = false;

@@ -72,7 +72,8 @@ connection changed.
 | MachineService | Connection, status snapshot, events (state change, message, alarm, hold, probe result) | jog, cancel jog, home, unlock, zero, go to, hold, resume, reset, overrides, run file, send line |
 | FileService | File sources and transfers | list(source, path), fetch to cache, upload to controller, delete; progress and cancel |
 | JobService | The selected job: source file, derived files, run state | select, generate (a new job, [10](10-new-jobs.md)), transform, build outline, commit (upload), start, progress mapping |
-| PreviewService | The selected job's working copy and analysis (extents, stock, tools, operations, segment list), the library's arena ([11](11-preview.md)) | load (fetch from the Controller SD, then analyse, on the worker task), cancel, retry; progress |
+| PreviewService | The selected job's working copy and analysis (extents, stock, tools, operations, segment list), the library's arena ([11](11-preview.md)) | load (fetch from the Controller SD, then analyse, on the worker task), load for Run during a cut (download, or the working folder's copy; D94), cancel, retry; progress |
+| RunFollow, RunPreview | Run following the tool (11 §6, §7); the offer of the running job's preview when Run has none (D72, D94) | follow, time left, message; check the size, use the copy, download |
 | Generators | The list of generators and their common interface: texts, fields, messages, plan, write ([10 §7](10-new-jobs.md#7-services)) | list, form data, messages, plan, write |
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |

@@ -23,6 +23,10 @@ public:
     };
     static const Choice &choice() { return chosen; }
     static void choose(FileService::Card card, const char *folder, const FileService::Entry &entry);
+    // The running job's file becomes the chosen one, previewed during the cut (Run, D72, D94):
+    // `size` from the controller's listing (-1 if unknown); `download` now, or the working
+    // folder's copy of that size
+    static void chooseRunning(int32_t size, bool download);
     // A file was deleted: forget it if it was the chosen one
     static void forget(FileService::Card card, const char *path);
 
@@ -46,6 +50,8 @@ public:
     static const char *runPath() { return job.path; }
     static const char *runName() { return job.name; }
     static int32_t runSize() { return job.size; }
+    // The running job's size learnt later (a job started elsewhere): kept when the name is the same
+    static void learnRunSize(const char *path, int32_t size);
 
     static void start();     // READY: $SD/Run
     static void pause();     // RUNNING: feed hold

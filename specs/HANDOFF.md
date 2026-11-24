@@ -163,8 +163,14 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    numbered N10, N20, ... (followed by `Ln:` from its first cut on). Not tried on FluidNC:
    it needs `use_line_numbers: true` in the config and N words in the files, which the
    post-processor doesn't write today. Found: with an N on every line the library finds no
-   operations (`structure`), so "op N of M" is empty for such a file; (4) the download
-   offer during a cut (D72).
+   operations (`structure`), so "op N of M" is empty for such a file (Jeffrey keeps line
+   numbers off); (4) the download offer during a cut (D72): done as D94 after Jeffrey's
+   answers (button then confirm; the working folder's copy used when its size matches; the
+   running file becomes the chosen job). Checked in the simulator with a job started from
+   the fake's console: the offer, the confirm naming the file it replaces, the download and
+   the preview following; the copy used with no download; a slowed download's progress; a
+   404's reason beside the button. Not on the device: a download of the reference job during
+   a real cut is the open question D72 names.
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
    on the real machine; Jeffrey sends it when he can.
 4. The temporary machine picker (D57) is to be removed at the end of development.

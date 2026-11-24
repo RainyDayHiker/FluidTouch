@@ -32,8 +32,11 @@ M5 is built and checked in three parts, each its own branch:
   only fetched files, and from M6 the transforms' outputs.
 - **Chosen on Job during a cut:** not downloaded then (D72); Job says "Downloaded for the
   preview when the job ends." and the download starts when it ends.
-- **During a cut, no copy:** Run's preview area offers the download with the confirm of
-  [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
+- **During a cut, no preview of the running job:** the working folder's copy when its size is
+  the controller's and no other file is chosen, else Run offers the download with the confirm
+  of [05 §2](05-file-workflow.md#2-model) (D94: `RunPreview`). "Not now" keeps the pre-M5 view
+  with the button. A job started elsewhere has no size until the listing (or the analysed
+  file) gives it; Run then follows it by name and that size.
 - A fetch that fails (controller offline, a write to the display SD failing, a short
   download) deletes the partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
   on the controller's SD." for a 404). A write to the display SD that fails ("Writing to the
