@@ -10,7 +10,9 @@
 // RunTracker (§6): the tool is put at the middle of each move in turn; the match must never go
 // back and never pass the move the tool is on. How often it is that
 // very move is printed ("follow"): less than 100% where a path passes within the tolerance of
-// an earlier one still in the window (the match stays on the earlier pass).
+// an earlier one still in the window (the match stays on the earlier pass). For a file whose N
+// words increase ("N"), each move's N must be the one on its line, and a report with that `Ln:`
+// (and a position far off) must match that very move; printed "Ln" with the moves checked.
 //
 // JobNotes (D92): the file's messages come in line order, each is recognised as FluidNC sends
 // it (as written, or with the comment's spaces dropped and shifted by one), and a message of the
@@ -41,7 +43,22 @@ struct Exact {
     double unit;
     bool arcOk;
     double sweep;
+    uint32_t n;  // the line's N word, read from the text; 0 if none
 };
+
+// An N word at the start of the line, as the post-processors write it
+uint32_t lineN(const gcode::Line &l) {
+    size_t i = 0;
+    while (i < l.length && (l.data[i] == ' ' || l.data[i] == '\t')) i++;
+    if (i >= l.length || (l.data[i] != 'N' && l.data[i] != 'n')) return 0;
+    uint32_t v = 0;
+    bool digits = false;
+    for (i++; i < l.length && l.data[i] >= '0' && l.data[i] <= '9'; i++) {
+        v = v * 10 + (uint32_t)(l.data[i] - '0');
+        digits = true;
+    }
+    return digits ? v : 0;
+}
 
 // Records the library's segments, and passes everything on to the packer
 class Tee : public gcode::AnalysisSink {
@@ -55,7 +72,7 @@ public:
     void line(const gcode::Line &l, const gcode::Token *t, uint16_t n, const gcode::LineState &st) override {
         if (have && last.line == l.index) {
             exact.push_back({last, st.units == gcode::UnitsMode::G20 ? 25.4 : 1.0,
-                             st.arc.state == gcode::ArcState::Ok, st.arc.geometry.sweep});
+                             st.arc.state == gcode::ArcState::Ok, st.arc.geometry.sweep, lineN(l)});
         }
         have = false;
         packer.line(l, t, n, st);
@@ -78,7 +95,7 @@ void fail(const char *name, const char *what, uint32_t i, double got, double wan
 }
 
 bool same(const SegmentList::Move &a, const SegmentList::Move &b) {
-    return a.kind == b.kind && a.line == b.line && a.x1 == b.x1 && a.y1 == b.y1 && a.z1 == b.z1 && a.x0 == b.x0 &&
+    return a.kind == b.kind && a.line == b.line && a.n == b.n && a.x1 == b.x1 && a.y1 == b.y1 && a.z1 == b.z1 && a.x0 == b.x0 &&
            a.y0 == b.y0 && a.feed == b.feed && a.cx == b.cx && a.cy == b.cy;
 }
 
@@ -226,6 +243,8 @@ void check(const char *name, const std::string &text, size_t listBytes, bool qui
         const Exact &e = tee.exact[i];
         const gcode::Segment &g = e.s;
         if (m.line != g.line) fail(name, "line", i, m.line, g.line);
+        if (list.nUsable() && e.n && m.n != e.n) fail(name, "N word", i, m.n, e.n);
+        if (!list.nUsable() && m.n) fail(name, "N word without usable N", i, m.n, 0);
         double ex = g.x1 * e.unit, ey = g.y1 * e.unit, ez = g.z1 * e.unit;
         double dxy = fmax(fabs(m.x1 - ex), fabs(m.y1 - ey));
         worstXY = fmax(worstXY, dxy);
@@ -302,16 +321,38 @@ void check(const char *name, const std::string &text, size_t listBytes, bool qui
     }
     double follow = moves.empty() ? 100.0 : 100.0 * onMove / moves.size();
 
+    // Following by `Ln:`: the very move, whatever the position
+    char byLn[48] = "";
+    if (list.nUsable()) {
+        RunTracker t;
+        uint32_t checked = 0;
+        for (size_t k = 0; k < moves.size(); k++) {
+            const SegmentList::Move &mv = moves[k];
+            if (!mv.n) continue;
+            t.update(list, 1e6f, 1e6f, 1e6f, RunTracker::READ_ALL, mv.n);
+            if (!t.matched() || !t.byLineNumber() || t.record() != mv.record || t.line() != mv.line) {
+                fail(name, "Ln match", (uint32_t)k, t.matched() ? t.record() : -1, mv.record);
+                break;
+            }
+            checked++;
+        }
+        // A number no move has (a jog's) keeps the match
+        uint32_t before = t.record();
+        t.update(list, 1e6f, 1e6f, 1e6f, RunTracker::READ_ALL, 4000000000u);
+        if (checked && t.record() != before) fail(name, "Ln unknown moved the match", 0, t.record(), before);
+        snprintf(byLn, sizeof(byLn), "  Ln %u", checked);
+    }
+
     SegmentList::Rates rates = {8000, 8000, 3000};
     SegmentList::Estimate est = list.estimate(rates);
     checkNotes(name, notes);
     char timing[160] = "";
     if (!list.truncated() && est.seconds >= 60) timeModel(name, list, moves, est, rates, timing, sizeof(timing));
     if (!quiet || failures != before) {
-        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s  follow %.1f%%  msgs %u%s\n",
+        printf("%-48s %6u moves %6u records %s step %.2f/%.1f mm  err xy %.3f z %.3f arc %.3f mm  est %.0f s%s%s  follow %.1f%%%s  msgs %u%s\n",
                name, list.moves(), list.records(), list.truncated() ? "TRUNCATED" : "", list.xyStep(), list.zStep(),
                worstXY, worstZ, worstArc, est.seconds, est.incomplete ? "+" : "", list.nUsable() ? "  N" : "", follow,
-               notes.messages(), timing);
+               byLn, notes.messages(), timing);
     }
 }
 

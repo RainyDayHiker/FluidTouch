@@ -163,9 +163,15 @@ library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait f
 Each status report gives the work position and the `SD:` percent (how far FluidNC has read).
 The tool's record is found as follows, at every report:
 
-1. **`Ln:` present** (FluidNC with `use_line_numbers: true`, and the file's N table in use):
-   the N is looked up in the table, giving the line, and the line's first record is found
-   from the checkpoints. The record within that line is the one nearest the position. Exact.
+1. **`Ln:` present** (FluidNC with `use_line_numbers: true`, and the file's N words
+   increasing, D93): `Ln:` is the N word of the move FluidNC is executing (its planner's
+   current block; FluidNC sends none for a line without one, nor in a dwell or a hold). The
+   checkpoints hold the last N before them, so the move with that N is in the block of the
+   last checkpoint below it: at most 256 records read. One line is one move in the list, so
+   that move is the match. Exact. A number no move has (a jog in a hold, a line the list has
+   no move for) and a move before the last match are ignored, and position matching is
+   tried instead; so is a report without `Ln:` (a file with N words on some lines only).
+   The log says when the match changes between the two ("RunFollow: following by Ln:").
 2. **Otherwise, position matching (S3):** the window runs from the last matched record to the
    record at the `SD:` read position (checkpoints by byte offset). The match is the first
    record in the window whose move passes within 1 mm of the position in XY and 0.5 mm (or one Z level) in Z.
@@ -244,7 +250,7 @@ moves, how far each second closes the gap) are set in step 2 against the referen
 ## 8. Memory and threads
 
 As 02 §6: one canvas on Job, two on Run, the 512 KB arena while a job is selected, and the
-segment list (with the N table) in what is left. The fetch and the analysis run on the worker
+segment list (with its N words) in what is left. The fetch and the analysis run on the worker
 task, one at a time, yielding (02 §7). Packing a segment costs a few divisions; the repacking
 at a doubled step runs on the worker task too.
 
@@ -281,6 +287,10 @@ at a doubled step runs on the worker task too.
   climbs); the escape wheel within 4 to 6%; with the feed override going to 150% at 40%, 3 to
   13%. Jobs of a few long moves end low (the tool's progress within a move isn't known).
   121 files, 0 failures (2026-11-23).
+  `Ln:` (step 3): for each file whose N words increase, each move's N is the one written on
+  its line, and a report with that `Ln:` and a position far off finds that very move; an N
+  no move has keeps the match. The reference job with an N on every line: all 13,301 moves
+  found by `Ln:` (by position 45.9% on the very move). 122 files, 0 failures (2026-11-23).
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

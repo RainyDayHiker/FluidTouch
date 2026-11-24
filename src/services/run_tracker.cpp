@@ -11,6 +11,33 @@ void RunTracker::reset() {
     have = false;
     rec = 0;
     ln = 0;
+    byN = false;
+}
+
+uint32_t RunTracker::findN(const SegmentList &list, uint32_t n, uint32_t *line) {
+    if (!n || !list.checkpoints()) return NOT_FOUND;
+    // The last checkpoint whose previous N is below n: the move is in its block, if anywhere
+    // (a checkpoint holds the N of the last move with one before it; they increase)
+    uint32_t lo = 0, hi = list.checkpoints() - 1;
+    while (lo < hi) {
+        uint32_t mid = (lo + hi + 1) / 2;
+        if (list.checkpoint(mid).n < n) {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    const uint32_t end = (lo + 1) * SegmentList::CHECKPOINT_EVERY;
+    SegmentList::Reader reader(list, lo);
+    SegmentList::Move m;
+    while (reader.next(m) && m.record < end) {
+        if (m.n == n) {
+            if (line) *line = m.line;
+            return m.record;
+        }
+        if (m.n > n) break;
+    }
+    return NOT_FOUND;
 }
 
 uint32_t RunTracker::windowEnd(const SegmentList &list, uint64_t readOffset) {
@@ -67,9 +94,22 @@ bool RunTracker::near(const SegmentList::Move &m, float x, float y, float z, flo
     return fabsf(mz - z) <= zTolerance;
 }
 
-bool RunTracker::update(const SegmentList &list, float x, float y, float z, uint64_t readOffset) {
+bool RunTracker::update(const SegmentList &list, float x, float y, float z, uint64_t readOffset, uint32_t lineN) {
     if (!list.records()) return false;
     const uint32_t from = have ? rec : 0;
+    if (lineN && list.nUsable()) {
+        uint32_t line = 0;
+        uint32_t r = findN(list, lineN, &line);
+        // Never back (a jog in a hold reports its own number, which no move has)
+        if (r != NOT_FOUND && r >= from) {
+            bool moved = !have || r != rec;
+            have = true;
+            byN = true;
+            rec = r;
+            ln = line;
+            return moved;
+        }
+    }
     const uint32_t end = windowEnd(list, readOffset);
     const float zTolerance = list.zStep() > Z_TOLERANCE ? list.zStep() : Z_TOLERANCE;
     SegmentList::Reader reader(list, from / SegmentList::CHECKPOINT_EVERY);
@@ -80,6 +120,7 @@ bool RunTracker::update(const SegmentList &list, float x, float y, float z, uint
         if (near(m, x, y, z, zTolerance)) {
             bool moved = !have || m.record != rec;
             have = true;
+            byN = false;
             rec = m.record;
             ln = m.line;
             return moved;

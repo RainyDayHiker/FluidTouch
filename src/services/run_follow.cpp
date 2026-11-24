@@ -4,6 +4,7 @@
 #include "services/preview_service.h"
 #include "services/run_tracker.h"
 #include "services/time_left.h"
+#include <Arduino.h>
 #include <string.h>
 
 namespace {
@@ -18,6 +19,7 @@ TimeLeft timeLeft;
 int lastOp = 0;
 float lastFeedOverride = 100, lastRapidOverride = 100;
 uint32_t lastEstimateGen = 0;
+int lastSource = -1;  // how the last match was found, for the log: 1 Ln:, 0 the position
 
 // The read position is rounded to a hundredth of a percent: a little slack past it
 const uint64_t READ_SLACK = 1024;
@@ -112,6 +114,7 @@ void RunFollow::poll() {
         tracker.reset();
         timeLeft.reset();
         lastOp = 0;
+        lastSource = -1;
         generation++;
     }
     wasActive = active;
@@ -137,8 +140,13 @@ void RunFollow::poll() {
     if (s.is_sd_printing) {
         read = (uint64_t)((double)s.sd_percent / 100.0 * (double)PreviewService::jobSize()) + READ_SLACK;
     }
-    bool moved = tracker.update(list, s.wpos_x, s.wpos_y, s.wpos_z, read);
+    bool moved = tracker.update(list, s.wpos_x, s.wpos_y, s.wpos_z, read, s.line_number);
     if (!tracker.matched()) return;
+    if (moved && (int)tracker.byLineNumber() != lastSource) {
+        lastSource = tracker.byLineNumber();
+        Serial.printf("RunFollow: following by %s (line %lu)\n", lastSource ? "Ln:" : "position",
+                      (unsigned long)tracker.line() + 1);
+    }
     bool overrides = s.feed_override != lastFeedOverride || s.rapid_override != lastRapidOverride;
     if (moved || overrides || !timeLeft.known()) {
         lastFeedOverride = s.feed_override;

@@ -367,6 +367,7 @@ SegmentList::Reader::Reader(const SegmentList &l, uint32_t fromCheckpoint) : lis
     haveCentre = false;
     centreX = centreY = 0;
     jumped = false;
+    nextN = 0;
 }
 
 bool SegmentList::Reader::next(Move &m) {
@@ -383,7 +384,8 @@ bool SegmentList::Reader::next(Move &m) {
                 case X_FEED: memcpy(&feed, &v32, 4); feedMode = (FeedMode)rec.c; break;
                 case X_DWELL: { float d; memcpy(&d, &v32, 4); dwell += d; break; }
                 case X_JUMP: px = rec.a; py = rec.b; pz = rec.c; jumped = true; break;
-                default: break;  // padding, N words
+                case X_N: nextN = v32; break;
+                default: break;  // padding
             }
             continue;
         }
@@ -403,6 +405,7 @@ bool SegmentList::Reader::next(Move &m) {
         m.feedMode = feedMode;
         m.dwellBefore = dwell;
         m.record = at - 1;
+        m.n = list.nUsable() ? nextN : 0;  // N records written before the N words stopped increasing
         m.cx = m.cy = m.r = m.sweep = 0;
         if (m.kind == ARC_CW || m.kind == ARC_CCW) {
             bool ccw = m.kind == ARC_CCW;
@@ -439,6 +442,7 @@ bool SegmentList::Reader::next(Move &m) {
         haveLine = false;
         haveCentre = false;
         jumped = false;
+        nextN = 0;
         return true;
     }
     return false;

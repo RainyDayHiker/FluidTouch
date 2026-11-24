@@ -46,6 +46,7 @@ public:
         FeedMode feedMode;
         float dwellBefore;  // seconds of G4 since the previous move
         uint32_t record;    // index of the move's record
+        uint32_t n;         // the move's line's N word; 0 if none, or when N words don't increase (D79)
     };
 
     struct Checkpoint {
@@ -139,6 +140,7 @@ public:
         bool haveCentre;
         int32_t centreX, centreY;
         bool jumped;
+        uint32_t nextN;
     };
 
     // Receives the analysis's segments and lines (AnalysisSink) and packs them
