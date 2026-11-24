@@ -78,6 +78,7 @@ struct FluidNCStatus {
     char sd_filename[64];       // Current file being run
     uint32_t sd_start_time_ms;  // Timestamp when file started (millis())
     uint32_t sd_elapsed_ms;     // Elapsed time since file started
+    uint32_t line_number;       // Ln: N word of the executing line (use_line_numbers), 0 if not reported
     
     // Connection status
     bool is_connected;
@@ -99,6 +100,7 @@ struct FluidNCStatus {
                      feed_rate(0), feed_override(100), rapid_override(100),
                      spindle_speed(0), spindle_override(100),
                      is_sd_printing(false), sd_percent(0), sd_start_time_ms(0), sd_elapsed_ms(0),
+                     line_number(0),
                      is_connected(false), last_update_ms(0),
                      pin_limit_x(false), pin_limit_y(false), pin_limit_z(false), pin_limit_a(false),
                      pin_probe(false) {

@@ -1164,6 +1164,10 @@ void FluidNCClient::parseStatusReport(const char* message) {
         currentStatus.sd_filename[0] = '\0';
     }
     
+    // Parse the executing line's number (Ln:n), sent with use_line_numbers when the line has one
+    const char* ln = strstr(message, "|Ln:");
+    currentStatus.line_number = ln ? (uint32_t)strtoul(ln + 4, nullptr, 10) : 0;
+
     // Parse modal states (Pn:, WCO:, etc.)
     // Note: Full parser state might come in separate $G response
     
