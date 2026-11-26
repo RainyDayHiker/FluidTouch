@@ -13,14 +13,14 @@ pixels on the 800 x 480 display. Touch targets are at least 64 x 56.
 |                              screen content  800 x 360                         |
 |                                                                                |
 +--------------------------------------------------------------------------------+
-|       | W X123.45 Y67.89 Z15.00   M X223.45 Y167.89 Z-5.00  |      |           | 64
-| IDLE  | Probe done. Next: insert the 6 mm end mill            | wifi | [ STOP ]  |
+|       | W X123.45 Y67.89 Z15.00   M X223.45 Y167.89 Z-5.00  | wifi |           | 64
+| IDLE  | Probe done. Next: insert the 6 mm end mill            | batt | [ STOP ]  |
 +--------------------------------------------------------------------------------+
 ```
 
-Screen tabs are at the top; the status bar is at the bottom (D27). State, WiFi and STOP
-take the bar's full height; between them, positions are on the first row and the last
-message on the second (D39).
+Screen tabs are at the top; the status bar is at the bottom (D27). State and STOP take the
+bar's full height; between them, positions are on the first row and the last message on the
+second (D39), then a column with WiFi on the first row and the battery on the second (D96).
 
 | Element | Behaviour |
 |---------|-----------|
@@ -28,6 +28,7 @@ message on the second (D39).
 | Position | Work position and machine position, both always visible, in the status bar |
 | Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. While Run follows a running job, a message from the file is replaced by the file's message at the tool ([11 §6](11-preview.md#6-run-following-the-tool-d79), D92). A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
 | STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 52; its touch area extends 10 px beyond it on every side. The 104 x 40 button in the 48 px bar was checked on the device: good |
+| Battery | Under the WiFi icon: the battery's level in five steps, a charge symbol while charging, amber at 20% and under, red at 10% and under; nothing when no fuel gauge is fitted ([12 §4](12-battery.md#4-the-battery-icon), D96) |
 | Alarm banner | Replaces the status bar: alarm text + Unlock (`$X`). On every screen |
 | Offline banner | Replaces the status bar. The text says whether an attempt is under way or when the next one starts. During an attempt: "Connecting to <machine>..." before the first connection, "Connection lost. Reconnecting..." after a drop; Reconnect is greyed out, because it could do nothing. Between attempts: "No answer from <machine>. Next attempt in N s." or "Connection lost. Next attempt in N s.", counting down; Reconnect starts the attempt at once. Once the retries are used up (after 5, 5, 10 and 10 s, D46): "No answer from <machine>. Press Reconnect to try again." or "Connection lost. Press Reconnect to try again."; Reconnect starts again with the same back-off. While joining WiFi: "Connecting to WiFi <ssid>..." (or "WiFi lost. Reconnecting to <ssid>..."). If a job was running when the link dropped, a second line "The job continues on the controller." Retries happen on their own until then ([02 §4](02-architecture.md#4-services)) |
 | No-machine banner | The chosen classic machine slot (D57) is empty or not a WiFi machine: says so, with a Settings button that opens Settings > Machine |
@@ -290,7 +291,7 @@ refused on OK with the range in red. Text (names, WiFi, address) opens a keyboar
 | Machine | Machine picker (temporary, D57): the four classic slots by name, marked "(empty)" or "(not WiFi)". For the chosen slot: name, WiFi network, WiFi password (shown as stars), FluidNC address, port. An empty slot can be chosen and filled in here; it becomes a WiFi machine with classic's jog and probe defaults. A machine with no name is called "Machine N" in messages. Saving a change of slot, WiFi or address reconnects at once (the name alone does not). Greyed out while a job runs, so the connection can't be changed under it |
 | Jog & Probe | XY step at start and Z step at start: the step lists as buttons; the one tapped is the step Setup starts with. The lists themselves are not changed here (D58). XY jog feed, Z jog feed, joystick feed at full deflection, each with - and + buttons beside the value that change it by 100 mm/min; tapping the value opens the keypad. Probe feed, probe maximum distance, probe back-off. Laser offset X and Y (laser crosshair to bit, D11). Setup picks up new values the next time it is shown; the step chosen there goes back to the start step |
 | Display | Brightness: a slider from 25 to 100% in steps of 5. Dimming goes to a quarter of the brightness, at least 5% (stored in classic's `pm_dim_bri`; classic's own Power page rounds both up to its choices) (D58). Dim after: off, 15, 30, 45 s, 1 min, 90 s, 2, 5 min. Screen off after: off, 1, 2, 5, 10, 15, 30, 60 min. Deep sleep after: off, 5, 10, 15, 30, 60, 90 min. Rotate 180: off/on. Same keys and choices as classic Settings > Power and General. Brightness changes while the slider moves; the timers follow classic's rules (screen off at least 10 s after dim, deep sleep at least 60 s after screen off), and a choice that breaks them moves the later timer, and later choices that would break them are greyed out. Rotation takes effect after a restart, which the page says |
-| Tools | Restart into classic UI, Restart, Draw test (spike S2, goes with M5). Position log: Off / On (D62), with the last log's file name and rows, or why it stopped. Library tests: Run, with progress, then the summary and the first failure; greyed out while it runs or a job runs (D73, [04 §2](04-gcode-library.md#2-the-device-test-suite)). About: LowRider Touch and FluidTouch versions, FluidNC address and version, display IP and WiFi signal, free RAM and PSRAM, time since start |
+| Tools | Restart into classic UI, Restart, Draw test (spike S2, goes with M5). Position log: Off / On (D62), with the last log's file name and rows, or why it stopped. Library tests: Run, with progress, then the summary and the first failure; greyed out while it runs or a job runs (D73, [04 §2](04-gcode-library.md#2-the-device-test-suite)). About: LowRider Touch and FluidTouch versions, FluidNC address and version, display IP and WiFi signal, free RAM and PSRAM, time since start, and the battery: percent, voltage, and charging or the discharge rate, or "No battery gauge found" ([12 §4](12-battery.md#4-the-battery-icon)) |
 
 The spec's earlier Files page (file manager, copy to controller, inbox address) is not
 built: the Job picker lists and deletes on both cards, "Use this job" copies to the

@@ -20,6 +20,7 @@ questions; the list is in [07-decisions.md](07-decisions.md#open-questions).
 | 09 | [Git workflow](09-git-workflow.md) | Draft |
 | 10 | [New jobs (generators)](10-new-jobs.md) | Draft, 2026-11-21; M8 |
 | 11 | [Preview and progress](11-preview.md) | Draft, 2026-11-21; M5 |
+| 12 | [Battery gauge](12-battery.md) | Draft, 2026-11-25; M10; waits for the hardware check |
 |    | [Handoff](HANDOFF.md) | Current state and next steps; read first |
 
 Related specs live in the CNC-Tools repo (`gcode-editor/specs/`). Its specs 04 (G-code

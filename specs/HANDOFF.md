@@ -52,6 +52,12 @@ answers:
   the tool (Fit or a double tap restarts it); Fit is hidden during a prompt; "(S1)" dropped
   from the D72 confirm text.
 
+**Battery gauge (M10, [12](12-battery.md), D95 to D97), specified 2026-11-25, not built.**
+Jeffrey has ordered the gauge (Adafruit MAX17048, 5580) and cable (4424). He fits it and runs
+the hardware check (12 §6: cable pin order, polarity, 0x36 in the boot log's I²C scan, touch
+unaffected); then build it on `lrt/m10-battery` from `lrt/main` in the order of 12 §7. It
+doesn't touch upstream code and doesn't depend on M5.
+
 Older open questions (Q2 to Q20, OneDrive inbox and Move) are in
 [07](07-decisions.md#open-questions); none of them blocks M5.
 
