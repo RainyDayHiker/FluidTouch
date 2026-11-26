@@ -1,43 +1,48 @@
-# Handoff — state as of 2026-11-25 (M5 part 5c built; waiting on a device test)
+# Handoff — state as of 2026-11-26 (M5 part 5c checked on the device; D98 built)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
-## 0. Pick up here (2026-11-25)
+## 0. Pick up here (2026-11-26)
 
-**Branch `lrt/m5c-run`, last commit 7eff507, pushed, working tree clean.** All four steps
-of 5c are built (D89 to D94) and checked in the simulator and the host test (122 files, 0
-failures). The firmware builds. **None of 5c has run on the device.** It is not merged into
-`lrt/main`; merge (`--no-ff`) only when Jeffrey says so, after the device test.
+**Branch `lrt/m5c-run`.** 5c (D89 to D94) ran on the device on 2026-11-26 (Jeffrey, the
+Third Wheel job from the Controller SD, unmodified). D98 is built after it and checked in the
+simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says so.
 
-**Next: flash `lrt/m5c-run` and run a real job (DogHoles).** What to watch, and what it
-answers:
+**Device results (2026-11-26, Jeffrey):**
 
-1. **The preview follows the cut:** green behind the tool, the marker on the tool, no
-   stutter from the 0.2 s redraws, following when zoomed in (D89). The serial log prints
-   `RunFollow: following by position (line N)` (or `by Ln:`).
-2. **The message follows the tool (D92), the spaces question.** FluidNC's source looked as
-   if it might drop a comment's spaces before sending the `[MSG]`, so the match ignores
-   spaces and allows a one-character shift. Check that the status bar names the hole the
-   tool is cutting, not one the controller has read ahead to.
-3. **"op N of M"** reads the operation the tool is in (DogHoles: op 5 at hole 3, op 11 at
-   hole 6 in the simulator).
-4. **Time left on a real job (D91, D92).** Only checked against simulated runs. Expect it
-   to start about 30% short (no acceleration in the plan) and climb for the first few
-   minutes. Note the real total time of DogHoles against the estimate (3,403 s, about 57
-   min, with the fake's axis rates).
-5. **The download offer during a cut (D72, D94), D72's open question:** start a job with
-   no preview on the display (from FluidNC's web UI, or restart the display mid-job), tap
-   "Download preview", Download. Does fetching the 771 KB reference job while cutting
-   disturb the motion? Only a small file was tried before (S1). Also check that a restart
-   mid-job finds the earlier copy and uses it without asking.
-6. **Memory:** the segment list should still get its 640 KB (D88) with Run's canvas.
+1. **The preview follows the cut:** good.
+2. **The message follows the tool:** the status bar is not ahead of the cut.
+3. **"op N of M"** matches the operation being cut.
+4. **Time left:** started at about 30 minutes, short as expected, and went up a good deal. The
+   real total isn't known (the display was restarted for the next test). Still open; next
+   time with the position log on (Settings > Tools), whose file keeps the start and end.
+5. **Download during a cut (D72's open question): answered.** Downloading the job's preview
+   while it cut did not disturb the motion. The confirm no longer says only a small file was
+   tried (05 §2).
+   **The copy after a restart was not found:** the display offered the download although
+   the job had been fetched for its preview before. Most likely the controller refused the
+   size listing during the cut (not confirmed: no serial log at the machine). D98 offers the
+   copy of that name in the confirm, with the controller's reply beside the button, which will
+   show the cause on the device.
+6. **Memory:** `PreviewService: segment list 655360 bytes (largest free block 1048564)`.
+
+The axis rates on the real machine are `9000 9000 900 mm/min`, matching the config's
+`max_rate_mm_per_min` (Jeffrey).
+
+**Next on the device:** restart the display mid-job (a Controller SD job chosen and
+previewed on Job first). Expected, if the listing is refused: "The controller didn't give the
+size (error:N). A copy from before is on the display." beside a "Load preview" button; its
+confirm offers Use the copy, Download, Not now; Use the copy shows the preview with no
+download. If the button reads "Download preview" with no reason beside it, the listing
+answered and the copy's size differed: then the copy itself needs looking at.
+
+**Found in the simulator, not yet fixed:** a refused listing's `error:8` line becomes
+FluidNC's last message (upstream's `FluidNCClient` stores every `error:` line in
+`last_message`). During a prompt it replaces the prompt text on Run and the status bar's
+message, until the next message. Waiting on Jeffrey's choice of fix.
 
 **Open questions for Jeffrey (not blocking):**
 
-- **The axis-rates line** ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate)):
-  the serial log's `FileService: axis rates X Y Z mm/min` after a connect to the real
-  machine, and whether it matches the config's `max_rate_mm_per_min`. Without it the time
-  estimate can't be judged.
 - **Line numbers stay off** (Jeffrey, D93). `Ln:` works in the simulator but needs
   `use_line_numbers: true` and N words from the post-processor. With an N on every line the
   library's `structure` finds no operations (its markers are matched at the start of the
