@@ -1,6 +1,59 @@
-# Handoff — state as of 2026-11-17 (end of the second development session)
+# Handoff — state as of 2026-11-25 (M5 part 5c built; waiting on a device test)
 
 Sections 1 and 2 are rewritten at the end of each working session.
+
+## 0. Pick up here (2026-11-25)
+
+**Branch `lrt/m5c-run`, last commit 7eff507, pushed, working tree clean.** All four steps
+of 5c are built (D89 to D94) and checked in the simulator and the host test (122 files, 0
+failures). The firmware builds. **None of 5c has run on the device.** It is not merged into
+`lrt/main`; merge (`--no-ff`) only when Jeffrey says so, after the device test.
+
+**Next: flash `lrt/m5c-run` and run a real job (DogHoles).** What to watch, and what it
+answers:
+
+1. **The preview follows the cut:** green behind the tool, the marker on the tool, no
+   stutter from the 0.2 s redraws, following when zoomed in (D89). The serial log prints
+   `RunFollow: following by position (line N)` (or `by Ln:`).
+2. **The message follows the tool (D92), the spaces question.** FluidNC's source looked as
+   if it might drop a comment's spaces before sending the `[MSG]`, so the match ignores
+   spaces and allows a one-character shift. Check that the status bar names the hole the
+   tool is cutting, not one the controller has read ahead to.
+3. **"op N of M"** reads the operation the tool is in (DogHoles: op 5 at hole 3, op 11 at
+   hole 6 in the simulator).
+4. **Time left on a real job (D91, D92).** Only checked against simulated runs. Expect it
+   to start about 30% short (no acceleration in the plan) and climb for the first few
+   minutes. Note the real total time of DogHoles against the estimate (3,403 s, about 57
+   min, with the fake's axis rates).
+5. **The download offer during a cut (D72, D94), D72's open question:** start a job with
+   no preview on the display (from FluidNC's web UI, or restart the display mid-job), tap
+   "Download preview", Download. Does fetching the 771 KB reference job while cutting
+   disturb the motion? Only a small file was tried before (S1). Also check that a restart
+   mid-job finds the earlier copy and uses it without asking.
+6. **Memory:** the segment list should still get its 640 KB (D88) with Run's canvas.
+
+**Open questions for Jeffrey (not blocking):**
+
+- **The axis-rates line** ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate)):
+  the serial log's `FileService: axis rates X Y Z mm/min` after a connect to the real
+  machine, and whether it matches the config's `max_rate_mm_per_min`. Without it the time
+  estimate can't be judged.
+- **Line numbers stay off** (Jeffrey, D93). `Ln:` works in the simulator but needs
+  `use_line_numbers: true` and N words from the post-processor. With an N on every line the
+  library's `structure` finds no operations (its markers are matched at the start of the
+  line; the fix would be in CNC-Tools: skip a leading `N\d+`). Open: should a note go to
+  CNC-Tools (`specs/outgoing/`) anyway, for later?
+- **The D88 draw-buffer fix upstream:** optionally open an issue on jeyeager65/FluidTouch
+  (the buffers are sized with the 3-byte `lv_color_t` at 16-bit colour, about 750 KB unused).
+  Jeffrey to say whether to.
+- **The display SD's write errors** (errno 5 on the first download after boot, D86 retries
+  it): cause still unknown; watch whether it shows up again.
+- Choices made without review and still open to change: a drag stops the view following
+  the tool (Fit or a double tap restarts it); Fit is hidden during a prompt; "(S1)" dropped
+  from the D72 confirm text.
+
+Older open questions (Q2 to Q20, OneDrive inbox and Move) are in
+[07](07-decisions.md#open-questions); none of them blocks M5.
 
 ## 1. Where things stand
 
