@@ -499,7 +499,7 @@ void RunScreen::update() {
     if (prompt) {
         setText(leftMessage, JobService::promptText());
     } else if (JobService::active() && online) {
-        setText(leftMessage, MachineService::status().last_message);
+        setText(leftMessage, MachineService::message());
     } else if (ready) {
         setText(leftMessage, "Ready. Nothing moves until START.");
     } else {

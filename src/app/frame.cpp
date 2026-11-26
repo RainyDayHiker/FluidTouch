@@ -291,15 +291,15 @@ void Frame::updateStatusBar() {
     setTextColor(wifiLabel, UITheme::STATE_IDLE);
 
     // A new message from FluidNC replaces a notice at once
-    if (strcmp(s.last_message, lastDeviceMessage) != 0) {
-        strncpy(lastDeviceMessage, s.last_message, sizeof(lastDeviceMessage) - 1);
+    if (strcmp(MachineService::message(), lastDeviceMessage) != 0) {
+        strncpy(lastDeviceMessage, MachineService::message(), sizeof(lastDeviceMessage) - 1);
         noticeText[0] = '\0';
     }
     static bool noticeShown = false;
     bool showNotice = noticeText[0] && millis() - noticeAtMs < NOTICE_MS;
     if (!showNotice) noticeText[0] = '\0';
     // While Run follows the tool, the file's messages follow it too (D65, D92)
-    setText(messageLabel, showNotice ? noticeText : RunFollow::message(s.last_message));
+    setText(messageLabel, showNotice ? noticeText : RunFollow::message(MachineService::message()));
     if (showNotice != noticeShown) {
         noticeShown = showNotice;
         lv_obj_set_style_text_color(messageLabel, showNotice ? UITheme::UI_NOTE : UITheme::TEXT_LIGHT, 0);

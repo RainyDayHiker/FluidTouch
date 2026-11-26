@@ -279,6 +279,8 @@ void FileService::onLine(const char *payload) {
             }
         } else if (line.startsWith("error:")) {
             if (!collecting) {
+                // The reply to this service's own command, not a message for the operator (D99)
+                MachineService::ownReply(line.c_str());
                 finishRequest(false, line.c_str());
                 return;
             }

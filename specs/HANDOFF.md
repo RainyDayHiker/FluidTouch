@@ -1,11 +1,11 @@
-# Handoff — state as of 2026-11-26 (M5 part 5c checked on the device; D98 built)
+# Handoff — state as of 2026-11-26 (M5 part 5c checked on the device; D98 and D99 built)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 0. Pick up here (2026-11-26)
 
 **Branch `lrt/m5c-run`.** 5c (D89 to D94) ran on the device on 2026-11-26 (Jeffrey, the
-Third Wheel job from the Controller SD, unmodified). D98 is built after it and checked in the
+Third Wheel job from the Controller SD, unmodified). D98 and D99 are built after it and checked in the
 simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says so.
 
 **Device results (2026-11-26, Jeffrey):**
@@ -36,10 +36,13 @@ confirm offers Use the copy, Download, Not now; Use the copy shows the preview w
 download. If the button reads "Download preview" with no reason beside it, the listing
 answered and the copy's size differed: then the copy itself needs looking at.
 
-**Found in the simulator, not yet fixed:** a refused listing's `error:8` line becomes
+**Found in the simulator and fixed (D99):** a refused listing's `error:8` line became
 FluidNC's last message (upstream's `FluidNCClient` stores every `error:` line in
-`last_message`). During a prompt it replaces the prompt text on Run and the status bar's
-message, until the next message. Waiting on Jeffrey's choice of fix.
+`last_message`) and replaced a prompt's text on Run and the status bar's message. The new UI
+now reads `MachineService::message()`, which passes over an `error:` reply to FileService's
+own commands. Checked in the simulator (the prompt's text stays; the log says
+`MachineService: error:8 answers the display's own command; not shown`). On the device, the
+same restart check above should keep the prompt's text.
 
 **Open questions for Jeffrey (not blocking):**
 

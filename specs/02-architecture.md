@@ -128,6 +128,11 @@ A hold is a prompt unless it was asked for here (Pause or STOP: `MachineService:
 An alarm, or a reset from Abort, ends it as Aborted. While it runs, `MachineService::jobActive()`
 is true even after `SD:` has gone, so Setup stays greyed out to the end (S3).
 
+The new UI reads FluidNC's message through `MachineService::message()`, not `last_message`:
+the client stores every `error:` line there, and an `error:` reply to FileService's own
+commands (listings, size checks, axis rates) is passed over, leaving the message before it
+(D99). The position log records the raw messages.
+
 `MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
 `canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
 to grey out buttons and to explain a press they refuse (`busyReason()`), and each action

@@ -154,7 +154,7 @@ void JobService::enter(RunState next) {
     if (next == RUN_FINISHED || next == RUN_ABORTED) endMs = now;
     if (next == RUN_PROMPT) {
         // The M0's (MSG ...) arrives when its line is read, before the hold
-        copy(prompt, sizeof(prompt), MachineService::status().last_message);
+        copy(prompt, sizeof(prompt), MachineService::message());
     }
     idleSinceMs = 0;
     state = next;
@@ -290,7 +290,7 @@ void JobService::poll() {
                 snprintf(endReason, sizeof(endReason), "%s", s.alarm_message[0] ? s.alarm_message : "Alarm.");
                 enter(RUN_ABORTED);
             } else if (now - startMs >= START_TIMEOUT_MS) {
-                snprintf(endReason, sizeof(endReason), "The job did not start. %s", s.last_message);
+                snprintf(endReason, sizeof(endReason), "The job did not start. %s", MachineService::message());
                 enter(RUN_ABORTED);
             }
             break;
@@ -309,8 +309,8 @@ void JobService::poll() {
                 enter(userPaused || MachineService::heldByUser() ? RUN_PAUSED : RUN_PROMPT);
                 // One prompt straight after another, between two status
                 // reports: the text follows the newest M0's message
-                if (state == RUN_PROMPT && strcmp(prompt, s.last_message) != 0) {
-                    copy(prompt, sizeof(prompt), s.last_message);
+                if (state == RUN_PROMPT && strcmp(prompt, MachineService::message()) != 0) {
+                    copy(prompt, sizeof(prompt), MachineService::message());
                 }
             } else if (!s.is_sd_printing && s.state == STATE_IDLE) {
                 if (!idleSinceMs) {

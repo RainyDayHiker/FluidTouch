@@ -44,6 +44,38 @@ uint32_t MachineService::homeYSinceMs = 0;
 // How long $HX may take to show up as Home in the status before Home XY gives up
 static const uint32_t HOME_X_START_TIMEOUT_MS = 3000;
 
+// --- The message to show (D99) ----------------------------------------------------------
+
+namespace {
+char seenMessage[sizeof(FluidNCStatus::last_message)] = "";   // the client's, as last seen
+char shownMessage[sizeof(FluidNCStatus::last_message)] = "";  // what message() returns
+char ownReplyText[32] = "";  // an error line answering the display's own command, not yet seen
+
+void copyText(char *out, size_t outLen, const char *text) {
+    strncpy(out, text, outLen - 1);
+    out[outLen - 1] = '\0';
+}
+}  // namespace
+
+void MachineService::ownReply(const char *line) { copyText(ownReplyText, sizeof(ownReplyText), line); }
+
+const char *MachineService::message() {
+    const char *raw = status().last_message;
+    if (strcmp(raw, seenMessage) != 0) {
+        copyText(seenMessage, sizeof(seenMessage), raw);
+        // The client stored the error line of a listing the display asked for itself: the
+        // message before it stays (e.g. a prompt's text during a cut)
+        bool own = ownReplyText[0] && strcmp(raw, ownReplyText) == 0;
+        if (own) {
+            Serial.printf("MachineService: %s answers the display's own command; not shown\n", raw);
+        } else {
+            copyText(shownMessage, sizeof(shownMessage), raw);
+        }
+        ownReplyText[0] = '\0';
+    }
+    return shownMessage;
+}
+
 void MachineService::Listener::onProbeResult(float x, float y, float z, bool success) {
     probe.count++;
     probe.x = x;
