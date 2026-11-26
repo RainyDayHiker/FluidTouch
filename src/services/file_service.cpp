@@ -38,6 +38,7 @@ FileService::SizeState FileService::sizeStateValue = FileService::SIZE_IDLE;
 bool FileService::sizeWanted = false;
 char FileService::sizePathValue[FileService::PATH_LEN] = "";
 int32_t FileService::sizeValue = -1;
+char FileService::sizeErrorText[80] = "";
 char FileService::uploadLocalPath[PATH_LEN] = "";
 char FileService::uploadName[NAME_LEN] = "";
 char FileService::uploadRemotePath[PATH_LEN] = "";
@@ -368,8 +369,12 @@ void FileService::finishRequest(bool ok, const char *error) {
             sizeStateValue = SIZE_KNOWN;
         } else {
             sizeStateValue = SIZE_FAILED;
+            // The controller's own words when it refused (error:8 during a job, D98)
+            copy(sizeErrorText, sizeof(sizeErrorText),
+                 !ok ? (error ? error : "No answer from the controller.") : "The file is not in the listing.");
         }
-        Serial.printf("FileService: size of %s: %ld\n", sizePathValue, (long)sizeValue);
+        Serial.printf("FileService: size of %s: %ld%s%s\n", sizePathValue, (long)sizeValue,
+                      sizeStateValue == SIZE_FAILED ? ", " : "", sizeStateValue == SIZE_FAILED ? sizeErrorText : "");
     } else if (done == REQUEST_VERIFY) {
         int32_t size = -2;
         if (!ok || !findInListing(uploadName, size)) {
@@ -391,6 +396,7 @@ void FileService::finishRequest(bool ok, const char *error) {
 void FileService::sizeOf(const char *path) {
     copy(sizePathValue, sizeof(sizePathValue), path);
     sizeValue = -1;
+    sizeErrorText[0] = '\0';
     sizeStateValue = SIZE_LOADING;
     sizeWanted = true;  // asked for in poll(), once no other request is under way
 }

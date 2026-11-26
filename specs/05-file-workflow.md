@@ -39,14 +39,31 @@ comments say motion may need:
 
 > "Download <name> (<size>) now, while the machine is cutting?
 >
-> The controller reads its SD card for the download as well as for the job. It worked on a
-> small file; a large one has not been tried.
+> The controller reads its SD card for the download as well as for the job.
 >
 > It replaces <other> as the chosen job." [Download] [Not now]
 
 The size is left out when the listing didn't give it; the last sentence is there only when
-another file is chosen on Job. Either way the running file becomes the chosen job (there is
-room for one preview). While it downloads and is analysed, the button's place shows
+another file is chosen on Job. (The earlier "It worked on a small file; a large one has not
+been tried." went once a download during a real cut was seen not to disturb the motion,
+2026-11-26.)
+
+**The size unchecked (D98).** The controller may refuse the listing during a cut (the reply
+an `error:` line). Then a copy of that name in the working folder can't be matched by size,
+so the operator judges it: beside the button, "The controller didn't give the size (<the
+controller's reply>). A copy from before is on the display." (the second sentence only when
+there is one); the button reads "Load preview", and its confirm is
+
+> "The display has a copy of <name> from before (<its size>). The controller didn't give the
+> file's size (<reply>), so it can't be checked that the copy is the same file.
+>
+> Use the copy, or download the file now, while the machine is cutting?" [Use the copy]
+> [Download] [Not now]
+
+with the replacing sentence as above. Use the copy analyses it with no download. Without a
+copy of that name the offer is the download alone, with the reason beside the button.
+
+Either way the running file becomes the chosen job (there is room for one preview). While it downloads and is analysed, the button's place shows
 "Downloading the preview: N%", then "Analysing the preview: N%"; then Run shows the preview.
 A failure brings the button back with the reason beside it. "Not now" closes the confirm; the
 button stays until the job ends. No confirm when no job is running.

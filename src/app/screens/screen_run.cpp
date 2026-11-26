@@ -63,6 +63,9 @@ lv_obj_t *downloadButton;  // the offer (D72, D94)
 lv_obj_t *downloadText;    // its progress, or why the last try failed
 lv_obj_t *downloadDialog;
 lv_obj_t *downloadDialogText;
+lv_obj_t *useCopyButton;      // in the dialog when only the name vouches for a copy (D98)
+lv_obj_t *dialogDownloadButton;
+lv_obj_t *dialogNotNowButton;
 
 // Panel groups, one shown at a time
 lv_obj_t *startGroup;
@@ -150,13 +153,36 @@ void onDownloadOffer(lv_event_t *) {
     }
     char other[FileService::NAME_LEN + 48] = "";
     if (RunPreview::otherChosen()) snprintf(other, sizeof(other), "\n\nIt replaces %s as the chosen job.", RunPreview::otherName());
-    char text[FileService::NAME_LEN * 2 + 320];
-    snprintf(text, sizeof(text),
-             "Download %s%s now, while the machine is cutting?\n\nThe controller reads its SD card for the "
-             "download as well as for the job. It worked on a small file; a large one has not been tried.%s",
-             JobService::runName(), size, other);
+    char text[FileService::NAME_LEN * 2 + 360];
+    bool copy = RunPreview::nameCopy() >= 0;
+    if (copy) {
+        // Only the name vouches for the copy: the operator knows whether it is the same file (D98)
+        char s[12];
+        formatSize(s, sizeof(s), RunPreview::nameCopy());
+        snprintf(text, sizeof(text),
+                 "The display has a copy of %s from before (%s). The controller didn't give the file's size "
+                 "(%s), so it can't be checked that the copy is the same file.\n\nUse the copy, or download "
+                 "the file now, while the machine is cutting?%s",
+                 JobService::runName(), s, RunPreview::sizeError(), other);
+    } else {
+        snprintf(text, sizeof(text),
+                 "Download %s%s now, while the machine is cutting?\n\nThe controller reads its SD card for the "
+                 "download as well as for the job.%s",
+                 JobService::runName(), size, other);
+    }
     setText(downloadDialogText, text);
+    // Three buttons with the copy, two without
+    show(useCopyButton, copy);
+    int w = copy ? 184 : 276;
+    lv_obj_set_size(dialogDownloadButton, w, 56);
+    lv_obj_set_size(dialogNotNowButton, w, 56);
+    lv_obj_set_x(dialogDownloadButton, copy ? 16 + w + 8 : 16);
+    lv_obj_set_x(dialogNotNowButton, copy ? 16 + 2 * (w + 8) : 16 + w + 16);
     showDialog(downloadDialog, true);
+}
+void onUseCopy(lv_event_t *) {
+    showDialog(downloadDialog, false);
+    RunPreview::useCopy();
 }
 void onDownloadConfirmed(lv_event_t *) {
     showDialog(downloadDialog, false);
@@ -223,8 +249,10 @@ void createDownloadDialog(lv_obj_t *parent) {
     downloadDialogText = label(downloadDialog, 16, 16, FONT_MID, UITheme::TEXT_LIGHT, "");
     lv_obj_set_size(downloadDialogText, 568, 196);
     lv_label_set_long_mode(downloadDialogText, LV_LABEL_LONG_WRAP);
-    button(downloadDialog, 16, 228, 276, 56, LV_SYMBOL_DOWNLOAD "  Download", FONT_BIG, onDownloadConfirmed);
-    button(downloadDialog, 308, 228, 276, 56, "Not now", FONT_BIG, onDownloadNotNow);
+    useCopyButton = button(downloadDialog, 16, 228, 184, 56, LV_SYMBOL_OK "  Use the copy", FONT_BIG, onUseCopy);
+    dialogDownloadButton =
+        button(downloadDialog, 16, 228, 276, 56, LV_SYMBOL_DOWNLOAD "  Download", FONT_BIG, onDownloadConfirmed);
+    dialogNotNowButton = button(downloadDialog, 308, 228, 276, 56, "Not now", FONT_BIG, onDownloadNotNow);
 }
 
 // The offer under the file and message (D72, D94): the button, and the download's progress
@@ -239,7 +267,14 @@ void updateOffer() {
                  ps == PreviewService::FETCHING ? "Downloading" : "Analysing", (int)(PreviewService::progress() * 100));
     } else if (st == RunPreview::OFFER && RunPreview::failure()[0]) {
         snprintf(text, sizeof(text), "%s", RunPreview::failure());
+    } else if (st == RunPreview::OFFER && RunPreview::sizeError()[0]) {
+        // Why the copy from before wasn't used without asking (D98)
+        snprintf(text, sizeof(text), "The controller didn't give the size (%s).%s", RunPreview::sizeError(),
+                 RunPreview::nameCopy() >= 0 ? " A copy from before is on the display." : "");
     }
+    // The button names what it leads to: a copy to use, or only the download
+    setText(lv_obj_get_child(downloadButton, 0), RunPreview::nameCopy() >= 0 ? LV_SYMBOL_IMAGE "  Load preview"
+                                                                              : LV_SYMBOL_DOWNLOAD "  Download preview");
     show(downloadText, text[0] != '\0');
     setText(downloadText, text);
     // Beside the button, or in its place while it is hidden

@@ -34,7 +34,8 @@ M5 is built and checked in three parts, each its own branch:
   preview when the job ends." and the download starts when it ends.
 - **During a cut, no preview of the running job:** the working folder's copy when its size is
   the controller's and no other file is chosen, else Run offers the download with the confirm
-  of [05 §2](05-file-workflow.md#2-model) (D94: `RunPreview`). "Not now" keeps the pre-M5 view
+  of [05 §2](05-file-workflow.md#2-model) (D94: `RunPreview`). When the controller refuses the
+  listing, a copy of that name is offered in the confirm beside the download (D98). "Not now" keeps the pre-M5 view
   with the button. A job started elsewhere has no size until the listing (or the analysed
   file) gives it; Run then follows it by name and that size.
 - A fetch that fails (controller offline, a write to the display SD failing, a short

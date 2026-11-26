@@ -7,8 +7,10 @@
 //
 // Once per running job: its size from a listing of its folder (unless known), then the working
 // folder's copy of that name and size is analysed without asking (unless another file is chosen
-// on Job), or else Run offers the download with a confirm. Either way the running file becomes
-// the chosen job. The offer lasts until the job ends.
+// on Job), or else Run offers the download with a confirm. When the controller didn't give the
+// size (it may refuse the listing during a cut), a copy of that name is offered in the same
+// confirm, beside the download (D98). Either way the running file becomes the chosen job. The
+// offer lasts until the job ends.
 class RunPreview {
 public:
     enum State {
@@ -25,9 +27,16 @@ public:
     static const char *otherName();
     // OFFER after a load of this file failed: why; "" otherwise
     static const char *failure();
+    // OFFER with the size unchecked: why the controller didn't give it; "" otherwise
+    static const char *sizeError();
+    // OFFER with the size unchecked and a working folder copy of the running file's name: the
+    // copy's size, offered beside the download (D98); -1 otherwise
+    static int32_t nameCopy();
 
     // The user confirmed: download now
     static void download();
+    // The user chose the copy of that name (nameCopy() >= 0)
+    static void useCopy();
 
     static void poll();
 };

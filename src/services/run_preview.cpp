@@ -14,6 +14,7 @@ char runKey[FileService::PATH_LEN] = "";  // the running job these flags are for
 bool checked = false;                     // its size asked for (or known)
 int32_t fileSize = -1;
 bool copyTried = false;                   // its working folder copy tried once
+int32_t nameCopySize = -1;                // a copy only its name vouches for (the size unchecked, D98)
 
 void copy(char *out, size_t outLen, const char *text) {
     strncpy(out, text, outLen - 1);
@@ -26,21 +27,23 @@ void reset() {
     checked = false;
     fileSize = -1;
     copyTried = false;
+    nameCopySize = -1;
 }
 
 // The preview service is on the running file
 bool previewOnRunFile() { return strcmp(PreviewService::jobPath(), JobService::runPath()) == 0; }
 
-// The working folder holds the running file at that size (from before a restart or a UI switch)
-bool copyMatches(int32_t size) {
-    if (size < 0 || FileService::displayCardBusy()) return false;
+// The size of the working folder's file of the running file's name (from before a restart or a
+// UI switch); -1 when there is none
+int32_t copySize() {
+    if (FileService::displayCardBusy()) return -1;
     char path[FileService::PATH_LEN];
     FileService::join(path, sizeof(path), PreviewService::WORK_FOLDER, JobService::runName());
     File f = SD.open(path, FILE_READ);
-    if (!f) return false;
-    bool same = !f.isDirectory() && (int64_t)f.size() == (int64_t)size;
+    if (!f) return -1;
+    int64_t size = f.isDirectory() ? -1 : (int64_t)f.size();
     f.close();
-    return same;
+    return size > INT32_MAX ? -1 : (int32_t)size;
 }
 
 }  // namespace
@@ -59,6 +62,20 @@ const char *RunPreview::failure() {
     if (current != OFFER || !previewOnRunFile()) return "";
     PreviewService::State s = PreviewService::state();
     return s == PreviewService::FAILED ? PreviewService::message() : "";
+}
+
+int32_t RunPreview::nameCopy() { return current == OFFER ? nameCopySize : -1; }
+
+const char *RunPreview::sizeError() {
+    return current == OFFER && checked && fileSize < 0 ? FileService::sizeError() : "";
+}
+
+void RunPreview::useCopy() {
+    if (current != OFFER || nameCopySize < 0) return;
+    Serial.printf("RunPreview: %s: the working folder's copy used by name, %ld bytes\n", JobService::runPath(),
+                  (long)nameCopySize);
+    JobService::chooseRunning(nameCopySize, false);
+    current = LOADING;
 }
 
 void RunPreview::download() {
@@ -113,14 +130,22 @@ void RunPreview::poll() {
         JobService::learnRunSize(path, fileSize);
     }
 
-    // The copy from before, used without asking when no other file is chosen
+    // The copy from before, used without asking when its size matches and no other file is chosen.
+    // When the size couldn't be checked (the controller refused the listing during the cut), the
+    // copy is offered beside the download, for the operator to judge (D98)
     if (!copyTried) {
         copyTried = true;
-        if (!otherChosen() && copyMatches(fileSize)) {
+        int32_t local = copySize();
+        if (local >= 0 && local == fileSize && !otherChosen()) {
             Serial.printf("RunPreview: %s: the working folder's copy matches, %ld bytes\n", path, (long)fileSize);
             JobService::chooseRunning(fileSize, false);
             current = LOADING;
             return;
+        }
+        nameCopySize = fileSize < 0 ? local : -1;
+        if (nameCopySize >= 0) {
+            Serial.printf("RunPreview: %s: size unchecked (%s); a copy of that name, %ld bytes, is offered\n", path,
+                          FileService::sizeError(), (long)nameCopySize);
         }
     }
     current = OFFER;

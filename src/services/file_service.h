@@ -58,6 +58,8 @@ public:
     static SizeState sizeState() { return sizeStateValue; }
     static const char *sizePath() { return sizePathValue; }
     static int32_t sizeResult() { return sizeValue; }
+    // SIZE_FAILED: why (the controller's error line, or that the file wasn't listed)
+    static const char *sizeError() { return sizeErrorText; }
 
     // --- Deleting -------------------------------------------------------------
     // Deletes a file, then lists its folder again. Returns false (with the
@@ -133,6 +135,7 @@ private:
     static bool sizeWanted;
     static char sizePathValue[PATH_LEN];
     static int32_t sizeValue;
+    static char sizeErrorText[80];
 
     static UploadState uploadStateValue;
     static char uploadLocalPath[PATH_LEN];
