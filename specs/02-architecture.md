@@ -75,6 +75,7 @@ connection changed.
 | Generators | The list of generators and their common interface: texts, fields, messages, plan, write ([10 §7](10-new-jobs.md#7-services)) | list, form data, messages, plan, write |
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |
+| BatteryService | The MAX17048 fuel gauge on `I2C-OUT` ([12](12-battery.md), D95); main loop only, as the bus is shared with touch and the backlight | present, percent, volts, rate, charging |
 
 ### Connection (MachineService)
 

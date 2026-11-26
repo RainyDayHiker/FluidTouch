@@ -2,6 +2,14 @@
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
+## 0. Pick up here (2026-11-25)
+
+**Battery gauge (M10, [12](12-battery.md), D95 to D97), specified 2026-11-25, not built.**
+Jeffrey has ordered the gauge (Adafruit MAX17048, 5580) and cable (4424). He fits it and runs
+the hardware check (12 §6: cable pin order, polarity, 0x36 in the boot log's I²C scan, touch
+unaffected); then build it on `lrt/m10-battery` from `lrt/main` in the order of 12 §7. It
+doesn't touch upstream code and doesn't depend on M5.
+
 ## 1. Where things stand
 
 **M1 (chassis) and the Setup screen of M2 are done and checked on the device. The next
