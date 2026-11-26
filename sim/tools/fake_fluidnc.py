@@ -56,6 +56,7 @@ session as if that client had sent it):
                      (a running job continues)
     $sim/httprate=<n>  limit HTTP transfers to n KB/s (0 = no limit)
     $sim/httpblock=1|0  refuse downloads with 503 while the machine moves
+    $sim/listbusy=1|0   refuse $Files/ListGcode with error:8 while a job runs
 """
 
 import argparse
@@ -111,6 +112,7 @@ class Machine:
         self.drop_until = 0.0
         self.http_rate = 0         # KB/s limit for HTTP transfers, 0 = none
         self.http_block = False    # refuse downloads while moving
+        self.list_busy = False     # refuse listings while a job runs
         self.broadcast = lambda line: None  # send a line to every connected client
 
     def tick(self):
@@ -637,8 +639,11 @@ class Session:
             # its rapid rate
             self.send(f"$/axes/{line[7:8].lower()}/max_rate_mm_per_min={RAPID_RATE:.3f}")
             self.send("ok")
+        elif up.startswith("$FILES/LISTGCODE") and m.list_busy and m.job is not None:
+            # As the real controller may: a listing refused during a job (error:8, not idle)
+            self.send("error:8")
         elif up.startswith("$FILES/LISTGCODE"):
-            path = line.split("=", 1)[1].strip() if "=" in line else "/sd/"
+            path =line.split("=", 1)[1].strip() if "=" in line else "/sd/"
             files, error = list_files(self.sd_root, path or "/sd/")
             reply = {"error": error} if error else {"files": files, "path": path}
             self.send("[JSON:" + json.dumps(reply, separators=(",", ":")) + "]")
@@ -674,6 +679,9 @@ class Session:
             self.send("ok")
         elif up.startswith("$SIM/HTTPRATE="):
             m.http_rate = max(0.0, float(line.split("=", 1)[1] or 0))
+            self.send("ok")
+        elif up.startswith("$SIM/LISTBUSY="):
+            m.list_busy = line.split("=", 1)[1].strip() == "1"
             self.send("ok")
         elif up.startswith("$SIM/HTTPBLOCK="):
             m.http_block = line.split("=", 1)[1].strip() == "1"

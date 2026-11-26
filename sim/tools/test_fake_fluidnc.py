@@ -80,6 +80,13 @@ async def main():
     session.handle_line("$Files/ListGcode=/sd/")
     assert "facing.nc" not in out[-2] and "sign_v2.gcode" in out[-2], out
     session.handle_line("$SD/Delete=/sd/facing.nc"); assert out[-1] == "error:65", out
+    # $sim/listbusy: a listing is refused only while a job runs
+    session.handle_line("$sim/listbusy=1")
+    m.job = object(); out.clear(); session.handle_line("$Files/ListGcode=/sd/")
+    m.job = None
+    assert out == ["error:8"], out
+    out.clear(); session.handle_line("$Files/ListGcode=/sd/"); assert out[-1] == "ok", out
+    session.handle_line("$sim/listbusy=0")
     print("ALL CHECKS PASSED")
 asyncio.run(main())
 
