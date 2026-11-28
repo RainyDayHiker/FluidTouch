@@ -30,7 +30,7 @@ simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says 
    factor settles at 1.12, and from 15 min on is within 1.8 min of the truth (factor 1.05 to
    1.08). So the estimate and D91/D92's constants hold on this job. The Third Wheel's "30 min
    and went up a good deal" is not explained: its file isn't on the PC to check whether its
-   estimate was short. Simulator-side replay only; on the device, the next full job with the
+   estimate was short (`tools/host_tests/replay.sh <file> <log>` does this check). A host replay only; on the device, the next full job with the
    position log on and the time left noted at the start would confirm it.
    The `SD:` percent is far from time (24% at 47 min, 74% at 64 min), as 06 found.
 5. **Download during a cut (D72's open question): answered.** Downloading the job's preview

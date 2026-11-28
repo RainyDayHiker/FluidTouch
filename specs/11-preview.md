@@ -295,6 +295,11 @@ at a doubled step runs on the worker task too.
   its line, and a report with that `Ln:` and a position far off finds that very move; an N
   no move has keeps the match. The reference job with an N on every line: all 13,301 moves
   found by `Ln:` (by position 45.9% on the very move). 122 files, 0 failures (2026-11-23).
+- **A real cut replayed:** `tools/host_tests/replay.sh <file> [position log] [x,y,z rates]`
+  prints the estimate per `(MSG ...)` part of the file and, with a position log from the
+  device (Settings > Tools), the time left the display would show every 3 minutes of running
+  against the time really left (the overrides taken as 100%). CenterWheel (2026-11-27): the
+  estimate 72.6 min against 74.8 min cut, time left within 1.9 min from 15 min on (HANDOFF).
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.
