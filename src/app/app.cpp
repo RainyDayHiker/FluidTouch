@@ -1,5 +1,6 @@
 #include "app/app.h"
 #include "app/frame.h"
+#include "app/splash.h"
 #include <Arduino.h>
 #include <lvgl.h>
 #include "core/display_driver.h"
@@ -14,15 +15,18 @@
 #include "services/preview_service.h"
 #include "services/run_follow.h"
 #include "services/run_preview.h"
+#include "services/terminal_service.h"
 
 bool LrtApp::running = false;
 
 void LrtApp::begin(DisplayDriver *display) {
     Serial.println("LrtApp: starting LowRider Touch");
 
-    // The frame is drawn before the connection starts, so the screen is
-    // never blank while WiFi and FluidNC are being reached
+    // The splash first (D104), then the frame is built under it, so the screen
+    // is never blank while WiFi and FluidNC are being reached
+    Splash::show();
     MachineService::begin(display);
+    TerminalService::begin();
     Frame::create();
     lv_timer_handler();
 
@@ -39,6 +43,7 @@ void LrtApp::loop() {
     RunPreview::poll();
     MacroService::poll();
     PositionLog::poll();
+    Splash::poll();
 
     uint32_t now = millis();
 

@@ -1,14 +1,17 @@
-# Handoff — state as of 2026-11-27 (M5 built and merged; device checks of D99 to D102 left)
+# Handoff — state as of 2026-11-27 (M5 done; the splash and terminal merged)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 0. Pick up here (2026-11-27)
 
-**M5 is built.** `lrt/m5d-time` (D101 and D102, the allowances for probes, homings and
-prompts) is merged into `lrt/main` (2026-11-27); checked by the host tests, by replaying the
-CenterWheel log and in the simulator; not on the device. Left before M5 is closed: one full
-job with tool changes on the device for D100 to D102, a display restart during it for D99;
-then M5 marked done in 08, this file's §1 rewritten, and the build tagged `lrt-m5`.
+**M5 is done (2026-11-27).** Every part is merged into `lrt/main`: 5a to 5c, D98 to D103,
+and the boot splash with the version from git (D104) and Settings > Tools > Terminal (D105)
+from `lrt/m5f-splash-terminal`. Jeffrey's device checks on 2026-11-27 closed the open ones:
+D100 (the operation's time left, hidden at a tool change), D101 and D102 (Run's time left
+steady after the first probe; the Job screen's time with the allowances), D104 and D105.
+D99's restart at a prompt shows "Another interface is busy" instead of the prompt's text,
+with Continue working; kept as is (D106). Open: tag the build in use `lrt-m5` (and push the
+tag) so the splash and About show `lrt-m5` rather than `lrt-m2+N`.
 
 `lrt/m5c-run` (5c, D89 to D94, D98 to D100) is merged into `lrt/main` (2026-11-27). 5c ran on
 the device on 2026-11-26 (Jeffrey, the Third Wheel job from the Controller SD, unmodified);
@@ -104,8 +107,10 @@ Older open questions (Q2 to Q20, OneDrive inbox and Move) are in
 
 ## 1. Where things stand
 
-**M1 (chassis) and the Setup screen of M2 are done and checked on the device. The next
-session starts M3.**
+**M1 to M5 are done and checked on the device** (M5 on 2026-11-27). Next: M10 (the battery
+gauge) once Jeffrey has fitted it and run its hardware check; M6 (transforms) and M9 (inbox,
+starting with spike S5) as in 08, when Jeffrey picks the next. The rest of this section and
+§2 are the history up to M5, kept for reference.
 
 Git: `main` (equal to `upstream/main`) and `lrt/main`, locally and on the fork, in sync.
 CI (`build-lrt.yml`) passed on the last Setup commit. Tag `lrt-m2` marks the build on the

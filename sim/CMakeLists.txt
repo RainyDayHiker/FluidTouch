@@ -156,6 +156,19 @@ target_compile_options(fluidtouch_sim PRIVATE
     "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include ${FT_CXX_FORCE_INCLUDE}>")
 target_link_libraries(fluidtouch_sim PRIVATE lvgl arduinowebsockets mbedcrypto SDL2::SDL2 gcode_core)
 
+# LowRider Touch: its version from git into lrt_version.h, on every build (tools/lrt_version.py).
+# Without Python, src/app/version.cpp says "unknown".
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+    set(LRT_VERSION_DIR "${CMAKE_BINARY_DIR}/lrt_version")
+    add_custom_target(lrt_version ALL
+        COMMAND "${Python3_EXECUTABLE}" "${FT_ROOT}/tools/lrt_version.py" "${LRT_VERSION_DIR}"
+        BYPRODUCTS "${LRT_VERSION_DIR}/lrt_version.h"
+        VERBATIM)
+    add_dependencies(fluidtouch_sim lrt_version)
+    target_include_directories(fluidtouch_sim PRIVATE "${LRT_VERSION_DIR}")
+endif()
+
 # ESP-NOW link test against sim/tools/fake_fluidnc.py (see sim/test/espnow_link_test.cpp)
 add_executable(espnow_link_test
     "${SIM_DIR}/test/espnow_link_test.cpp"
