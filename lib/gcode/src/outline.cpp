@@ -1340,7 +1340,7 @@ size_t outlineCheckName(const char* name, size_t length, char* out, size_t capac
   }
   const bool ext = dot < length && dot > 0;
   static const char kInsert[] = ".outline";
-  static const char kAppend[] = ".outline.nc";
+  static const char kAppend[] = ".outline.gcode";
   const size_t addLength = ext ? sizeof kInsert - 1 : sizeof kAppend - 1;
   const size_t n = length + addLength;
   if (capacity <= n) return n;

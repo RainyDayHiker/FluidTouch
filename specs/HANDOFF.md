@@ -219,6 +219,16 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    hand; its API matches spec 10 (`surfacingForm()`, `fieldValue()`, a 4 KB write buffer).
    The suite's SD writer now removes every `*.tmp` it closes (the new `perf-surfacing.tmp`
    as well as `perf-write.tmp`).
+   **Library version in use: 0.7.0-build.116** (2026-11-28, branch `lrt/m8-gcode-070`): New
+   Surfacing Job gains Probe X and Probe Y (nine fields) and a "Probe the surface for Z zero"
+   checkbox (unticked: `-keepz.gcode`, the Z zero kept); suggested names end `.gcode`; a file
+   with an N word on each line now has operations (CNC-Tools 09 D75, from
+   [outgoing/cnc-tools-line-numbers.md](outgoing/cnc-tools-line-numbers.md)). 296 of 296 on
+   the PC and in the simulator; the segment host test 122 files, 0 failures. Not yet on the
+   device: run the suite from Settings > Tools with the release's data copied to
+   `/gcode-tests/` (`python tools/gcode_core.py data 0.7.0-build.116 <folder>`). Nothing
+   here uses the surfacing API yet; spec 10's form (written for 0.4.0's seven fields, `.nc`
+   names) needs the new fields and the checkbox before M8 is built.
    **New jobs (M8, spec 10, D78)**, designed 2026-11-21: generators, starting with New
    Surfacing Job (CNC-Tools 15 §20, revision 15 reviewed; library 0.4.0 integrated, above). CNC-Tools
    answered `specs/outgoing/cnc-tools-generators.md` in spec 15 revision 16 (the form's texts
@@ -267,9 +277,9 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    fake sends it), checked by the host test and in the simulator with the reference job
    numbered N10, N20, ... (followed by `Ln:` from its first cut on). Not tried on FluidNC:
    it needs `use_line_numbers: true` in the config and N words in the files, which the
-   post-processor doesn't write today. Found: with an N on every line the library finds no
-   operations (`structure`), so "op N of M" is empty for such a file (Jeffrey keeps line
-   numbers off); (4) the download offer during a cut (D72): done as D94 after Jeffrey's
+   post-processor doesn't write today. Found: with an N on every line the library found no
+   operations (`structure`), so "op N of M" was empty for such a file (Jeffrey keeps line
+   numbers off); fixed in CNC-Tools 0.7.0-build.116 (D75 there); (4) the download offer during a cut (D72): done as D94 after Jeffrey's
    answers (button then confirm; the working folder's copy used when its size matches; the
    running file becomes the chosen job). Checked in the simulator with a job started from
    the fake's console: the offer, the confirm naming the file it replaces, the download and

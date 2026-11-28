@@ -1,5 +1,9 @@
 # Notes for CNC-Tools: operations in a file with line numbers (after 0.4.0-build.100)
 
+> **Answered** in 0.7.0-build.116 (CNC-Tools 09 D75): the structure scan and Flip's cut groups
+> skip one leading N word; golden cases with numbered copies of `CNC_EscapeWheel.gcode` and
+> `synthetic-off-operations-numbered`. Kept as sent.
+
 From LowRider Touch, 2026-11-27. Low priority: nothing here uses line numbers today. It is
 sent so the gap is known, for whenever someone turns line numbers on in the post-processor.
 

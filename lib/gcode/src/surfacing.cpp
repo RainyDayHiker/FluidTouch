@@ -20,7 +20,6 @@ constexpr int P = 3;
 // The lowrider_post preamble and postamble values (11 §4.1), as that post writes them.
 constexpr int kSafeZ = 5;
 constexpr int kProbeRetractZ = 15;
-constexpr double kProbeSpot = 10;
 constexpr int kRapidFeed = 2400;
 
 const SurfacingBit kBit = {
@@ -35,6 +34,9 @@ const SurfacingFieldInfo kFields[kSurfacingFieldCount] = {
     {"width", "Width (X)", "mm", false, 1, 3000, 100, "100"},
     {"height", "Height (Y)", "mm", false, 1, 3000, 100, "100"},
     {"depth", "Depth", "mm", false, 0.01, 3, 0.1, "0.1"},
+    // And no more than the width (height), checked in surfacingErrors(): 3000 is the most it can be.
+    {"probeX", "Probe X", "mm", false, 0, 3000, 10, "10"},
+    {"probeY", "Probe Y", "mm", false, 0, 3000, 10, "10"},
     // Above 80% the corners of a rectangular spiral can leave uncut points (14 §3).
     {"stepover", "Stepover", "% of bit", true, 10, 80, 40, "40"},
     {"feed", "Feed", "mm/min", true, 10, 10000, 1200, "1200"},
@@ -42,18 +44,23 @@ const SurfacingFieldInfo kFields[kSurfacingFieldCount] = {
     {"spindle", "Spindle", "rpm", true, 1000, 24000, 18000, "18000"},
 };
 
-/** surfacingErrors' "Between MIN and MAX UNIT", with the limits as JS writes them. */
+/** surfacingErrors' "Between MIN and MAX UNIT", with the limits as JS writes them; the probe's own. */
 const char* const kRangeMessages[kSurfacingFieldCount] = {
-    "Between 1 and 3000 mm",       "Between 1 and 3000 mm",       "Between 0.01 and 3 mm", "Between 10 and 80%",
-    "Between 10 and 10000 mm/min", "Between 10 and 5000 mm/min", "Between 1000 and 24000 rpm",
+    "Between 1 and 3000 mm",      "Between 1 and 3000 mm",       "Between 0.01 and 3 mm",      "Between 0 and the width",
+    "Between 0 and the height",   "Between 10 and 80%",          "Between 10 and 10000 mm/min", "Between 10 and 5000 mm/min",
+    "Between 1000 and 24000 rpm",
 };
 
 const SurfacingForm kForm = {
     "New Surfacing Job",
-    "Probes the surface, then skims the area in one pass with an inward clockwise spiral, so the cut is conventional.",
+    "Skims the area in one pass with an inward clockwise spiral, so the cut is conventional.",
     "Zero X/Y at the area's lower-left corner; the bit hangs 6.35 mm past every edge.",
     "Bit: 1/2in 14\xc2\xb0 dovetail (Freud 22-104), 12.7 mm at the tip",
     "Stepover and feeds",
+    "Probe the surface for Z zero",
+    "Probe on a high spot, measured from that corner.",
+    "Z zero stays as set, for example by an earlier job that probed, so this one cuts at the same height: for surfacing a piece "
+    "in stages.",
 };
 
 /** Text into a fixed buffer; `ok` false once something didn't fit. */
@@ -134,7 +141,7 @@ bool finishPlan(const SurfacingParams& p, const Job& job, double cutLength, Surf
   name.fixed(job.h);
   name.put("-");
   name.mm(p.depth);
-  name.put("mm.nc");
+  name.put(p.probe ? "mm.gcode" : "mm-keepz.gcode");
   const double r = jsRound(cutLength / p.feed);
   const double minutes = r > 1 ? r : 1;
   Text s{plan.summary, sizeof plan.summary - 1};
@@ -205,6 +212,8 @@ double surfacingValue(const SurfacingParams& p, SurfacingField field) {
     case SurfacingField::Width: return p.width;
     case SurfacingField::Height: return p.height;
     case SurfacingField::Depth: return p.depth;
+    case SurfacingField::ProbeX: return p.probeX;
+    case SurfacingField::ProbeY: return p.probeY;
     case SurfacingField::Stepover: return p.stepover;
     case SurfacingField::Feed: return p.feed;
     case SurfacingField::Plunge: return p.plunge;
@@ -218,6 +227,8 @@ void setSurfacingValue(SurfacingParams& p, SurfacingField field, double value) {
     case SurfacingField::Width: p.width = value; break;
     case SurfacingField::Height: p.height = value; break;
     case SurfacingField::Depth: p.depth = value; break;
+    case SurfacingField::ProbeX: p.probeX = value; break;
+    case SurfacingField::ProbeY: p.probeY = value; break;
     case SurfacingField::Stepover: p.stepover = value; break;
     case SurfacingField::Feed: p.feed = value; break;
     case SurfacingField::Plunge: p.plunge = value; break;
@@ -252,8 +263,16 @@ uint32_t surfacingErrors(const SurfacingParams& p, const char* messages[kSurfaci
   for (int f = 0; f < kSurfacingFieldCount; f++) {
     const double v = surfacingValue(p, static_cast<SurfacingField>(f));
     const char* m = nullptr;
+    // A probe field also stays within its side, when that is a number (PROBE_SIDES).
+    const SurfacingField field = static_cast<SurfacingField>(f);
+    // Without the probe, the probe fields aren't used, so they aren't checked.
+    if (!p.probe && (field == SurfacingField::ProbeX || field == SurfacingField::ProbeY)) {
+      if (messages) messages[f] = nullptr;
+      continue;
+    }
+    const double side = field == SurfacingField::ProbeX ? p.width : field == SurfacingField::ProbeY ? p.height : NAN;
     if (!std::isfinite(v)) m = "Enter a number";
-    else if (v < kFields[f].min || v > kFields[f].max) m = kRangeMessages[f];
+    else if (v < kFields[f].min || v > kFields[f].max || (std::isfinite(side) && v > side)) m = kRangeMessages[f];
     if (m) bits |= 1u << f;
     if (messages) messages[f] = m;
   }
@@ -280,7 +299,6 @@ Status writeSurfacingJob(const SurfacingParams& p, ByteWriter& writer, Arena are
   const Job job(p);
   Out out{writer, buf, kSurfacingBufferSize};
   const SurfacingBit& bit = kBit;
-  const double probe = toFixed(kProbeSpot, P);
 
   out.put("(Surfacing job, made by G-code Editor)");
   Text* t = &out.begin();
@@ -302,7 +320,8 @@ Status writeSurfacingJob(const SurfacingParams& p, ByteWriter& writer, Arena are
   t = &out.begin();
   t->put("(Depth ");
   t->mm(p.depth);
-  t->put(" mm below the probed surface in one pass: an inward clockwise spiral, conventional cutting)");
+  t->put(p.probe ? " mm below the probed surface" : " mm below the Z zero already set");
+  t->put(" in one pass: an inward clockwise spiral, conventional cutting)");
   out.end();
   t = &out.begin();
   t->put("(Stock: XMIN=0 XMAX=");
@@ -320,29 +339,45 @@ Status writeSurfacingJob(const SurfacingParams& p, ByteWriter& writer, Arena are
   t->put(bit.label);
   t->put(")");
   out.end();
-  for (const char* s : {"G21", "G90", "G94", "G54", "G10 L20 P0 X0 Y0 Z0 (set current location to zero)"}) out.put(s);
-  t = &out.begin();
-  t->put("G0 X");
-  const double halfW = std::floor(job.w / 2), halfH = std::floor(job.h / 2);
-  t->fixed(probe < halfW ? probe : halfW);
-  t->put(" Y");
-  t->fixed(probe < halfH ? probe : halfH);
-  t->put(" F");
-  t->fixed(kRapidFeed, 0);
-  t->put(" (move to probing location)");
-  out.end();
-  t = &out.begin();
-  t->put("M0 (MSG Insert ");
-  t->put(bit.label);
-  t->put(", attach probe)");
-  out.end();
-  out.put("G38.2 Z-110 F200 P0.5 (probe down set thickness)");
-  t = &out.begin();
-  t->put("G1 Z");
-  t->fixed(kProbeRetractZ, 0);
-  t->put(" F900");
-  out.end();
-  out.put("M0 (MSG Remove probe and start router)");
+  for (const char* s : {"G21", "G90", "G94", "G54"}) out.put(s);
+  if (p.probe) {
+    // lowrider_post's probe (14 §4).
+    out.put("G10 L20 P0 X0 Y0 Z0 (set current location to zero)");
+    t = &out.begin();
+    t->put("G0 X");
+    t->mm(p.probeX);
+    t->put(" Y");
+    t->mm(p.probeY);
+    t->put(" F");
+    t->fixed(kRapidFeed, 0);
+    t->put(" (move to probing location)");
+    out.end();
+    t = &out.begin();
+    t->put("M0 (MSG Insert ");
+    t->put(bit.label);
+    t->put(", attach probe)");
+    out.end();
+    out.put("G38.2 Z-110 F200 P0.5 (probe down set thickness)");
+    t = &out.begin();
+    t->put("G1 Z");
+    t->fixed(kProbeRetractZ, 0);
+    t->put(" F900");
+    out.end();
+    out.put("M0 (MSG Remove probe and start router)");
+  } else {
+    // X/Y zero only, keeping Z zero, then above the surface (09 D74).
+    out.put("G10 L20 P0 X0 Y0 (set current location to X/Y zero, keeping Z zero)");
+    t = &out.begin();
+    t->put("G0 Z");
+    t->fixed(kProbeRetractZ, 0);
+    t->put(" (above the surface)");
+    out.end();
+    t = &out.begin();
+    t->put("M0 (MSG Z zero kept for ");
+    t->put(bit.label);
+    t->put(" - start router)");
+    out.end();
+  }
   t = &out.begin();
   t->put("M3 S");
   t->mm(p.spindle);
