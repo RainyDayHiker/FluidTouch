@@ -790,8 +790,8 @@ void surfacingGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
     if (f.is(0, "M")) {
       formLines++;
       const SurfacingForm& m = surfacingForm();
-      const char* got[] = {m.title, m.description, m.setup, m.bitLine, m.advancedTitle};
-      for (int k = 0; k < 5; k++) {
+      const char* got[] = {m.title, m.description, m.setup, m.bitLine, m.advancedTitle, m.probeLabel, m.probeSetup, m.keepZSetup};
+      for (int k = 0; k < 8; k++) {
         if (!sameHexText(f[1 + k], got[k])) form.set("form text %s: %s", f[1 + k], got[k]);
       }
     } else if (f.is(0, "B")) {
@@ -835,19 +835,23 @@ void surfacingGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
       if (!sameHex(f[3], v)) texts.set("text %s: value %s", f[2], f[3]);
       else if (!sameHexText(f[4], messages[k])) texts.set("text %s: message %s", f[2], f[4]);
     } else if (f.is(0, "J")) {
-      // J name p0..p6 E m0..m6, or J name p0..p6 O sha256 length laps cutLength name summaryHex
+      // J name p0..pN probe E m0..mN, or J name p0..pN probe O sha256 length laps cutLength name summaryHex (N + 1 fields)
       jobCount++;
+      constexpr int kProbe = 2 + kSurfacingFieldCount;  // 1, or 0 to keep Z zero
+      constexpr int kMark = kProbe + 1;                 // the E or O column
+      constexpr int kOut = kMark + 1;
       SurfacingParams p;
       for (int k = 0; k < kSurfacingFieldCount; k++) setSurfacingValue(p, static_cast<SurfacingField>(k), fromHex(f[2 + k]));
+      p.probe = !f.is(kProbe, "0");
       const char* messages[kSurfacingFieldCount];
       const uint32_t bits = surfacingErrors(p, messages);
       SurfacingPlan plan{}, wplan{};
       HashWriter hw;
       const Status ps = planSurfacing(p, plan);
       const Status ws = writeSurfacingJob(p, hw, small, wplan);
-      if (f.is(9, "E")) {
+      if (f.is(kMark, "E")) {
         bool ok = bits != 0 && ps == Status::InvalidParameters && ws == Status::InvalidParameters && hw.length == 0;
-        for (int k = 0; k < kSurfacingFieldCount; k++) ok = ok && sameHexText(f[10 + k], messages[k]);
+        for (int k = 0; k < kSurfacingFieldCount; k++) ok = ok && sameHexText(f[kOut + k], messages[k]);
         if (!ok) jobs.set("%s: the errors%s", f[1]);
         continue;
       }
@@ -855,11 +859,11 @@ void surfacingGroup(Platform& platform, Report& r, Scratch& sc, Arena arena, con
       hw.sha.hex(digest);
       if (ps != Status::Ok || ws != Status::Ok) {
         jobs.set("%s: status %s", f[1], statusName(ps != Status::Ok ? ps : ws));
-      } else if (!f.is(10, digest) || std::strtoull(f[11], nullptr, 10) != hw.length) {
+      } else if (!f.is(kOut, digest) || std::strtoull(f[kOut + 1], nullptr, 10) != hw.length) {
         jobs.set("%s: the file (%s)", f[1], digest);
-      } else if (std::strtoul(f[12], nullptr, 10) != plan.laps || !sameHex(f[13], plan.cutLength)) {
+      } else if (std::strtoul(f[kOut + 2], nullptr, 10) != plan.laps || !sameHex(f[kOut + 3], plan.cutLength)) {
         jobs.set("%s: laps or cutLength%s", f[1]);
-      } else if (!f.is(14, plan.name) || !sameHexText(f[15], plan.summary)) {
+      } else if (!f.is(kOut + 4, plan.name) || !sameHexText(f[kOut + 5], plan.summary)) {
         jobs.set("%s: name or summary %s", f[1], plan.summary);
       } else if (wplan.laps != plan.laps || !sameDouble(wplan.cutLength, plan.cutLength) || std::strcmp(wplan.name, plan.name) != 0 ||
                  std::strcmp(wplan.summary, plan.summary) != 0) {

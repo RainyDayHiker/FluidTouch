@@ -61,6 +61,17 @@ Stripped stripOff(View v) {
   return s;
 }
 
+/** skipLineNumber: one leading N word, structure.ts LINE_NUMBER_RE: blanks, N or n, digits, blanks (09 D75). */
+View skipLineNumber(View v) {
+  size_t i = 0;
+  while (i < v.n && isBlank(v.p[i])) i++;
+  if ((v.at(i) | 0x20) != 'n' || !isDigit(v.at(i + 1))) return v;
+  i++;
+  while (isDigit(v.at(i))) i++;
+  while (i < v.n && isBlank(v.p[i])) i++;
+  return View{v.p + i, v.n - i};
+}
+
 /** markerName: "NAME" from "(Begin operation: NAME)". */
 View markerName(View t, const char* marker) {
   const size_t k = std::strlen(marker);
@@ -226,7 +237,8 @@ void StructureFinder::step(const char* text, size_t length, uint32_t i) {
   if (done_) return;
   const View raw{text, length};
   const Stripped s = stripOff(raw);
-  const View t = trimBlanks(s.text);
+  const View body = skipLineNumber(s.text);
+  const View t = trimBlanks(body);
   const Str none{"", 0};
 
   if (t.startsWith(BEGIN_OP)) {
@@ -261,7 +273,7 @@ void StructureFinder::step(const char* text, size_t length, uint32_t i) {
 
   if (!firstBlockSeen_) {
     // The preamble's (MSG …) run and probe lines, for the first block's start and the probe.
-    const bool msg = msgLine(s.text);
+    const bool msg = msgLine(body);
     size_t ls = 0, le = 0;
     const bool hit = groupMatch(raw, "(MSG Insert ", ", attach probe)", ls, le);
     ProbeHit h{};
@@ -294,7 +306,7 @@ void StructureFinder::step(const char* text, size_t length, uint32_t i) {
 
   if (!open_) {
     if (t.startsWith(FINISH_OP)) return invalid("Finish operation without its Begin", none, "", i);
-    if (afterPrev_ >= 0 && firstNonComment_ < 0 && !commentOnly(s.text)) firstNonComment_ = i;
+    if (afterPrev_ >= 0 && firstNonComment_ < 0 && !commentOnly(body)) firstNonComment_ = i;
     return;
   }
   if (s.off != cur_.off) return invalid("\"", cur_.name, "\" is only partly commented out (;OFF)", i);
@@ -545,7 +557,7 @@ Str trimmedBlanks(const char* text, size_t length) {
 }
 
 LineMarker lineMarker(const char* text, size_t length, Str& name) {
-  const View t = trimBlanks(View{text, length});
+  const View t = trimBlanks(skipLineNumber(View{text, length}));
   if (t.startsWith(BEGIN_OP)) {
     const View n = markerName(t, BEGIN_OP);
     name = Str{n.p, static_cast<uint32_t>(n.n)};

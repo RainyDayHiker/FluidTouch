@@ -257,6 +257,7 @@ run; the `perf` figures below the table.
 
 | Date | Library version | Groups | Result |
 |------|-----------------|--------|--------|
+| 2026-11-28 | 0.7.0-build.116 (surfacing probe location and keep-Z, `.gcode` names, numbered files have operations) | all | PC: passed 296, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator (0:05). Host `perf.surfacing` as 0.4.0. Not yet on the device |
 | 2026-11-21 | 0.4.0-build.100 (New Surfacing Job) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 294, failed 0, skipped 0 in 9:01. A first run had 96 cases with "can't open the case's files" (whole case families: reference, refused, roundtrip, synthetic, random-1031 onwards); after the data was copied to the card again, all passed |
 | 2026-11-21 | 0.4.0-build.100 (New Surfacing Job) | all (float, parse, self, analyse, transform, outline, surfacing, perf) | PC: passed 294, failed 0, skipped 0 (MinGW GCC 16.2, no warnings), and from Settings > Tools in the simulator. `surfacing`: 420 field texts, 318 jobs (1,495,159 bytes) identical to the editor's. Host `perf.surfacing`, the largest job (3000 x 3000 mm at 10%, 1,183 laps, 105,040 bytes): plan 0 ms, write 1 ms |
 | 2026-11-21 | 0.3.0-build.87 (C3) | all | **Device (Jeffrey, display SD at 20 MHz):** passed 288, failed 0, skipped 0 in 8:31 |

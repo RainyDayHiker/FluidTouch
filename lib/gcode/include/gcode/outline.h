@@ -88,7 +88,7 @@ Status writeOutline(const Analysis& analysis, ByteWriter& writer, const char* so
 
 /**
  * The outline file's suggested name (outlineCheckName): "part.nc" gives "part.outline.nc", a name
- * with no extension (or only a leading dot) gets ".outline.nc". UTF-8 in and out. Returns the new
+ * with no extension (or only a leading dot) gets ".outline.gcode". UTF-8 in and out. Returns the new
  * name's length in bytes; writes it to `out`, terminated, only when `capacity` exceeds that.
  */
 size_t outlineCheckName(const char* name, size_t length, char* out, size_t capacity);
