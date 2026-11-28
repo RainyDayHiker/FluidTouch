@@ -16,7 +16,8 @@
 //
 // JobNotes (D92): the file's messages come in line order, each is recognised as FluidNC sends
 // it (as written, or with the comment's spaces dropped and shifted by one), and a message of the
-// controller's own is not. Printed: "msgs".
+// controller's own is not. Printed: "msgs". The probes, homings and prompts (D101, D102): a set of
+// lines classified as FluidNC reads them.
 //
 // TimeLeft (§7, D91), for jobs of a minute or more: the job is "run" with each move taking 1.25 x
 // its estimate + 0.05 s (no acceleration in the estimate), the feed override going to 150% at
@@ -26,6 +27,7 @@
 // 90%. TRACE=<part of a name> prints that job's first run every 30 s, then every 5 minutes.
 #include "gcode/analysis.h"
 #include "services/job_notes.h"
+#include "services/run_plan.h"
 #include "services/run_tracker.h"
 #include "services/segment_list.h"
 #include "services/time_left.h"
@@ -119,34 +121,6 @@ void checkNotes(const char *name, const JobNotes &notes) {
     if (notes.isFileMessage("Report/Interval=250")) fail(name, "controller message taken as the file's", 0, 0, 0);
 }
 
-// RunFollow's planAt, without the services: planned seconds before `record`
-TimeLeft::Plan planAt(const SegmentList &list, uint32_t record, const SegmentList::Estimate &est,
-                      const SegmentList::Rates &rates) {
-    TimeLeft::Plan p = {0, 0, 0, 0, est.feedSeconds, est.seconds - est.feedSeconds};
-    if (!list.checkpoints()) return p;
-    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
-    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
-    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
-    SegmentList::Reader reader(list, cp);
-    SegmentList::Move m;
-    bool incomplete = false;
-    bool more;
-    while ((more = reader.next(m)) && m.record < record) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        total += s;
-        feed += SegmentList::feedPart(m, s);
-    }
-    p.feedDone = p.feedAfter = feed;
-    p.otherDone = p.otherAfter = total - feed;
-    if (more && m.record == record) {
-        // The matched move itself
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        p.feedAfter += SegmentList::feedPart(m, s);
-        p.otherAfter += s - SegmentList::feedPart(m, s);
-    }
-    return p;
-}
-
 // One run of the time model; `errors` at 25, 50, 75 and 90% of it, in percent of the true time
 // left; returns the largest move in one report beyond the countdown
 double runTimeModel(const char *name, const SegmentList &list, const std::vector<SegmentList::Move> &moves,
@@ -180,7 +154,7 @@ double runTimeModel(const char *name, const SegmentList &list, const std::vector
         if (k >= moves.size()) break;
         double fs = k >= overrideAt ? 1.5 : 1.0;
         if (k != lastK || fs != lastFs) {
-            tl.match(t, planAt(list, moves[k].record, est, rates), fs, 1.0);
+            tl.match(t, RunPlan::at(list, nullptr, moves[k].record, rates, est.seconds, est.feedSeconds), fs, 1.0);
             lastK = k;
             lastFs = fs;
         }
@@ -369,8 +343,73 @@ std::string readFile(const char *path) {
 
 }  // namespace
 
+// JobNotes::classify (D101, D102): what counts as a probe, a homing or a prompt
+void checkClassify() {
+    struct Case {
+        const char *line;
+        JobNotes::Work want;
+    } cases[] = {
+        {"G38.2 Z-110 F200 P0.5 (probe down set thickness)", JobNotes::PROBE},
+        {"g38.3 z-5", JobNotes::PROBE},
+        {"G 38.2Z-1", JobNotes::PROBE},
+        {"G1 X38 G38.4 Z-2", JobNotes::PROBE},
+        {"$HZ", JobNotes::HOME},
+        {"  $H", JobNotes::HOME},
+        {"$h", JobNotes::HOME},
+        {"$X", JobNotes::NONE},
+        {"$$", JobNotes::NONE},
+        {"M0 (MSG Insert T3 1/4in flat endmill, attach probe)", JobNotes::PROMPT},
+        {"M00", JobNotes::PROMPT},
+        {"m0", JobNotes::PROMPT},
+        {"M03 S12000", JobNotes::NONE},
+        {"M3 S12000", JobNotes::NONE},
+        {"M1", JobNotes::NONE},
+        {"M30", JobNotes::NONE},
+        {"(M0 in a comment) G1 X1", JobNotes::NONE},
+        {"G1 X1 ; M0 after a semicolon", JobNotes::NONE},
+        {"(MSG G38.2 named in a message)", JobNotes::NONE},
+        {"G0 X38.2 Y-38", JobNotes::NONE},
+        {"G4 P0 ; wait for motion to finish before $ command", JobNotes::NONE},
+        {"(Begin toolchange)", JobNotes::NONE},
+        {"", JobNotes::NONE},
+    };
+    for (const Case &c : cases) {
+        JobNotes::Work got = JobNotes::classify(c.line, (uint32_t)strlen(c.line));
+        if (got != c.want) {
+            failures++;
+            printf("  FAIL classify \"%s\": %d, expected %d\n", c.line, (int)got, (int)c.want);
+        }
+    }
+    // The allowances by line
+    static char mem[16 * 1024];
+    JobNotes notes;
+    notes.attach(mem, sizeof(mem));
+    const char *lines[] = {"G0 X10 Y10", "M0 (MSG a)", "G38.2 Z-110 F200", "G1 Z15", "M0 (MSG b)", "G1 X20", "$HZ",
+                           "G38.2 Z-110", "M0", "G1 X30"};
+    for (uint32_t i = 0; i < sizeof(lines) / sizeof(lines[0]); i++) notes.scanLine(i, lines[i], (uint32_t)strlen(lines[i]));
+    if (notes.probes() != 2 || notes.homings() != 1 || notes.prompts() != 3) {
+        failures++;
+        printf("  FAIL counts: %u probes %u homings %u prompts\n", notes.probes(), notes.homings(), notes.prompts());
+    }
+    if (notes.workSeconds() != 2 * JobNotes::PROBE_S + JobNotes::HOME_S || notes.workSecondsAfter(0) != notes.workSeconds() ||
+        notes.workSecondsAfter(2) != JobNotes::PROBE_S + JobNotes::HOME_S || notes.workSecondsAfter(7) != 0) {
+        failures++;
+        printf("  FAIL workSecondsAfter\n");
+    }
+    if (!notes.workBetween(0, 5) || notes.workBetween(2, 5) || !notes.workBetween(5, 9) || notes.workBetween(7, 9)) {
+        failures++;
+        printf("  FAIL workBetween\n");
+    }
+    // The messages still fit beside the work lines
+    if (notes.messages() != 2 || strcmp(notes.messageAt(3), "a") != 0) {
+        failures++;
+        printf("  FAIL messages beside the work lines\n");
+    }
+}
+
 int main(int argc, char **argv) {
     int files = 0;
+    checkClassify();
     bool quiet = getenv("QUIET") != nullptr;
     for (int i = 1; i < argc; i++) {
         std::string text = readFile(argv[i]);

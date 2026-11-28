@@ -12,6 +12,7 @@
 #include "gcode/analysis.h"
 #include "gcode/io.h"
 #include "services/job_notes.h"
+#include "services/run_plan.h"
 #include "services/run_tracker.h"
 #include "services/segment_list.h"
 #include "services/time_left.h"
@@ -33,59 +34,6 @@ std::string readFile(const char *path) {
     while ((n = fread(buf, 1, sizeof buf, f)) > 0) s.append(buf, n);
     fclose(f);
     return s;
-}
-
-// As RunFollow's planAt: planned seconds before the record, and after it
-TimeLeft::Plan planAt(const SegmentList &list, uint32_t record, const SegmentList::Rates &rates,
-                      const SegmentList::Estimate &est) {
-    TimeLeft::Plan p = {0, 0, 0, 0, est.feedSeconds, est.seconds - est.feedSeconds};
-    if (!list.checkpoints()) return p;
-    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
-    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
-    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
-    SegmentList::Reader reader(list, cp);
-    SegmentList::Move m;
-    bool incomplete = false, more;
-    while ((more = reader.next(m)) && m.record < record) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        total += s;
-        feed += SegmentList::feedPart(m, s);
-    }
-    p.feedDone = p.feedAfter = feed;
-    p.otherDone = p.otherAfter = total - feed;
-    if (more && m.record == record) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        p.feedAfter += SegmentList::feedPart(m, s);
-        p.otherAfter += s - SegmentList::feedPart(m, s);
-    }
-    return p;
-}
-
-// As RunFollow's opEndAt: the plan at the end of operation `op`'s last move, from `record` on
-bool opEndAt(const SegmentList &list, const JobNotes &notes, const SegmentList::Rates &rates, int op, uint32_t record,
-             double &feedEnd, double &otherEnd) {
-    if (!list.checkpoints()) return false;
-    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
-    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
-    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
-    SegmentList::Reader reader(list, cp);
-    SegmentList::Move m;
-    bool incomplete = false, found = false;
-    while (reader.next(m)) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        total += s;
-        feed += SegmentList::feedPart(m, s);
-        if (m.record < record) continue;
-        int at = notes.opAt(m.line);
-        if (at == op) {
-            found = true;
-            feedEnd = feed;
-            otherEnd = total - feed;
-        } else if (at > op) {
-            break;
-        }
-    }
-    return found;
 }
 
 // The packer, and the messages and lines for JobNotes, as PreviewService's sink
@@ -169,14 +117,20 @@ void replay(const SegmentList &list, const JobNotes &notes, const SegmentList::R
         if (rows[i].percent < 0) continue;
         // As RunFollow: what FluidNC has read, from the SD: percent, with a little slack
         uint64_t read = (uint64_t)(rows[i].percent / 100.0 * (double)fileSize) + 1024;
+        bool hadMatch = tracker.matched();
+        uint32_t lastLine = tracker.line();
         bool moved = tracker.update(list, rows[i].x, rows[i].y, rows[i].z, read);
         if (!tracker.matched()) continue;
-        if (moved || !left.known()) left.match(run[i], planAt(list, tracker.record(), rates, est), 1, 1);
+        // As RunFollow: a probe or homing passed since the last match is set aside (D101)
+        bool setAside = moved && hadMatch && notes.workBetween(lastLine, tracker.line());
+        if (moved || !left.known())
+            left.match(run[i], RunPlan::at(list, &notes, tracker.record(), rates, est.seconds, est.feedSeconds), 1, 1,
+                       setAside);
         int at = notes.opAt(tracker.line());
         if (at) {
             op = at;
             if (opFor != op) {
-                opFound = opEndAt(list, notes, rates, op, tracker.record(), opFeed, opOther);
+                opFound = RunPlan::opEnd(list, notes, op, tracker.record(), rates, opFeed, opOther);
                 opFor = op;
             }
             opLastRun[op] = run[i];
@@ -300,8 +254,12 @@ int main(int argc, char **argv) {
     SegmentList::Estimate est = list.estimate(rates);
     printf("%s: %u moves%s, rates %.0f %.0f %.0f mm/min\n", argv[1], list.moves(), list.truncated() ? " (TRUNCATED)" : "",
            rates.x, rates.y, rates.z);
-    printf("Estimate %.1f min%s, of which feeds and arcs %.1f min\n\n", est.seconds / 60, est.incomplete ? "+" : "",
+    printf("Estimate %.1f min%s, of which feeds and arcs %.1f min\n", est.seconds / 60, est.incomplete ? "+" : "",
            est.feedSeconds / 60);
+    // The info line's time (D101, D102)
+    double allowed = notes.workSeconds() + notes.prompts() * JobNotes::PROMPT_S;
+    printf("%u probes, %u homings, %u prompts: %.1f min allowed; the Job screen shows %.1f min\n\n", notes.probes(),
+           notes.homings(), notes.prompts(), allowed / 60, (est.seconds + allowed) / 60);
 
     std::vector<double> per(parts.size() + 1, 0), perRapid(parts.size() + 1, 0);
     SegmentList::Reader r(list);

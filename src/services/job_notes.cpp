@@ -11,13 +11,98 @@ void JobNotes::attach(void *memory, size_t bytes) {
 void JobNotes::clear() {
     opCount = 0;
     msgCount = 0;
+    probeCount = homeCount = promptCount = 0;
+    workCount = 0;
     textLow = size;
-    isFull = mem == nullptr || size < MAX_OPS * sizeof(Op);
+    isFull = mem == nullptr || size < ENTRIES_AT;
+}
+
+namespace {
+bool isBlank(char c) { return c == ' ' || c == '\t'; }
+}  // namespace
+
+// As FluidNC reads a line: a `$` line is a system command (`$H`, `$HZ` home); otherwise comments
+// are left out (`(` to `)`, `;` to the end) and so are blanks, and each letter is followed by a
+// number. `G38` with any decimal probes; `M0` (also `M00`) is a program pause, a prompt
+JobNotes::Work JobNotes::classify(const char *d, uint32_t n) {
+    uint32_t i = 0;
+    while (i < n && isBlank(d[i])) i++;
+    if (i < n && d[i] == '$') return i + 1 < n && (d[i + 1] == 'H' || d[i + 1] == 'h') ? HOME : NONE;
+    Work found = NONE;
+    bool comment = false;
+    while (i < n) {
+        char c = d[i];
+        if (comment) {
+            if (c == ')') comment = false;
+            if (c == ';') break;
+            i++;
+            continue;
+        }
+        if (c == '(') {
+            comment = true;
+            i++;
+            continue;
+        }
+        if (c == ';') break;
+        bool letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+        i++;
+        if (!letter) continue;
+        char word = (char)(c & ~0x20);
+        // Its number: blanks allowed anywhere, a sign first, digits with one point
+        while (i < n && isBlank(d[i])) i++;
+        if (i < n && (d[i] == '-' || d[i] == '+')) i++;
+        bool digits = false, point = false, fraction = false;
+        uint32_t whole = 0;
+        while (i < n) {
+            char k = d[i];
+            if (isBlank(k)) {
+                i++;
+            } else if (k >= '0' && k <= '9') {
+                digits = true;
+                if (point) {
+                    if (k != '0') fraction = true;
+                } else if (whole < 100000) {
+                    whole = whole * 10 + (uint32_t)(k - '0');
+                }
+                i++;
+            } else if (k == '.' && !point) {
+                point = true;
+                i++;
+            } else {
+                break;
+            }
+        }
+        if (!digits) continue;
+        if (word == 'G' && whole == 38) found = PROBE;
+        if (word == 'M' && whole == 0 && !fraction && found == NONE) found = PROMPT;
+    }
+    return found;
+}
+
+double JobNotes::workSecondsAfter(uint32_t line) const {
+    double s = 0;
+    for (int i = workCount - 1; i >= 0 && work()[i].line > line; i--) s += work()[i].kind == PROBE ? PROBE_S : HOME_S;
+    return s;
+}
+
+bool JobNotes::workBetween(uint32_t after, uint32_t upTo) const {
+    for (int i = 0; i < workCount; i++) {
+        if (work()[i].line > upTo) break;
+        if (work()[i].line > after) return true;
+    }
+    return false;
 }
 
 // As FluidNC reads a line (GCode.cpp collapseGCode): a `(` starts a comment, `)` ends it, an
 // unclosed one runs to the end, and `;` ends the line, inside a comment too
 void JobNotes::scanLine(uint32_t line, const char *data, uint32_t length) {
+    Work w = classify(data, length);
+    if (w == PROMPT) promptCount++;
+    if (w == PROBE || w == HOME) {
+        if (w == PROBE) probeCount++;
+        if (w == HOME) homeCount++;
+        if (mem && size >= ENTRIES_AT && workCount < MAX_WORK) work()[workCount++] = WorkLine{line, (uint8_t)w, {0, 0, 0}};
+    }
     if (!memchr(data, '(', length)) return;
     const char *start = nullptr;
     for (uint32_t i = 0; i < length; i++) {
@@ -57,7 +142,7 @@ void JobNotes::addMessage(uint32_t line, const char *text, size_t length) {
     while (length && (text[length - 1] == ' ' || text[length - 1] == '\t' || text[length - 1] == '\r')) length--;
     if (!length) return;
     if (length > TEXT_MAX) length = TEXT_MAX;
-    size_t entriesEnd = MAX_OPS * sizeof(Op) + (msgCount + 1) * sizeof(Entry);
+    size_t entriesEnd = ENTRIES_AT + (msgCount + 1) * sizeof(Entry);
     if (textLow < length + 1 || textLow - length - 1 < entriesEnd) {
         isFull = true;
         return;
