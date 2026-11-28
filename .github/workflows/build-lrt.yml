@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # the lrt-* tags, for the version (tools/lrt_version.py)
 
       - name: Cache PlatformIO
         uses: actions/cache@v5
@@ -79,6 +81,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # the lrt-* tags, for the version (tools/lrt_version.py)
 
       - name: Set up MSYS2
         uses: msys2/setup-msys2@v2

@@ -1,4 +1,4 @@
-# Handoff — state as of 2026-11-27 (M5 built and merged; device checks of D99 to D102 left)
+# Handoff — state as of 2026-11-27 (M5 built and merged; device checks of D99 to D102 left; D104, D105 built)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
@@ -9,6 +9,13 @@ prompts) is merged into `lrt/main` (2026-11-27); checked by the host tests, by r
 CenterWheel log and in the simulator; not on the device. Left before M5 is closed: one full
 job with tool changes on the device for D100 to D102, a display restart during it for D99;
 then M5 marked done in 08, this file's §1 rewritten, and the build tagged `lrt-m5`.
+
+**Branch `lrt/m5f-splash-terminal`** (2026-11-27): the boot splash with the version from git
+(D104) and Settings > Tools > Terminal (D105). Built for the simulator and the firmware; checked
+in the simulator (the splash with `lrt-m2+133 (af78053, <branch>, modified)`, `$I` sent from
+the terminal with its `ok` shown). Not on the device: the splash's look and time while WiFi
+starts, and an `error:` reply in red (the fake answers `ok` to anything). The version reads
+`lrt-m2+N` until the build flashed for real use is tagged `lrt-m5` (and the tag pushed).
 
 `lrt/m5c-run` (5c, D89 to D94, D98 to D100) is merged into `lrt/main` (2026-11-27). 5c ran on
 the device on 2026-11-26 (Jeffrey, the Third Wheel job from the Controller SD, unmodified);

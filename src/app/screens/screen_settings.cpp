@@ -5,6 +5,7 @@
 #include "app/ui_mode.h"
 #include "app/widgets.h"
 #include "app/screens/draw_test.h"
+#include "app/version.h"
 #include "config.h"
 #include "core/power_manager.h"
 #include "services/gcode_tests.h"
@@ -12,6 +13,7 @@
 #include "services/position_log.h"
 #include "services/machine_service.h"
 #include "services/settings_service.h"
+#include "services/terminal_service.h"
 #include "ui/ui_theme.h"
 #include <Arduino.h>
 #include <WiFi.h>
@@ -82,6 +84,7 @@ struct Field {
     int decimals;
     lv_obj_t *button;
     void (*changed)(Field &);
+    const char *empty;  // shown for an empty text; "(none)" if not set
 };
 
 Field fields[40];
@@ -96,7 +99,7 @@ void showField(Field &f) {
     if (f.kind == Field::NUMBER) {
         Entry::formatNumber(buf, sizeof(buf), *f.number, f.decimals);
     } else if (!f.text[0]) {
-        strcpy(buf, "(none)");
+        snprintf(buf, sizeof(buf), "%s", f.empty ? f.empty : "(none)");
     } else if (f.kind == Field::PASSWORD) {
         size_t n = strlen(f.text);
         if (n > 12) n = 12;
@@ -593,6 +596,35 @@ void onRestart(lv_event_t *) {
 
 void onDrawTest(lv_event_t *) { DrawTest::open(screenParent); }
 
+// The terminal (D105): a line typed here goes to FluidNC as it is; its replies below
+char termCommand[TerminalService::COMMAND_LEN + 1] = "";
+lv_obj_t *termSend;
+lv_obj_t *termLines[TerminalService::LINES];
+uint32_t termShownGen = 0;
+
+void onTermSend(lv_event_t *) {
+    if (!TerminalService::canSend()) {
+        Frame::notice(TerminalService::busyReason());
+    } else if (!termCommand[0]) {
+        Frame::notice("Type a command first.");
+    } else {
+        TerminalService::send(termCommand);
+    }
+}
+
+void showTerminal() {
+    setEnabled(termSend, TerminalService::canSend());
+    if (termShownGen == TerminalService::generation()) return;
+    termShownGen = TerminalService::generation();
+    for (int i = 0; i < TerminalService::LINES; i++) {
+        const char *t = TerminalService::line(i);
+        setText(termLines[i], t);
+        bool sent = t[0] == '>';
+        bool bad = strncmp(t, "error", 5) == 0 || strncmp(t, "ALARM", 5) == 0;
+        setTextColor(termLines[i], bad ? UITheme::STATE_ALARM : sent ? UITheme::TEXT_MEDIUM : UITheme::TEXT_LIGHT);
+    }
+}
+
 void createToolsPage(lv_obj_t *page) {
     button(page, 0, 0, 280, 56, "Restart into classic UI", FONT_MID, onRestartClassic);
     button(page, 292, 0, 132, 56, "Restart", FONT_MID, onRestart);
@@ -615,8 +647,23 @@ void createToolsPage(lv_obj_t *page) {
     lv_obj_set_width(testFailure, CONTENT_W - 156);
     lv_label_set_long_mode(testFailure, LV_LABEL_LONG_DOT);
 
-    section(page, 280, "About");
-    aboutText = label(page, 0, 310, FONT_MID, UITheme::TEXT_LIGHT, "");
+    section(page, 280, "Terminal");
+    Field &cmd = addField(page, 0, 310, CONTENT_W - 152, 52, "Command for FluidNC", nullptr);
+    cmd.kind = Field::TEXT;
+    cmd.text = termCommand;
+    cmd.maxLen = TerminalService::COMMAND_LEN;
+    cmd.empty = "Tap to type a command";
+    showField(cmd);
+    termSend = button(page, CONTENT_W - 140, 310, 140, 52, "Send", FONT_MID, onTermSend);
+    for (int i = 0; i < TerminalService::LINES; i++) {
+        termLines[i] = label(page, 0, 372 + i * 20, FONT_SMALL, UITheme::TEXT_LIGHT, "");
+        lv_obj_set_width(termLines[i], CONTENT_W);
+        lv_label_set_long_mode(termLines[i], LV_LABEL_LONG_DOT);
+    }
+    termShownGen = TerminalService::generation() - 1;
+
+    section(page, 504, "About");
+    aboutText = label(page, 0, 534, FONT_MID, UITheme::TEXT_LIGHT, "");
     lv_obj_set_width(aboutText, CONTENT_W);
     lv_obj_set_style_text_line_space(aboutText, 6, 0);
 }
@@ -640,12 +687,15 @@ void showAbout() {
     }
     char buf[512];
     uint32_t up = millis() / 1000;
+    const char *detail = Version::detail();
     snprintf(buf, sizeof(buf),
-             "LowRider Touch (M3), FluidTouch " FLUIDTOUCH_VERSION ", built " __DATE__ "\n"
+             "LowRider Touch %s%s%s%s\n"
+             "Built %s, on FluidTouch " FLUIDTOUCH_VERSION "\n"
              "Machine %d: %s\n"
              "Display WiFi: %s\n"
              "Free RAM %u KB, PSRAM %u KB\n"
              "Running for %u:%02u:%02u",
+             Version::name(), detail[0] ? " (" : "", detail, detail[0] ? ")" : "", Version::built(),
              SettingsService::machineSlot() + 1, controller, wifi, (unsigned)(ESP.getFreeHeap() / 1024),
              (unsigned)(ESP.getFreePsram() / 1024), (unsigned)(up / 3600), (unsigned)(up / 60 % 60),
              (unsigned)(up % 60));
@@ -750,6 +800,7 @@ void showPage(int page) {
         showAbout();
         showPosLog();
         showTests();
+        showTerminal();
         aboutAtMs = millis();
     }
 }
@@ -816,6 +867,7 @@ void SettingsScreen::onHide() { saveAll(); }
 
 void SettingsScreen::update() {
     setMachineLocked(MachineService::jobActive());
+    if (pageShown == PAGE_TOOLS) showTerminal();  // replies as they come
     if (pageShown == PAGE_TOOLS && millis() - aboutAtMs >= 1000) {
         aboutAtMs = millis();
         showAbout();

@@ -91,9 +91,12 @@ them.
 ## 6. Tags and versions
 
 - Tag every build that goes onto the machine for real use: `lrt-m1`, `lrt-m2`,
-  `lrt-m2.1`... The About page shows the tag and short commit hash.
-- Leave upstream's `VERSION` / `FLUIDTOUCH_VERSION` alone (it changes with upstream merges);
-  add a separate `LRT_VERSION`.
+  `lrt-m2.1`... The splash and the About page show the version from git (D104):
+  `tools/lrt_version.py` writes `lrt_version.h` at each build with `LRT_VERSION` (`lrt-m5`, or
+  `lrt-m5+3` three commits after the tag), `LRT_DETAIL` (short commit, the branch when not
+  `lrt/main`, "modified" with local changes) and `LRT_BUILT`. Only `src/app/version.cpp`
+  includes it. Push the tag too, so CI's builds see it.
+- Leave upstream's `VERSION` / `FLUIDTOUCH_VERSION` alone (it changes with upstream merges).
 
 ## 7. CI
 
