@@ -1,13 +1,14 @@
-# Handoff — state as of 2026-11-27 (5c merged; D101, D102 built on `lrt/m5d-time`)
+# Handoff — state as of 2026-11-27 (M5 built and merged; device checks of D99 to D102 left)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 0. Pick up here (2026-11-27)
 
-**Branch `lrt/m5d-time`** (from `lrt/main`, 2026-11-27): D101 and D102, the allowances
-for probes, homings and prompts. Built; checked by the host tests, by replaying the
-CenterWheel log and in the simulator; not on the device. Merge into `lrt/main` (`--no-ff`)
-when Jeffrey says so.
+**M5 is built.** `lrt/m5d-time` (D101 and D102, the allowances for probes, homings and
+prompts) is merged into `lrt/main` (2026-11-27); checked by the host tests, by replaying the
+CenterWheel log and in the simulator; not on the device. Left before M5 is closed: one full
+job with tool changes on the device for D100 to D102, a display restart during it for D99;
+then M5 marked done in 08, this file's §1 rewritten, and the build tagged `lrt-m5`.
 
 `lrt/m5c-run` (5c, D89 to D94, D98 to D100) is merged into `lrt/main` (2026-11-27). 5c ran on
 the device on 2026-11-26 (Jeffrey, the Third Wheel job from the Controller SD, unmodified);
@@ -83,21 +84,14 @@ own commands. Checked in the simulator (the prompt's text stays; the log says
 `MachineService: error:8 answers the display's own command; not shown`). On the device, the
 same restart check above should keep the prompt's text.
 
-**Open questions for Jeffrey (not blocking):**
+**Settled (D103, 2026-11-27):** line numbers stay off; the note for CNC-Tools is
+[outgoing/cnc-tools-line-numbers.md](outgoing/cnc-tools-line-numbers.md) (Jeffrey passes it
+on). No upstream issue for D88. The choices made without review are kept.
 
-- **Line numbers stay off** (Jeffrey, D93). `Ln:` works in the simulator but needs
-  `use_line_numbers: true` and N words from the post-processor. With an N on every line the
-  library's `structure` finds no operations (its markers are matched at the start of the
-  line; the fix would be in CNC-Tools: skip a leading `N\d+`). Open: should a note go to
-  CNC-Tools (`specs/outgoing/`) anyway, for later?
-- **The D88 draw-buffer fix upstream:** optionally open an issue on jeyeager65/FluidTouch
-  (the buffers are sized with the 3-byte `lv_color_t` at 16-bit colour, about 750 KB unused).
-  Jeffrey to say whether to.
+**Still open (not blocking):**
+
 - **The display SD's write errors** (errno 5 on the first download after boot, D86 retries
   it): cause still unknown; watch whether it shows up again.
-- Choices made without review and still open to change: a drag stops the view following
-  the tool (Fit or a double tap restarts it); Fit is hidden during a prompt; "(S1)" dropped
-  from the D72 confirm text.
 
 **Battery gauge (M10, [12](12-battery.md), D95 to D97), specified 2026-11-25, not built.**
 Jeffrey has ordered the gauge (Adafruit MAX17048, 5580) and cable (4424). He fits it and runs
