@@ -5,6 +5,7 @@
 #include "services/run_tracker.h"
 #include "services/time_left.h"
 #include <Arduino.h>
+#include <math.h>
 #include <string.h>
 
 namespace {
@@ -20,6 +21,12 @@ int lastOp = 0;
 float lastFeedOverride = 100, lastRapidOverride = 100;
 uint32_t lastEstimateGen = 0;
 int lastSource = -1;  // how the last match was found, for the log: 1 Ln:, 0 the position
+// The end of lastOp's last move in the plan (D100): planned seconds of feeds and of the rest
+int opEndFor = 0;  // the op they were looked for; 0 none
+bool opEndFound = false;
+uint32_t opEndGen = 0;
+double opEndFeed = 0, opEndOther = 0;
+bool inOp = false;  // the matched move is in lastOp (not between operations)
 
 // The read position is rounded to a hundredth of a percent: a little slack past it
 const uint64_t READ_SLACK = 1024;
@@ -59,6 +66,35 @@ TimeLeft::Plan planAt(const SegmentList &list, uint32_t record) {
     return p;
 }
 
+// The planned seconds at the end of operation `op`'s last move, reading on from `record` (the
+// matched move) until a later operation starts; false when no move of `op` is found
+bool opEndAt(const SegmentList &list, const JobNotes &notes, int op, uint32_t record, double &feedEnd,
+             double &otherEnd) {
+    if (!list.checkpoints()) return false;
+    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
+    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
+    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
+    SegmentList::Rates rates = PreviewService::rates();
+    SegmentList::Reader reader(list, cp);
+    SegmentList::Move m;
+    bool incomplete = false, found = false;
+    while (reader.next(m)) {
+        double s = SegmentList::moveSeconds(m, rates, incomplete);
+        total += s;
+        feed += SegmentList::feedPart(m, s);
+        if (m.record < record) continue;
+        int at = notes.opAt(m.line);
+        if (at == op) {
+            found = true;
+            feedEnd = feed;
+            otherEnd = total - feed;
+        } else if (at > op) {
+            break;
+        }
+    }
+    return found;
+}
+
 double runSeconds() { return JobService::runningMs() / 1000.0; }
 
 }  // namespace
@@ -74,6 +110,12 @@ bool RunFollow::plansTime() {
 uint32_t RunFollow::leftMs() {
     if (!plansTime() || !timeLeft.known()) return 0;
     return (uint32_t)(timeLeft.seconds() * 1000.0);
+}
+
+uint32_t RunFollow::opLeftMs() {
+    if (!plansTime() || !timeLeft.known() || !inOp || !lastOp || opEndFor != lastOp || !opEndFound) return 0;
+    double s = timeLeft.leftUntil(opEndFeed, opEndOther, runSeconds());
+    return (uint32_t)(fmax(1, s) * 1000.0);
 }
 
 const char *RunFollow::message(const char *controllerMessage) {
@@ -114,6 +156,9 @@ void RunFollow::poll() {
         tracker.reset();
         timeLeft.reset();
         lastOp = 0;
+        opEndFor = 0;
+        opEndFound = false;
+        inOp = false;
         lastSource = -1;
         generation++;
     }
@@ -158,5 +203,13 @@ void RunFollow::poll() {
         const JobNotes *notes = PreviewService::notes();
         int op = notes ? notes->opAt(tracker.line()) : 0;
         if (op) lastOp = op;
+        inOp = op != 0;
+    }
+    // Where the operation ends in the plan: once per operation, and again with a new estimate
+    if (inOp && lastOp && (opEndFor != lastOp || opEndGen != lastEstimateGen)) {
+        const JobNotes *notes = PreviewService::notes();
+        opEndFound = notes && opEndAt(list, *notes, lastOp, tracker.record(), opEndFeed, opEndOther);
+        opEndFor = lastOp;
+        opEndGen = lastEstimateGen;
     }
 }

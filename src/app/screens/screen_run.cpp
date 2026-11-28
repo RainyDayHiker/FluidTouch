@@ -37,6 +37,7 @@ const lv_font_t *const FONT_SMALL = &lrt_font_14;
 const int LEFT_X = 16, LEFT_W = 552;
 const int LEFT_GROUP_W = 584;  // the left side, up to the divider
 const int PANEL_X = 592, PANEL_W = 200;
+const int OP_LEFT_W = 96;  // "~12:34 left"
 const int PREVIEW_X = 8, PREVIEW_Y = 8, PREVIEW_W = 568, PREVIEW_H = 344;
 
 lv_obj_t *noneGroup;
@@ -74,6 +75,7 @@ lv_obj_t *endGroup;
 
 // Run group
 lv_obj_t *opLabel;       // op N of M
+lv_obj_t *opLeftLabel;   // the operation's time left, right-aligned beside it (D100)
 lv_obj_t *progressBar;
 lv_obj_t *percentLabel;
 lv_obj_t *elapsedValue;
@@ -306,10 +308,12 @@ lv_obj_t *rightLabel(lv_obj_t *parent, int right, int y, int w, const lv_font_t 
 void createRun(lv_obj_t *parent) {
     runGroup = group(parent, PANEL_X, 0, PANEL_W, Frame::CONTENT_HEIGHT);
 
-    // op N of M; the bar with the percent at its right
+    // op N of M, the op's time left right-aligned as the values below it (so neither moves the
+    // other); the bar with the percent at its right
     opLabel = label(runGroup, 0, 8, FONT_MID, UITheme::TEXT_MEDIUM, "");
-    lv_obj_set_width(opLabel, PANEL_W);
+    lv_obj_set_width(opLabel, PANEL_W - OP_LEFT_W);
     lv_label_set_long_mode(opLabel, LV_LABEL_LONG_DOT);
+    opLeftLabel = rightLabel(runGroup, PANEL_W, 8, OP_LEFT_W, FONT_MID, UITheme::TEXT_LIGHT);
     progressBar = lv_bar_create(runGroup);
     lv_obj_set_pos(progressBar, 0, 40);
     lv_obj_set_size(progressBar, PANEL_W - 60, 24);
@@ -371,6 +375,16 @@ void updateRunGroup(JobService::RunState state, bool online) {
         text[0] = '\0';
     }
     setText(opLabel, text);
+    // To the end of the op's last move; hidden between operations (D100)
+    uint32_t opLeft = ops > 0 && op > 0 ? RunFollow::opLeftMs() : 0;
+    if (opLeft) {
+        text[0] = '~';
+        formatDuration(text + 1, sizeof(text) - 1, opLeft);
+        strncat(text, " left", sizeof(text) - strlen(text) - 1);
+    } else {
+        text[0] = '\0';
+    }
+    setText(opLeftLabel, text);
 
     float pct = JobService::percent();
     lv_bar_set_value(progressBar, (int32_t)(pct * 10), LV_ANIM_OFF);

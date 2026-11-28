@@ -29,6 +29,9 @@ public:
     static bool plansTime();
     // That time left in ms; 0 until the first match
     static uint32_t leftMs();
+    // The operation's time left in ms (D100), as leftMs() counts it, to the end of op()'s last
+    // move; 0 when the time isn't planned, or the tool is between operations
+    static uint32_t opLeftMs();
 
     static void poll();
 };

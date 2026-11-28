@@ -1,12 +1,22 @@
-# Handoff — state as of 2026-11-26 (M5 part 5c checked on the device; D98 and D99 built)
+# Handoff — state as of 2026-11-27 (M5 part 5c checked on the device; D98 checked there; D99, D100 built)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
-## 0. Pick up here (2026-11-26)
+## 0. Pick up here (2026-11-27)
 
 **Branch `lrt/m5c-run`.** 5c (D89 to D94) ran on the device on 2026-11-26 (Jeffrey, the
-Third Wheel job from the Controller SD, unmodified). D98 and D99 are built after it and checked in the
-simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says so.
+Third Wheel job from the Controller SD, unmodified). D98 and D99 are built after it; D98 is
+checked on the device (2026-11-27), D99 in the simulator only. D100 (the operation's time
+left beside "op N of M") is the last change before the merge: built, checked in the
+simulator and by replaying the CenterWheel log, not yet on the device. Merge into
+`lrt/main` (`--no-ff`) when Jeffrey says so.
+
+**D100 (2026-11-27):** Run shows "op 4 of 13 ... ~3:12 left", the time to the end of the
+operation's last move, counted as Run's time left (11 §7). Simulator: CenterWheel on the
+fake, "op 1 of 13  ~7:22 left" then "~7:12 left" ten seconds later, the op text not moving.
+Replay (`tools/host_tests/replay.sh` with the CenterWheel log): within 0.7 min for each of
+the 13 operations, a minute in and halfway. Not seen yet: the time hidden between
+operations (a tool change), and anything on the device.
 
 **Device results (2026-11-26, Jeffrey):**
 

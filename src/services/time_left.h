@@ -38,6 +38,11 @@ public:
     bool known() const { return haveShown; }
     double seconds() const { return shown; }
     double factor() const { return k; }
+    // The time to a point further on, as the target counts it: the plan from the matched move to
+    // the point (`feedEnd`, `otherEnd`: planned seconds at 100% from the start of the job), over the
+    // overrides, x the factor, counted down from the match but not below the plan after the matched
+    // move. Not smoothed. 0 before the first match (an operation's time left, D100)
+    double leftUntil(double feedEnd, double otherEnd, double runS) const;
 
 private:
     // The plan from (feed, other) to the end, over the overrides

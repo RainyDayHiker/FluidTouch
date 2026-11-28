@@ -13,6 +13,16 @@ double TimeLeft::target(double runS) const {
     return fmax(fromMatch, afterMove);
 }
 
+double TimeLeft::leftUntil(double feedEnd, double otherEnd, double runS) const {
+    if (!haveMatch) return 0;
+    auto span = [&](double feed, double other) {
+        return fmax(0, feedEnd - feed) / feedScale + fmax(0, otherEnd - other) / rapidScale;
+    };
+    double fromMatch = span(last.feedDone, last.otherDone) * k - (runS - matchRun);
+    double afterMove = span(last.feedAfter, last.otherAfter) * k;
+    return fmax(0, fmax(fromMatch, afterMove));
+}
+
 void TimeLeft::match(double runS, const Plan &plan, double fs, double rs) {
     if (haveMatch) {
         // The part done since the last match ran at the overrides of then

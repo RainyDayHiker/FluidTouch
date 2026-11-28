@@ -245,6 +245,15 @@ is summed at the overrides it ran at, so a change of override doesn't spoil the 
 axis rates (§5) make the estimate again; the position is taken over in the new numbers.
 Not with a truncated list (the plan doesn't reach the end): the percent formula.
 
+**The operation's time left (D100)** beside "op N of M": the same count to a nearer point,
+the end of the current operation's last move (found once per operation, reading on from the
+match until a later operation starts; again with a new estimate). The plan from the match to
+there over the overrides, x the same factor, counted down from the match, not below the plan
+after the matched move. Not smoothed (it is short, and a jump is at most the error of one
+report). Hidden between operations (the matched line in none) and without a planned time
+left. CenterWheel replayed (`replay.sh`): within 0.7 min of the truth for every operation,
+one minute in and halfway.
+
 The usual alternatives, compared 2026-11-23: extrapolating from percent (D51, D90: noisy,
 because bytes aren't time); FigUI's planned time counted down by the clock (steady, but never
 corrected: when the estimate runs out it shows nothing); smoothing the rate alone (moving
@@ -300,6 +309,8 @@ at a doubled step runs on the worker task too.
   device (Settings > Tools), the time left the display would show every 3 minutes of running
   against the time really left (the overrides taken as 100%). CenterWheel (2026-11-27): the
   estimate 72.6 min against 74.8 min cut, time left within 1.9 min from 15 min on (HANDOFF).
+  It also prints the operation's time left (D100) beside the true one, and how far off it was
+  per operation a minute in and halfway.
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

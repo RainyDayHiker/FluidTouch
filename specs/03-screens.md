@@ -164,7 +164,7 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 
 ```
 +--------------------------------------------------------+---------------------+
-|                                                        | op 24 of 90         |
+|                                                        | op 4 of 9 ~3:12 left|
 |                                                        | [=========>  ]  27% |
 |                 preview with progress                  | Elapsed     0:35:12 |
 |                   568 x 344 (D91)                      | Left          ~1:35 |
@@ -179,7 +179,8 @@ status bar: ... the message that follows the tool ...                  [ ABORT ]
 ```
 
 The panel (D90, D91): 200 px wide; no file line, no message (the status bar has it), no
-rapid override. The captions stay put and the times are right-aligned. The feed override
+rapid override. The captions stay put and the times are right-aligned; the operation's time
+left is right-aligned on the "op N of M" row, so neither moves the other (D100). The feed override
 buttons are 62 x 52 with 100 in the middle. Finished/Stopped puts Run again and Back to
 Setup one above the other. During a job the status bar's STOP reads
 ABORT and ends the job; the panel's PAUSE is the only hold.
@@ -206,7 +207,7 @@ States of the right-hand panel:
 
 Notes:
 
-- The current operation text is in the status bar. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); with a preview of the job the status bar shows the file's message at the tool's line instead (D65, D92). "op N of M" is the operation the tool is in, from the file's operation list (D92).
+- The current operation text is in the status bar. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); with a preview of the job the status bar shows the file's message at the tool's line instead (D65, D92). "op N of M" is the operation the tool is in, from the file's operation list (D92). Beside it, "~3:12 left": the operation's time left, to the end of its last move, counted as Run's time left is (the plan x the correction factor, the overrides applied, counting down, stopped at a prompt or a pause; [11 §7](11-preview.md#7-time-left)). Hidden between operations (a tool change) and whenever Run's time left isn't from the plan (D100).
 - The router is switched by hand; the display does not show spindle speed or spindle override.
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
 - Until the preview exists (M5), the preview area shows the file name and the current
