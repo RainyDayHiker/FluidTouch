@@ -28,6 +28,7 @@ Kept deliberately small, to stay mergeable (G11):
 | File | Change |
 |------|--------|
 | `network/fluidnc_client.*` | The direct calls to `UICommon` (connection popups) and `UITabControlProbe::updateResult` go through `FluidNCClientListener` (one listener, set with `FluidNCClient::setListener`). Events: connection established, connection lost, probe result. Done in M1. The header still includes `ui/machine_config.h` for `MachineConfig`; left as is. |
+| `include/network/fluidnc_client.h`, `network/fluidnc_client.cpp` | `FluidNCStatus::line_number`: the status report's `Ln:` (the N word of the line FluidNC is executing, sent with `use_line_numbers`), 0 when a report has none. For Run following the tool (D79, D93). |
 | `include/debug_log.h`, `network/fluidnc_client.cpp` | `LOG_STATUS_PRINTF`, off unless built with `-DLOG_FLUIDNC_STATUS=1`, for the lines printed on each status report and parser state (Status, WCO, FS, Ov, GCode State, modals). |
 | `ui/classic_client_listener.*` (new file in upstream's folder) | The classic UI's listener; does what the direct calls did. |
 | `ui/upload_manager.*` | Used by `FileService`. `init()` mounts the display SD at 20 MHz, and at upstream's 4 MHz if that fails, and logs which (D74). |
@@ -71,7 +72,8 @@ connection changed.
 | MachineService | Connection, status snapshot, events (state change, message, alarm, hold, probe result) | jog, cancel jog, home, unlock, zero, go to, hold, resume, reset, overrides, run file, send line |
 | FileService | File sources and transfers | list(source, path), fetch to cache, upload to controller, delete; progress and cancel |
 | JobService | The selected job: source file, derived files, run state | select, generate (a new job, [10](10-new-jobs.md)), transform, build outline, commit (upload), start, progress mapping |
-| PreviewService | The selected job's working copy and analysis (extents, stock, tools, operations, segment list), the library's arena ([11](11-preview.md)) | load (fetch from the Controller SD, then analyse, on the worker task), cancel, retry; progress |
+| PreviewService | The selected job's working copy and analysis (extents, stock, tools, operations, segment list), the library's arena ([11](11-preview.md)) | load (fetch from the Controller SD, then analyse, on the worker task), load for Run during a cut (download, or the working folder's copy; D94), cancel, retry; progress |
+| RunFollow, RunPreview | Run following the tool (11 §6, §7); the offer of the running job's preview when Run has none (D72, D94) | follow, time left, message; check the size, use the copy, download |
 | Generators | The list of generators and their common interface: texts, fields, messages, plan, write ([10 §7](10-new-jobs.md#7-services)) | list, form data, messages, plan, write |
 | MacroService | Macro slots | list, run, edit |
 | SettingsService | Persistent settings, export/import | get/set, backup to display SD |
@@ -126,6 +128,11 @@ A hold is a prompt unless it was asked for here (Pause or STOP: `MachineService:
 An alarm, or a reset from Abort, ends it as Aborted. While it runs, `MachineService::jobActive()`
 is true even after `SD:` has gone, so Setup stays greyed out to the end (S3).
 
+The new UI reads FluidNC's message through `MachineService::message()`, not `last_message`:
+the client stores every `error:` line there, and an `error:` reply to FileService's own
+commands (listings, size checks, axis rates) is passed over, leaving the message before it
+(D99). The position log records the raw messages.
+
 `MachineService` holds the rules for what may be done in which state (`canHome`, `canZero`,
 `canMove`, `canUnlock`, `canReset`; [03 §2](03-screens.md#2-setup) and S3). Screens use them
 to grey out buttons and to explain a press they refuse (`busyReason()`), and each action
@@ -173,10 +180,11 @@ Budget for the preview, replacing the earlier targets (which added up to 3.7 MB)
 
 | Use | Size | When |
 |-----|------|------|
-| Preview canvas, RGB565 (Job: 784 x 204, D83) | 313 KB | Job and Run screens |
-| Second canvas layer for cut progress | 337 KB | Run screen only |
+| Job's preview canvas, RGB565, 784 x 204 (D83) | 313 KB | From boot (built with the Job screen) |
+| Run's preview canvas, RGB565, 568 x 344 (D89, D91): the job and the cut so far in one canvas | 382 KB | From boot (built with the Run screen) |
 | Library arena (analysis with the outline, transforms) | 512 KB, provisional until C3's device `perf` figures (D77) | While a job is selected |
-| Segment list, 8 bytes per segment (D30) | Sized for Run (D83): the largest free block less 400 KB for Run's second canvas, at most 640 KB (about 80,000 records, 5.9 times the reference job, G8) | While a job is selected |
+| The file's messages and operations for Run (D92) | 16 KB | From the first job selected |
+| Segment list, 8 bytes per segment (D30) | The largest free block less 128 KB of headroom (D89; was 400 KB for a second canvas on Run, D83), at most 640 KB (about 80,000 records, 5.9 times the reference job, G8) | While a job is selected |
 
 At 24 bytes per segment (as tested), 1.1 MB holds about 48,000 segments: 3.4 times the
 reference job, short of the "at least 5x" in G8. The options were (Q21, decided as A: D30):

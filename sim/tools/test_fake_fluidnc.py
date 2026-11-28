@@ -52,6 +52,15 @@ async def main():
     session.handle_realtime(0x18); await asyncio.sleep(0.15)
     assert m.state == "Alarm" and "ALARM:3" in out and not m.busy(), (m.state, out)
     session.handle_line("$X"); assert m.state == "Idle"
+    # Ln: the moving line's N word, with use_line_numbers; none for a line without one
+    session.handle_line("N55 G1 X150 F600"); await asyncio.sleep(0.2)
+    assert m.state == "Run" and re.search(r"\|Ln:55[|>]", m.status()), m.status()
+    session.handle_line("$sim/ln=0"); assert "Ln:" not in m.status(), m.status()
+    session.handle_line("$sim/ln=1"); session.handle_realtime(0x18); await asyncio.sleep(0.15)
+    session.handle_line("$X"); assert "Ln:" not in m.status(), m.status()
+    session.handle_line("G1 X160 F600"); await asyncio.sleep(0.2)
+    assert m.state == "Run" and "Ln:" not in m.status(), m.status()
+    session.handle_realtime(0x18); await asyncio.sleep(0.15); session.handle_line("$X")
     # probe miss
     out.clear(); m.speed = 50; session.handle_line("$sim/probemiss=1"); session.handle_line("G38.2 Z-10 F100")
     await asyncio.sleep(0.5)
@@ -71,6 +80,13 @@ async def main():
     session.handle_line("$Files/ListGcode=/sd/")
     assert "facing.nc" not in out[-2] and "sign_v2.gcode" in out[-2], out
     session.handle_line("$SD/Delete=/sd/facing.nc"); assert out[-1] == "error:65", out
+    # $sim/listbusy: a listing is refused only while a job runs
+    session.handle_line("$sim/listbusy=1")
+    m.job = object(); out.clear(); session.handle_line("$Files/ListGcode=/sd/")
+    m.job = None
+    assert out == ["error:8"], out
+    out.clear(); session.handle_line("$Files/ListGcode=/sd/"); assert out[-1] == "ok", out
+    session.handle_line("$sim/listbusy=0")
     print("ALL CHECKS PASSED")
 asyncio.run(main())
 

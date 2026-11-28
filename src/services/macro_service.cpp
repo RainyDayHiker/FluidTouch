@@ -147,7 +147,7 @@ void MacroService::enter(RunState next) {
         if (state < RUN_STARTING || state > RUN_HELD) {
             lastPercent = 0;
             endReason[0] = '\0';
-            copy(startMessage, sizeof(startMessage), MachineService::status().last_message);
+            copy(startMessage, sizeof(startMessage), MachineService::message());
             messageSeen = false;
         }
     }
@@ -191,7 +191,7 @@ void MacroService::stop() {
 }
 
 const char *MacroService::message() {
-    const char *now = MachineService::status().last_message;
+    const char *now = MachineService::message();
     if (!messageSeen && strcmp(now, startMessage) == 0) return "";
     messageSeen = true;
     return now;
@@ -236,7 +236,7 @@ void MacroService::poll() {
                 if (s.is_sd_printing || s.state == STATE_RUN || s.state == STATE_HOLD || s.state == STATE_HOME) {
                     enter(RUN_RUNNING);
                 } else if (now - sinceMs >= START_TIMEOUT_MS) {
-                    snprintf(endReason, sizeof(endReason), "It did not start. %s", s.last_message);
+                    snprintf(endReason, sizeof(endReason), "It did not start. %s", MachineService::message());
                     enter(RUN_STOPPED);
                 }
             } else if (!idle) {

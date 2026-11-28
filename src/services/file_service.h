@@ -49,6 +49,18 @@ public:
     // Goes up each time a listing ends (ready or failed)
     static uint32_t listGeneration() { return generation; }
 
+    // --- One file's size ------------------------------------------------------
+    // The size of a file on the controller's SD, from a listing of its folder that leaves the
+    // picker's listing alone (Run's preview of a job started elsewhere, D72, D94). Waits for
+    // another request to end first
+    enum SizeState { SIZE_IDLE, SIZE_LOADING, SIZE_KNOWN, SIZE_FAILED };
+    static void sizeOf(const char *path);
+    static SizeState sizeState() { return sizeStateValue; }
+    static const char *sizePath() { return sizePathValue; }
+    static int32_t sizeResult() { return sizeValue; }
+    // SIZE_FAILED: why (the controller's error line, or that the file wasn't listed)
+    static const char *sizeError() { return sizeErrorText; }
+
     // --- Deleting -------------------------------------------------------------
     // Deletes a file, then lists its folder again. Returns false (with the
     // reason in listError()) if it could not even be tried.
@@ -86,7 +98,7 @@ public:
     static bool displayCardBusy();
 
 private:
-    enum Request { REQUEST_NONE, REQUEST_LIST, REQUEST_CHECK, REQUEST_VERIFY, REQUEST_RATES };
+    enum Request { REQUEST_NONE, REQUEST_LIST, REQUEST_CHECK, REQUEST_VERIFY, REQUEST_RATES, REQUEST_SIZE };
 
     static void listDisplay(const char *folder);
     static void requestController(Request request, const char *folder);
@@ -118,6 +130,12 @@ private:
     static bool wasConnected;
     static uint32_t connectedAtMs;
     static int rateAxis;
+
+    static SizeState sizeStateValue;
+    static bool sizeWanted;
+    static char sizePathValue[PATH_LEN];
+    static int32_t sizeValue;
+    static char sizeErrorText[80];
 
     static UploadState uploadStateValue;
     static char uploadLocalPath[PATH_LEN];

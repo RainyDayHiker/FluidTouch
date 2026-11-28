@@ -46,6 +46,7 @@ public:
         FeedMode feedMode;
         float dwellBefore;  // seconds of G4 since the previous move
         uint32_t record;    // index of the move's record
+        uint32_t n;         // the move's line's N word; 0 if none, or when N words don't increase (D79)
     };
 
     struct Checkpoint {
@@ -53,11 +54,12 @@ public:
         uint32_t offset;   // its byte offset in the file
         uint32_t n;        // the last N word, 0 if none
         float feed;
-        float seconds;     // the estimate up to here (estimate())
-        int16_t x, y;      // the previous move's end, in steps
+        float seconds;      // the estimate up to here (estimate())
+        float feedSeconds;  // of which feeds and arcs, without their dwells (the feed override's part)
+        int16_t x, y;       // the previous move's end, in steps
         int8_t z;
         uint8_t feedMode;
-        uint8_t pad[6];
+        uint8_t pad[2];
     };
 
     // Axis rates for the estimate, mm/min; 0 when unknown
@@ -66,7 +68,8 @@ public:
     };
     struct Estimate {
         double seconds;
-        bool incomplete;  // moves without a usable feed, or rates unknown
+        double feedSeconds;  // of which feeds and arcs (dwells not included)
+        bool incomplete;     // moves without a usable feed, or rates unknown
     };
 
     // Starts empty in `bytes` of memory owned by the caller
@@ -111,6 +114,8 @@ public:
     // One move's time in seconds, as estimate() counts it; `incomplete` is set when it had
     // no usable feed
     static double moveSeconds(const Move &m, const Rates &rates, bool &incomplete);
+    // A move's share of feedSeconds: its time less its dwell for a feed or an arc, else 0
+    static double feedPart(const Move &m, double seconds) { return m.kind == RAPID ? 0 : seconds - m.dwellBefore; }
 
     // Reads the moves in order, from the start or from a checkpoint
     class Reader {
@@ -135,6 +140,7 @@ public:
         bool haveCentre;
         int32_t centreX, centreY;
         bool jumped;
+        uint32_t nextN;
     };
 
     // Receives the analysis's segments and lines (AnalysisSink) and packs them

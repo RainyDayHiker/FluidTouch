@@ -62,6 +62,14 @@ public:
     // Last status from FluidNC. Only meaningful while online().
     static const FluidNCStatus &status() { return FluidNCClient::getStatus(); }
 
+    // The message to show: FluidNC's last message (status().last_message), except an error
+    // line that answers one of the display's own background commands, which leaves the one
+    // before it (D99). The client stores every error line as the last message
+    static const char *message();
+    // Called by the service whose command this error line answers, before the client stores
+    // it (FileService's listings, D99)
+    static void ownReply(const char *line);
+
     // A file is running on the controller (also true during a G4 dwell,
     // when FluidNC reports Idle), or JobService still counts its job as
     // running: FluidNC drops the SD: field once it has read the last line

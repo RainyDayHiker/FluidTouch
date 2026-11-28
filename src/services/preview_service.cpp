@@ -20,11 +20,13 @@ namespace {
 
 // The library's arena, held while a job is selected (D77)
 constexpr size_t ARENA_SIZE = 512 * 1024;
-// The segment list: what is left once Run's second canvas would still fit (02 §6), at most
-// LIST_MAX (75,000 records, 5 times the reference job, D30)
+// The segment list: the largest free block less some headroom (Run's canvas is allocated at
+// boot, D89), at most LIST_MAX (about 80,000 records, almost 6 times the reference job, D30)
 constexpr size_t LIST_MAX = 640 * 1024;
 constexpr size_t LIST_MIN = 64 * 1024;
-constexpr size_t RUN_RESERVE = 400 * 1024;
+constexpr size_t RUN_RESERVE = 128 * 1024;
+// The file's messages and operations (D92): the reference job's 93 messages take 4 KB
+constexpr size_t NOTES_BYTES = 16 * 1024;
 // Download buffer and timeouts
 constexpr size_t FETCH_CHUNK = 16384;
 constexpr uint32_t CONNECT_TIMEOUT_MS = 5000;
@@ -35,6 +37,8 @@ struct Request {
     char path[FileService::PATH_LEN];
     char name[FileService::NAME_LEN];
     int32_t size;
+    bool duringJob;  // Run asked for it during the cut (D72): no waiting for the end
+    bool useCopy;    // the working folder's copy, no download (D94)
 };
 
 Request request = {};       // the chosen file
@@ -47,8 +51,11 @@ void *arena = nullptr;
 void *listMemory = nullptr;
 size_t listBytes = 0;
 SegmentList list;
+void *notesMemory = nullptr;
+JobNotes notes;
 uint32_t readyGen = 0;
 uint32_t estimateRatesGen = 0;
+uint32_t estimateGen = 0;
 
 // The service's state; the task writes it only for its own generation
 volatile PreviewService::State current = PreviewService::NONE;
@@ -287,7 +294,8 @@ void formatTools(char *out, size_t outLen, const gcode::Structure &s) {
     }
 }
 
-// The packer, timed (the log splits analyse()'s time into reading, packing and the rest)
+// The packer, timed (the log splits analyse()'s time into reading, packing and the rest); it
+// also collects the file's messages
 class TimedPacker : public gcode::AnalysisSink {
 public:
     explicit TimedPacker(SegmentList::Packer &p) : packer(p) {}
@@ -299,6 +307,7 @@ public:
     void line(const gcode::Line &l, const gcode::Token *t, uint16_t n, const gcode::LineState &st) override {
         uint32_t t0 = micros();
         packer.line(l, t, n, st);
+        notes.scanLine(l.index, l.data, l.length);
         us += micros() - t0;
     }
     uint32_t us = 0;
@@ -346,8 +355,16 @@ void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t 
     if (a.structure.kind == gcode::StructureKind::Ok) {
         sum.ops = 0;
         for (uint32_t i = 0; i < a.structure.unitCount; i++) {
-            if (a.structure.units[i].enabled) sum.ops++;
+            const gcode::Unit &u = a.structure.units[i];
+            if (!u.enabled) continue;
+            sum.ops++;
+            // Its lines: the body and its fixtures (D92)
+            notes.addOp(u.body.start, u.body.end, (uint16_t)sum.ops);
+            for (uint32_t f = 0; f < u.fixtureCount; f++) {
+                notes.addOp(u.fixtures[f].start, u.fixtures[f].end, (uint16_t)sum.ops);
+            }
         }
+        notes.finishOps();
     }
     sum.unitsAssumed = a.unitsAssumed;
     sum.unitsMixed = a.unitsMixed;
@@ -360,6 +377,7 @@ void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t 
     sum.moves = list.moves();
     SegmentList::Estimate e = list.estimate(currentRates());
     sum.estimateSeconds = e.seconds;
+    sum.estimateFeedSeconds = e.feedSeconds;
     sum.estimateIncomplete = e.incomplete;
 }
 
@@ -377,7 +395,10 @@ void task(void *param) {
 
     char localPath[FileService::PATH_LEN];
     Outcome outcome = Outcome::Ok;
-    if (req.card == FileService::CARD_CONTROLLER) {
+    if (req.card == FileService::CARD_CONTROLLER && req.useCopy) {
+        FileService::join(localPath, sizeof(localPath), PreviewService::WORK_FOLDER, req.name);
+        Serial.printf("PreviewService: %s: the working folder's copy, no download\n", req.path);
+    } else if (req.card == FileService::CARD_CONTROLLER) {
         FileService::join(localPath, sizeof(localPath), PreviewService::WORK_FOLDER, req.name);
         uint32_t t0 = millis();
         uint64_t got = 0;
@@ -421,6 +442,7 @@ void task(void *param) {
                 uint32_t t0 = millis();
                 activeReader = &reader;
                 list.attach(listMemory, listBytes);
+                notes.attach(notesMemory, NOTES_BYTES);
                 SegmentList::Packer packer(list);
                 TimedPacker timed(packer);
                 estimateRatesGen = MachineService::ratesGeneration();
@@ -448,6 +470,7 @@ void task(void *param) {
                     sum.maxY = a.displayExtents.maxY;
                     sum.outline = a.outlineStatus == gcode::Status::Ok;
                     sum.arenaPeak = (uint32_t)a.arenaPeak;
+                    sum.fileBytes = reader.fileSize();
                     summarise(sum, a, reader.fileSize());
                 }
                 Serial.printf("PreviewService: analyse %s: status %d, %lu lines in %lu ms, outline %d, peak %lu bytes\n",
@@ -460,6 +483,8 @@ void task(void *param) {
                               (unsigned long)list.moves(), (unsigned long)list.records(), (unsigned long)listBytes,
                               list.xyStep(), list.zStep(), list.truncated() ? ", truncated" : "",
                               sum.estimateSeconds, sum.estimateIncomplete ? "+" : "");
+                Serial.printf("PreviewService: %lu messages%s, %d ops\n", (unsigned long)notes.messages(),
+                              notes.full() ? " (no room for more)" : "", sum.ops);
             }
         }
     }
@@ -485,9 +510,29 @@ void task(void *param) {
 PreviewService::State PreviewService::state() { return current; }
 const PreviewService::Summary &PreviewService::summary() { return result; }
 const SegmentList *PreviewService::segments() { return current == READY && !taskRunning ? &list : nullptr; }
+const JobNotes *PreviewService::notes() { return current == READY && !taskRunning ? &::notes : nullptr; }
+SegmentList::Rates PreviewService::rates() { return currentRates(); }
+uint32_t PreviewService::estimateGeneration() { return estimateGen; }
 uint32_t PreviewService::readyGeneration() { return readyGen; }
+const char *PreviewService::jobPath() { return request.path; }
+const char *PreviewService::jobName() { return request.name; }
+int32_t PreviewService::jobSize() {
+    if (request.size < 0 && current == READY && !taskRunning) return (int32_t)result.fileBytes;
+    return request.size;
+}
 
 void PreviewService::load(FileService::Card card, const char *path, const char *name, int32_t size) {
+    loadRequest(card, path, name, size, false, false);
+}
+
+void PreviewService::loadForRun(const char *path, const char *name, int32_t size, bool download) {
+    loadRequest(FileService::CARD_CONTROLLER, path, name, size, true, !download);
+}
+
+void PreviewService::loadRequest(FileService::Card card, const char *path, const char *name, int32_t size,
+                                 bool duringJob, bool useCopy) {
+    request.duringJob = duringJob;
+    request.useCopy = useCopy;
     request.card = card;
     copy(request.path, sizeof(request.path), path);
     copy(request.name, sizeof(request.name), name);
@@ -498,7 +543,7 @@ void PreviewService::load(FileService::Card card, const char *path, const char *
     doneBytes = 0;
     totalBytes = size > 0 ? (uint64_t)size : 0;
     passNumber = 1;
-    current = card == FileService::CARD_CONTROLLER ? FETCHING : ANALYSING;
+    current = card == FileService::CARD_CONTROLLER && !useCopy ? FETCHING : ANALYSING;
     poll();
 }
 
@@ -519,7 +564,7 @@ void PreviewService::cancel() {
 
 void PreviewService::retry() {
     if (current == FAILED || current == CANCELLED || current == WAITING_FOR_JOB) {
-        load(request.card, request.path, request.name, request.size);
+        loadRequest(request.card, request.path, request.name, request.size, request.duringJob, request.useCopy);
     }
 }
 
@@ -578,12 +623,12 @@ void PreviewService::start() {
         return;
     }
     if (request.card == FileService::CARD_CONTROLLER) {
-        if (MachineService::jobActive()) {
+        if (MachineService::jobActive() && !request.duringJob) {
             // Reading the controller's card during a cut takes its time (D72): wait for the end
             current = WAITING_FOR_JOB;
             return;
         }
-        if (!MachineService::online()) {
+        if (!MachineService::online() && !request.useCopy) {
             current = FAILED;
             std::lock_guard<std::mutex> g(lock);
             copy(failText, sizeof(failText), "The controller is offline.");
@@ -591,8 +636,9 @@ void PreviewService::start() {
         }
     }
     if (!arena) arena = heap_caps_malloc(ARENA_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!notesMemory) notesMemory = heap_caps_malloc(NOTES_BYTES, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (arena && !listMemory) {
-        // Sized so Run's second canvas still fits beside it (02 §6)
+        // The largest free block less some headroom (02 §6, D89)
         size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         size_t bytes = largest > RUN_RESERVE + LIST_MIN ? largest - RUN_RESERVE : 0;
         if (bytes > LIST_MAX) bytes = LIST_MAX;
@@ -601,13 +647,13 @@ void PreviewService::start() {
         Serial.printf("PreviewService: segment list %lu bytes (largest free block %lu)\n", (unsigned long)listBytes,
                       (unsigned long)largest);
     }
-    if (!arena || !listMemory) {
+    if (!arena || !listMemory || !notesMemory) {
         current = FAILED;
         std::lock_guard<std::mutex> g(lock);
         copy(failText, sizeof(failText), "Not enough free memory for the preview.");
         return;
     }
-    current = request.card == FileService::CARD_CONTROLLER ? FETCHING : ANALYSING;
+    current = request.card == FileService::CARD_CONTROLLER && !request.useCopy ? FETCHING : ANALYSING;
     doneBytes = 0;
     passNumber = 1;
     cancelFlag = false;
@@ -632,6 +678,8 @@ void PreviewService::poll() {
         estimateRatesGen = MachineService::ratesGeneration();
         SegmentList::Estimate e = list.estimate(currentRates());
         result.estimateSeconds = e.seconds;
+        result.estimateFeedSeconds = e.feedSeconds;
         result.estimateIncomplete = e.incomplete;
+        estimateGen++;
     }
 }

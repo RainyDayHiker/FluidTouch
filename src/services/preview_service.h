@@ -1,6 +1,7 @@
 #pragma once
 
 #include "services/file_service.h"
+#include "services/job_notes.h"
 #include "services/segment_list.h"
 #include <stdint.h>
 
@@ -33,7 +34,8 @@ public:
         bool hasExtents;
         double minX, maxX, minY, maxY;  // displayExtents, in the file's units
         bool outline;         // the Outline Check is there
-        uint32_t fetchMs;     // 0 for a display SD file
+        uint32_t fetchMs;     // 0 for a display SD file, or the working folder's copy
+        uint64_t fileBytes;   // the analysed file's size
         uint32_t analyseMs;
         uint32_t arenaPeak;   // bytes
 
@@ -52,11 +54,16 @@ public:
         uint8_t shownPercent;  // 100, or how much of the job the list holds
         uint32_t moves;
         double estimateSeconds;
+        double estimateFeedSeconds;  // of which feeds and arcs (the feed override's part)
         bool estimateIncomplete;
     };
 
     // A file was chosen (JobService::choose): starts over for it
     static void load(FileService::Card card, const char *path, const char *name, int32_t size);
+    // The running job's Controller SD file, during the cut (Run, D72, D94): `download` fetches
+    // it now instead of waiting for the job to end; otherwise the working folder's copy, which
+    // the caller found to be that size, is analysed without a download
+    static void loadForRun(const char *path, const char *name, int32_t size, bool download);
     // Nothing chosen any more
     static void clear();
     static void cancel();
@@ -70,8 +77,18 @@ public:
     static const Summary &summary();
     // READY: the packed segments; otherwise null
     static const SegmentList *segments();
+    // READY: the file's messages and operations (D92); otherwise null
+    static const JobNotes *notes();
+    // The axis rates the estimate uses, and a count that moves on each time it is made again
+    static SegmentList::Rates rates();
+    static uint32_t estimateGeneration();
     // Moves on each time a job becomes READY: time to draw it (a new estimate doesn't move it)
     static uint32_t readyGeneration();
+    // The file the preview is of (when READY, the one segments() holds): its path, name and
+    // size (when the size wasn't known before, the analysed file's once READY)
+    static const char *jobPath();
+    static const char *jobName();
+    static int32_t jobSize();
 
     // The worker task is running (fetch or analysis)
     static bool busy();
@@ -85,5 +102,7 @@ public:
     static void poll();
 
 private:
+    static void loadRequest(FileService::Card card, const char *path, const char *name, int32_t size, bool duringJob,
+                            bool useCopy);
     static void start();
 };

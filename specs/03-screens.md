@@ -26,7 +26,7 @@ second (D39), then a column with WiFi on the first row and the battery on the se
 |---------|-----------|
 | State | IDLE, RUN, HOLD, JOG, HOME, ALARM, OFFLINE; colour coded |
 | Position | Work position and machine position, both always visible, in the status bar |
-| Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
+| Message | The last `[MSG:...]` from FluidNC, as in the classic UI's message box; it stays until the next one. An `error:` reply to a command the display sent on its own (a listing) is not shown (D99). While Run follows a running job, a message from the file is replaced by the file's message at the tool ([11 §6](11-preview.md#6-run-following-the-tool-d79), D92). A notice of the display's own (e.g. "Wait for the jog to finish.") is shown there in amber for 5 s, or until FluidNC sends a message (D38, D39) |
 | STOP | Jogging: jog cancel. Otherwise feed hold (`!`), which FluidNC ignores when idle. Always enabled. Resume is only on the Run screen, so it can't be hit by habit. The button is 104 x 52; its touch area extends 10 px beyond it on every side. The 104 x 40 button in the 48 px bar was checked on the device: good |
 | Battery | Under the WiFi icon: the battery's level in five steps, a charge symbol while charging, amber at 20% and under, red at 10% and under; nothing when no fuel gauge is fitted ([12 §4](12-battery.md#4-the-battery-icon), D96) |
 | Alarm banner | Replaces the status bar: alarm text + Unlock (`$X`). On every screen |
@@ -163,19 +163,27 @@ Opens over the screen's content (800 x 360); the status bar stays visible.
 ## 4. Run
 
 ```
-+------------------------------------------------+-------------------------------+
-|                                                | T2 hole 12/45 X164 Y624: rough|
-|                                                | op 24 of 90                   |
-|            preview with progress               | [=========>        ] 27%      |
-|                 ~470 x 300                     | 0:35 elapsed   ~1:35 left     |
-|                                                | feed 1200 mm/min              |
-|                                                |-------------------------------|
-|                                                | Feed  [-10] 100% [+10] [100]  |
-|                                                | Rapid [25] [50] [100]         |
-|------------------------------------------------|-------------------------------|
-| Spoilboard_DogHoles.gcode                      | [  PAUSE  ]      [ ABORT ]    |
-+------------------------------------------------+-------------------------------+
++--------------------------------------------------------+---------------------+
+|                                                        | op 4 of 9 ~3:12 left|
+|                                                        | [=========>  ]  27% |
+|                 preview with progress                  | Elapsed     0:35:12 |
+|                   568 x 344 (D91)                      | Left          ~1:35 |
+|                                                        | feed 1200 mm/min    |
+|                                                        |---------------------|
+|                                                        | Feed override  100% |
+|                                                        | [-10] [100] [+10]   |
+|                                                        |---------------------|
+|                                                        | [      PAUSE      ] |
++--------------------------------------------------------+---------------------+
+status bar: ... the message that follows the tool ...                  [ ABORT ]
 ```
+
+The panel (D90, D91): 200 px wide; no file line, no message (the status bar has it), no
+rapid override. The captions stay put and the times are right-aligned; the operation's time
+left is right-aligned on the "op N of M" row, so neither moves the other (D100). The feed override
+buttons are 62 x 52 with 100 in the middle. Finished/Stopped puts Run again and Back to
+Setup one above the other. During a job the status bar's STOP reads
+ABORT and ends the job; the panel's PAUSE is the only hold.
 
 States of the right-hand panel:
 
@@ -183,7 +191,7 @@ States of the right-hand panel:
 |-------|-------------|
 | Start | After Job's "Use this job": file name, size and folder on the controller, and a large START (`$SD/Run=<path>`, D51). Extents and first tool are added once the analysis exists (M5); they fill in when it finishes, and START doesn't wait for it (D75) |
 | Running | As drawn |
-| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") and one large CONTINUE button. Pause/Abort stay below |
+| Prompt (HOLD after `M0` with a message) | The message in large type ("Insert T2 1/8in flat endmill, attach probe") in a box over the top half of the preview, headed "Waiting for you"; one large CONTINUE button in the feed override's place. PAUSE stays below (D89, D90). Without a preview, the message in large type on the left as before |
 | Paused (HOLD by the user) | RESUME in place of PAUSE |
 | Probing | "Probing..." and the probe indicator |
 | Finished / Aborted | Result, total time, [Run again] [Back to Setup]. The job's final `M0` is a Prompt like the others; CONTINUE ends the file and Finished follows (D52) |
@@ -193,22 +201,25 @@ States of the right-hand panel:
 |---------|-------|-------|
 | PAUSE / RESUME | `!` / `~` | |
 | CONTINUE | `~` | Only in Prompt |
-| ABORT | soft reset (0x18), then the alarm banner offers Unlock | Single press. Placed apart from PAUSE |
-| Feed override | realtime override commands | [-10] value [+10] [100]; 10% steps only (D52); range 10 to 200% |
-| Rapid override | realtime override commands | |
-| Preview | | Cut so far in a bright colour, the rest dim, marker at the work position. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting ([05 §2](05-file-workflow.md), D72) |
+| ABORT | soft reset (0x18), then the alarm banner offers Unlock | The status bar's STOP, relabelled ABORT while a job is active (D90). Single press. Not a hold: the panel's PAUSE is |
+| Feed override | realtime override commands | value, then [-10] [100] [+10] (D91); 10% steps only (D52); range 10 to 200% |
+| Preview | | The job as on Job, the cut so far in bright green over it, marker at the work position ([11 §6](11-preview.md#6-run-following-the-tool-d79), D89). Fit, double tap and drag as on Job. Follows the tool when zoomed in. A Controller SD job with no copy on the display (a restart, or a job started elsewhere) offers its download with a confirm while cutting, from a "Download preview" button under the message; a copy of the right size left in the working folder is used without asking ([05 §2](05-file-workflow.md), D72, D94) |
 
 Notes:
 
-- The current operation text is the last `[MSG:...]` received; "op N of M" comes from the file's operation list. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); from M5 the text follows the tool's line instead (D65).
+- The current operation text is in the status bar. FluidNC sends a message when it reads the line, up to 50 s before the tool gets there (S3); with a preview of the job the status bar shows the file's message at the tool's line instead (D65, D92). "op N of M" is the operation the tool is in, from the file's operation list (D92). Beside it, "~3:12 left": the operation's time left, to the end of its last move, counted as Run's time left is (the plan x the correction factor, the overrides applied, counting down, stopped at a prompt or a pause; [11 §7](11-preview.md#7-time-left)). Hidden between operations (a tool change) and whenever Run's time left isn't from the plan (D100).
 - The router is switched by hand; the display does not show spindle speed or spindle override.
 - An outline check uses the same screen, with a banner "Outline check" and no feed override.
 - Until the preview exists (M5), the preview area shows the file name and the current
   FluidNC message in large type (D51).
-- Time left: "~1:35 left" = elapsed x (100 - percent) / percent, from the controller's
+- Time left: "~1:35" = running time x (100 - percent) / percent, from the controller's
   `SD:` percent (by file position, so rough). Hidden for the first minute and below 2%
   (D51). Replaced by an estimate from the file once M5 has one (D64; S3 showed how rough
-  it is).
+  it is). Running time leaves out the waits (a prompt, a pause), so time left stops while
+  the job waits for you. A new estimate is taken every 5 s of running time and the one shown
+  is the average of the last five, each counted down since it was taken, so it shifts slowly
+  (D90). With a segment list, step 2 of 5c replaces this with [11 §7](11-preview.md#7-time-left)
+  (D91); the formula above stays for jobs without one.
 
 ## 5. Macros
 

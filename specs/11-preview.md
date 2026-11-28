@@ -32,8 +32,12 @@ M5 is built and checked in three parts, each its own branch:
   only fetched files, and from M6 the transforms' outputs.
 - **Chosen on Job during a cut:** not downloaded then (D72); Job says "Downloaded for the
   preview when the job ends." and the download starts when it ends.
-- **During a cut, no copy:** Run's preview area offers the download with the confirm of
-  [05 §2](05-file-workflow.md#2-model). "Not now" keeps the pre-M5 view.
+- **During a cut, no preview of the running job:** the working folder's copy when its size is
+  the controller's and no other file is chosen, else Run offers the download with the confirm
+  of [05 §2](05-file-workflow.md#2-model) (D94: `RunPreview`). When the controller refuses the
+  listing, a copy of that name is offered in the confirm beside the download (D98). "Not now" keeps the pre-M5 view
+  with the button. A job started elsewhere has no size until the listing (or the analysed
+  file) gives it; Run then follows it by name and that size.
 - A fetch that fails (controller offline, a write to the display SD failing, a short
   download) deletes the partial file and shows the reason on Job's preview area, with Retry ("The file is no longer
   on the controller's SD." for a 404). A write to the display SD that fails ("Writing to the
@@ -71,11 +75,11 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
   matching the tool's Z (§6).
 - **Checkpoints:** every 256 records, from the top of the same memory down (32 bytes each):
   the state before that record (the last move's line, its byte offset and end, the feed, the
-  last N word) and the estimate up to there (§5, filled by the estimate), so Run can start
-  decoding at any checkpoint (§6) instead of from the start.
+  last N word) and the estimate up to there with its feeds' share (§5, §7, filled by the
+  estimate), so Run can start decoding at any checkpoint (§6) instead of from the start.
 - **Units:** inch files are converted to mm when packed.
-- **Capacity (D83):** one block, sized when a job is first chosen so that Run's second canvas
-  still fits beside it: the largest free PSRAM block less 400 KB, at most 640 KB (about 80,000
+- **Capacity (D83, D89):** one block, sized when a job is first chosen: the largest free
+  PSRAM block less 128 KB of headroom (Run's canvas is allocated at boot), at most 640 KB (about 80,000
   records; almost 6 times the reference job's 13,662). On Job and Run alike. A job with more records
   keeps those that fit, and the preview says "Preview shows the first 63% of the job" (by
   file offset). D30's file fallback is not built in M5.
@@ -163,26 +167,55 @@ library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait f
 Each status report gives the work position and the `SD:` percent (how far FluidNC has read).
 The tool's record is found as follows, at every report:
 
-1. **`Ln:` present** (FluidNC with `use_line_numbers: true`, and the file's N table in use):
-   the N is looked up in the table, giving the line, and the line's first record is found
-   from the checkpoints. The record within that line is the one nearest the position. Exact.
+1. **`Ln:` present** (FluidNC with `use_line_numbers: true`, and the file's N words
+   increasing, D93): `Ln:` is the N word of the move FluidNC is executing (its planner's
+   current block; FluidNC sends none for a line without one, nor in a dwell or a hold). The
+   checkpoints hold the last N before them, so the move with that N is in the block of the
+   last checkpoint below it: at most 256 records read. One line is one move in the list, so
+   that move is the match. Exact. A number no move has (a jog in a hold, a line the list has
+   no move for) and a move before the last match are ignored, and position matching is
+   tried instead; so is a report without `Ln:` (a file with N words on some lines only).
+   The log says when the match changes between the two ("RunFollow: following by Ln:").
 2. **Otherwise, position matching (S3):** the window runs from the last matched record to the
    record at the `SD:` read position (checkpoints by byte offset). The match is the first
    record in the window whose move passes within 1 mm of the position in XY and 0.5 mm (or one Z level) in Z.
    No match keeps the last one. A path that retraces itself picks the earliest, which stays
-   right because the window only moves forward.
+   right because the window only moves forward. Where moves lie closer together than the
+   tolerances (a small helix, a raster under 1 mm apart) the match trails the tool by those
+   moves: the reference job's holes (a 0.64 mm helix, 0.2 mm down per quarter turn) by a
+   quarter turn or two, a fine raster by a pass. It never gets ahead.
 3. A position outside every move (a jog in a hold, a probe) keeps the last match.
 
 Then:
 
-- **Progress layer:** the records from the last drawn one up to the match are drawn bright onto
-  Run's second canvas, incrementally (D29). The marker (a cross) is at the reported position,
-  and follows the tool when zoomed in.
-- **Op N of M:** the unit whose line range holds the matched line, from `structure`. Left out
-  when the file has no structure.
-- **The message follows the tool (D65):** a `[MSG:...]` is stored with the `SD:` read position
-  at which it arrived, and shown when the match passes that position. A prompt (`M0` HOLD) is
-  shown when it happens, since FluidNC holds when the tool gets there.
+- **Run's preview (D89, D91):** one canvas, 568 x 344, left of the panel. The job is drawn as on Job (§4), and the moves before the match in one bright green over
+  it (rapids a lighter grey), incrementally (D29): each report draws the moves from the last
+  drawn one up to the match. A view change (Fit, zoom, drag, following) redraws the whole
+  canvas, the job then what is done. Fit, double tap and drag as on
+  Job (§4). The marker, a cross at the reported work position, is its own small object over
+  the canvas, so moving it draws nothing; hidden when outside the view. **Following:** when
+  zoomed in and the marker comes within 15% of an edge (or leaves the view), the view centres
+  on it. A drag stops following, so the view stays where the finger put it; Fit or a double
+  tap starts it again. Fit is hidden at a prompt (the prompt box covers its corner). On the
+  start panel the job is shown with nothing done. Without a preview of this job (no card, the analysis failed, a job started elsewhere,
+  a different file) the left side shows the file and the message in large type, as before M5.
+- **The tool's job:** Run follows the preview when its file is the running one: the same name
+  and size (§2).
+- **Op N of M:** the enabled unit whose lines (its body or one of its fixtures, from
+  `structure`) hold the matched move's line, numbered among the enabled ones; between
+  operations (a tool change) the last one stays. Left out before the first and when the file
+  has no structure (D92).
+- **The message follows the tool (D65, D92):** the analysis keeps the file's `(MSG ...)`
+  comments with their lines, read as FluidNC reads them (a comment holding `MSG`, from its
+  fifth character; `;` ends the line), in 16 KB (the reference job's 93 take 4 KB; when full,
+  later ones are left out). While Run follows a running job and the controller's last message
+  is one of the file's, the status bar shows the file's last message at or before the matched
+  line instead; before the first match, at a prompt (`M0` HOLD: FluidNC holds where the tool
+  is, so its message is the current one), and for the controller's own messages, the
+  controller's. A message is the file's when its text, spaces ignored, matches one kept, also
+  shifted by a character (a FluidNC that drops a comment's spaces before cutting the first
+  four). This replaces storing each `[MSG]` with the `SD:` position it arrived at, which needed
+  a listener event in upstream code and lost messages that arrived together.
 
 ## 7. Time left
 
@@ -190,12 +223,47 @@ From the match: the estimate of the records still to come (§5), with the feed o
 to feeds and arcs and the rapid override to rapids, plus nothing for the prompts still to come.
 After 2 minutes of cutting it is scaled by how far the actual time has differed from the
 estimate so far. This replaces the percent formula (D64). Without a segment list (no card, too
-large, or no copy) the percent formula stays.
+large, or no copy) the percent formula stays, with D90's averaging.
+
+How it is shown (D91), so it is steady and still corrects itself:
+
+- **Planned time with a correction.** Each new match gives a target: the estimate still to
+  come x the correction factor. The factor is actual running time / estimated time of the
+  part done; it starts at 1 and moves toward the measured ratio slowly, from 2 minutes of
+  cutting on. Both are seconds, unlike the `SD:` percent, which counts bytes.
+- **Counted down by the clock.** Between reports the value shown goes down one second per
+  second of running time, and stops while the job waits (prompt, pause; D90).
+- **No jumps.** A new target moves the shown value toward it a part of the way each second,
+  not all at once.
+
+The target counts down from the match but never below the plan after the matched move x the
+factor, so a long move that takes longer than planned doesn't run it to zero. Constants
+(`TimeLeft`, D92): the factor settles with a 60 s time constant of running time and stays
+within 0.5 to 5; the shown value closes on the target with a 20 s time constant. Feeds and
+arcs are scaled by the feed override, rapids and dwells by the rapid override; the part done
+is summed at the overrides it ran at, so a change of override doesn't spoil the factor. New
+axis rates (§5) make the estimate again; the position is taken over in the new numbers.
+Not with a truncated list (the plan doesn't reach the end): the percent formula.
+
+**The operation's time left (D100)** beside "op N of M": the same count to a nearer point,
+the end of the current operation's last move (found once per operation, reading on from the
+match until a later operation starts; again with a new estimate). The plan from the match to
+there over the overrides, x the same factor, counted down from the match, not below the plan
+after the matched move. Not smoothed (it is short, and a jump is at most the error of one
+report). Hidden between operations (the matched line in none) and without a planned time
+left. CenterWheel replayed (`replay.sh`): within 0.7 min of the truth for every operation,
+one minute in and halfway.
+
+The usual alternatives, compared 2026-11-23: extrapolating from percent (D51, D90: noisy,
+because bytes aren't time); FigUI's planned time counted down by the clock (steady, but never
+corrected: when the estimate runs out it shows nothing); smoothing the rate alone (moving
+average, Kalman: hides the noise, doesn't remove it). The constants (how slowly the factor
+moves, how far each second closes the gap) are set in step 2 against the reference jobs.
 
 ## 8. Memory and threads
 
 As 02 §6: one canvas on Job, two on Run, the 512 KB arena while a job is selected, and the
-segment list (with the N table) in what is left. The fetch and the analysis run on the worker
+segment list (with its N words) in what is left. The fetch and the analysis run on the worker
 task, one at a time, yielding (02 §7). Packing a segment costs a few divisions; the repacking
 at a doubled step runs on the worker task too.
 
@@ -220,7 +288,29 @@ at a doubled step runs on the worker task too.
   line, ends within one step (a repack rounds twice), an arc's middle point within 3 steps
   (for steps under 1 mm: the fuzz cases with kilometre steps only check ends), a reader from
   each checkpoint reading the same moves as one from the start, a job over 327 mm doubling the
-  step, a list too small truncating. 121 files, 0 failures (2026-11-22).
+  step, a list too small truncating. 121 files, 0 failures (2026-11-22). Run's tracker
+  (5c): the tool put at the middle of each move in turn, the match never goes back nor past
+  the tool's move; how often it is that very move is printed (100% in 82 files; the reference
+  job 46%, its helices; `perf-5mb` 14%, a fine raster). 121 files, 0 failures (2026-11-22).
+  Messages (step 2): in line order, each recognised as sent with and without its spaces and
+  shifted by one, a controller message not taken for the file's. Time left (step 2), every job
+  of a minute or more "run" with each move taking 1.25 x its estimate + 0.05 s, a report every
+  0.25 s: the reference job within 1% from a quarter of the way on, steady after the factor
+  settles (about 5 minutes in: it shows the plan uncorrected for the first 2 minutes, then
+  climbs); the escape wheel within 4 to 6%; with the feed override going to 150% at 40%, 3 to
+  13%. Jobs of a few long moves end low (the tool's progress within a move isn't known).
+  121 files, 0 failures (2026-11-23).
+  `Ln:` (step 3): for each file whose N words increase, each move's N is the one written on
+  its line, and a report with that `Ln:` and a position far off finds that very move; an N
+  no move has keeps the match. The reference job with an N on every line: all 13,301 moves
+  found by `Ln:` (by position 45.9% on the very move). 122 files, 0 failures (2026-11-23).
+- **A real cut replayed:** `tools/host_tests/replay.sh <file> [position log] [x,y,z rates]`
+  prints the estimate per `(MSG ...)` part of the file and, with a position log from the
+  device (Settings > Tools), the time left the display would show every 3 minutes of running
+  against the time really left (the overrides taken as 100%). CenterWheel (2026-11-27): the
+  estimate 72.6 min against 74.8 min cut, time left within 1.9 min from 15 min on (HANDOFF).
+  It also prints the operation's time left (D100) beside the true one, and how far off it was
+  per operation a minute in and halfway.
 - **Device:** the reference job fetched, analysed and drawn, its times against D75; drawing
   times against S2; a real cut followed on Run, with and without `use_line_numbers`; the
   estimate against the real time.

@@ -27,17 +27,46 @@ A **file source** is anything that can list files and fetch one. Three are plann
 
 **Fetching a Controller SD file for the preview (M5, D72).** The file is downloaded into the
 working folder when it is chosen on Job, before any job starts, and Run uses that copy
-(matched by name and size). If a job is running and there is no copy (the display
-restarted, the UI was switched, or the job was started from FluidNC's web UI), Run's
-preview area offers the download with a confirm, since reading the card during a cut takes
-controller time that FluidNC's own comments say motion may need:
+(matched by name and size). If a job is running and Run has no preview of it (the display
+restarted, the UI was switched, or the job was started from FluidNC's web UI), Run first asks
+the controller for the file's size (a listing of its folder, `$Files/ListGcode`; the `SD:`
+field gives the path). If the working folder still holds that name at that size (left from
+before a restart or a UI switch) and no other file is chosen on Job, that copy is analysed
+without asking and without a download (D94). Otherwise Run's left side (the file name and
+current message, as before M5) gets a "Download preview" button at the bottom. It opens a
+confirm, since reading the card during a cut takes controller time that FluidNC's own
+comments say motion may need:
 
-> "Download <name> (<size>) now, while the machine is cutting? The controller reads its SD
-> card for the download as well as for the job. It worked on a small file (S1); a large
-> one has not been tried." [Download] [Not now]
+> "Download <name> (<size>) now, while the machine is cutting?
+>
+> The controller reads its SD card for the download as well as for the job.
+>
+> It replaces <other> as the chosen job." [Download] [Not now]
 
-"Not now" leaves the preview area as it was before M5 (file name and current message); the
-offer stays there until the job ends. No confirm when no job is running.
+The size is left out when the listing didn't give it; the last sentence is there only when
+another file is chosen on Job. (The earlier "It worked on a small file; a large one has not
+been tried." went once a download during a real cut was seen not to disturb the motion,
+2026-11-26.)
+
+**The size unchecked (D98).** The controller may refuse the listing during a cut (the reply
+an `error:` line). Then a copy of that name in the working folder can't be matched by size,
+so the operator judges it: beside the button, "The controller didn't give the size (<the
+controller's reply>). A copy from before is on the display." (the second sentence only when
+there is one); the button reads "Load preview", and its confirm is
+
+> "The display has a copy of <name> from before (<its size>). The controller didn't give the
+> file's size (<reply>), so it can't be checked that the copy is the same file.
+>
+> Use the copy, or download the file now, while the machine is cutting?" [Use the copy]
+> [Download] [Not now]
+
+with the replacing sentence as above. Use the copy analyses it with no download. Without a
+copy of that name the offer is the download alone, with the reason beside the button.
+
+Either way the running file becomes the chosen job (there is room for one preview). While it downloads and is analysed, the button's place shows
+"Downloading the preview: N%", then "Analysing the preview: N%"; then Run shows the preview.
+A failure brings the button back with the reason beside it. "Not now" closes the confirm; the
+button stays until the job ends. No confirm when no job is running.
 
 ## 3. Inbox options
 

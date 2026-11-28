@@ -1,14 +1,99 @@
-# Handoff — state as of 2026-11-17 (end of the second development session)
+# Handoff — state as of 2026-11-27 (M5 part 5c checked on the device; D98 checked there; D99, D100 built)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
-## 0. Pick up here (2026-11-25)
+## 0. Pick up here (2026-11-27)
+
+**Branch `lrt/m5c-run`.** 5c (D89 to D94) ran on the device on 2026-11-26 (Jeffrey, the
+Third Wheel job from the Controller SD, unmodified). D98 and D99 are built after it; D98 is
+checked on the device (2026-11-27), D99 in the simulator only. D100 (the operation's time
+left beside "op N of M") is the last change before the merge: built, checked in the
+simulator and by replaying the CenterWheel log, not yet on the device. Merge into
+`lrt/main` (`--no-ff`) when Jeffrey says so.
+
+**D100 (2026-11-27):** Run shows "op 4 of 13 ... ~3:12 left", the time to the end of the
+operation's last move, counted as Run's time left (11 §7). Simulator: CenterWheel on the
+fake, "op 1 of 13  ~7:22 left" then "~7:12 left" ten seconds later, the op text not moving.
+Replay (`tools/host_tests/replay.sh` with the CenterWheel log): within 0.7 min for each of
+the 13 operations, a minute in and halfway. Not seen yet: the time hidden between
+operations (a tool change), and anything on the device.
+
+**Device results (2026-11-26, Jeffrey):**
+
+1. **The preview follows the cut:** good.
+2. **The message follows the tool:** the status bar is not ahead of the cut.
+3. **"op N of M"** matches the operation being cut.
+4. **Time left:** started at about 30 minutes, short as expected, and went up a good deal. The
+   real total isn't known (the display was restarted for the next test).
+   **A full job's position log (2026-11-27, Jeffrey: `CNC_CenterWheel-001.csv`, a different
+   job, 13 operations, three tools):** 81.8 min from start to Program End, 76.0 min of it
+   running (Run and Home), 5.3 min held at prompts. Per operation, the logged path length over
+   the operation's usual feed (1200, 660, 330 mm/min) gives 70.9 min against 74.8 min run, so
+   acceleration costs only about 5% on this job: the machine is below 90% of the feed for
+   1 to 24% of each operation's time.
+   **The display's estimate against it** (`CNC_CenterWheel.gcode`, a host build of
+   SegmentList, RunTracker and TimeLeft, rates 9000/9000/900): 72.6 min against 74.8 min of
+   cutting, 3% short; each operation within 1 to 8% (the pockets 1.2 and 1.4, with the most
+   time below the feed, the furthest). Replaying the log's positions through the tracker and
+   TimeLeft (overrides 100%, running = Run and Home): time left starts at 72.6 min against
+   76.5 min really left (probing and homing included), is 3.7 min high at 3 min while the
+   factor settles at 1.12, and from 15 min on is within 1.8 min of the truth (factor 1.05 to
+   1.08). So the estimate and D91/D92's constants hold on this job. The Third Wheel's "30 min
+   and went up a good deal" is not explained: its file isn't on the PC to check whether its
+   estimate was short (`tools/host_tests/replay.sh <file> <log>` does this check). A host replay only; on the device, the next full job with the
+   position log on and the time left noted at the start would confirm it.
+   The `SD:` percent is far from time (24% at 47 min, 74% at 64 min), as 06 found.
+5. **Download during a cut (D72's open question): answered.** Downloading the job's preview
+   while it cut did not disturb the motion. The confirm no longer says only a small file was
+   tried (05 §2).
+   **The copy after a restart was not found:** the display offered the download although
+   the job had been fetched for its preview before. Most likely the controller refused the
+   size listing during the cut (not confirmed: no serial log at the machine). D98 offers the
+   copy of that name in the confirm, with the controller's reply beside the button, which will
+   show the cause on the device.
+6. **Memory:** `PreviewService: segment list 655360 bytes (largest free block 1048564)`.
+
+The axis rates on the real machine are `9000 9000 900 mm/min`, matching the config's
+`max_rate_mm_per_min` (Jeffrey).
+
+**D98 on the device (2026-11-27, Jeffrey):** restarting the display mid-job worked as
+expected: the reason beside "Load preview", the confirm offering Use the copy, and the preview
+from the copy with no download. This confirms the controller refuses the size listing during a
+cut. Still to try on the device: a prompt's text surviving the restart (D99); Jeffrey will
+report it if it doesn't.
+
+**Found in the simulator and fixed (D99; the device check is the prompt above):** a refused listing's `error:8` line became
+FluidNC's last message (upstream's `FluidNCClient` stores every `error:` line in
+`last_message`) and replaced a prompt's text on Run and the status bar's message. The new UI
+now reads `MachineService::message()`, which passes over an `error:` reply to FileService's
+own commands. Checked in the simulator (the prompt's text stays; the log says
+`MachineService: error:8 answers the display's own command; not shown`). On the device, the
+same restart check above should keep the prompt's text.
+
+**Open questions for Jeffrey (not blocking):**
+
+- **Line numbers stay off** (Jeffrey, D93). `Ln:` works in the simulator but needs
+  `use_line_numbers: true` and N words from the post-processor. With an N on every line the
+  library's `structure` finds no operations (its markers are matched at the start of the
+  line; the fix would be in CNC-Tools: skip a leading `N\d+`). Open: should a note go to
+  CNC-Tools (`specs/outgoing/`) anyway, for later?
+- **The D88 draw-buffer fix upstream:** optionally open an issue on jeyeager65/FluidTouch
+  (the buffers are sized with the 3-byte `lv_color_t` at 16-bit colour, about 750 KB unused).
+  Jeffrey to say whether to.
+- **The display SD's write errors** (errno 5 on the first download after boot, D86 retries
+  it): cause still unknown; watch whether it shows up again.
+- Choices made without review and still open to change: a drag stops the view following
+  the tool (Fit or a double tap restarts it); Fit is hidden during a prompt; "(S1)" dropped
+  from the D72 confirm text.
 
 **Battery gauge (M10, [12](12-battery.md), D95 to D97), specified 2026-11-25, not built.**
 Jeffrey has ordered the gauge (Adafruit MAX17048, 5580) and cable (4424). He fits it and runs
 the hardware check (12 §6: cable pin order, polarity, 0x36 in the boot log's I²C scan, touch
 unaffected); then build it on `lrt/m10-battery` from `lrt/main` in the order of 12 §7. It
 doesn't touch upstream code and doesn't depend on M5.
+
+Older open questions (Q2 to Q20, OneDrive inbox and Move) are in
+[07](07-decisions.md#open-questions); none of them blocks M5.
 
 ## 1. Where things stand
 
@@ -154,7 +239,31 @@ Spikes: S1, S2, S3 and S4 done (S3 and S4 on 2026-11-18, results in [06](06-test
    31 KB, 175 KB and 718 KB, card nearly empty; the D86 retry recovered the last one on the
    device. Cause unknown; nearly every download so far was the first after a flash, so that
    says nothing. Merged 2026-11-22.
-   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79)) next, on `lrt/m5c-run`.
+   **Part 5c** (Run tracking, [11 §6](11-preview.md#6-run-following-the-tool-d79), branch
+   `lrt/m5c-run`), in four steps: (1) Run's preview with the cut so far, the marker, position
+   matching, zoom and following (D89; built, checked in the simulator with the fake's
+   playback and by the host test of `RunTracker`; not yet on the device), then D90 after
+   Jeffrey's look at the screenshots (no file line, panel message or rapid override; STOP
+   reads ABORT during a job; time left averaged and stopped while waiting), then D91 (panel
+   200 px, preview 568 x 344, override buttons -10 100 +10; ABORT pressed in the simulator
+   ends the job); (2) the message following the tool, op N of M, time left from the estimate
+   as D91 describes it (11 §7): done as D92, without the planned listener event (the file's
+   own messages instead); checked in the simulator (a job with a message per move: the status
+   bar on the tool's step while the controller had read 7 ahead; DogHoles' op numbers) and by
+   the host test; the time model's accuracy only against simulated runs, so the device's
+   first real job is its test; (3) `Ln:`: done as D93 (the platform change in 02 §2; the
+   fake sends it), checked by the host test and in the simulator with the reference job
+   numbered N10, N20, ... (followed by `Ln:` from its first cut on). Not tried on FluidNC:
+   it needs `use_line_numbers: true` in the config and N words in the files, which the
+   post-processor doesn't write today. Found: with an N on every line the library finds no
+   operations (`structure`), so "op N of M" is empty for such a file (Jeffrey keeps line
+   numbers off); (4) the download offer during a cut (D72): done as D94 after Jeffrey's
+   answers (button then confirm; the working folder's copy used when its size matches; the
+   running file becomes the chosen job). Checked in the simulator with a job started from
+   the fake's console: the offer, the confirm naming the file it replaces, the download and
+   the preview following; the copy used with no download; a slowed download's progress; a
+   404's reason beside the button. Not on the device: a download of the reference job during
+   a real cut is the open question D72 names.
    Open: the axis rates line ([11 §5](11-preview.md#5-the-info-line-and-the-time-estimate))
    on the real machine; Jeffrey sends it when he can.
 4. The temporary machine picker (D57) is to be removed at the end of development.

@@ -29,7 +29,9 @@ session (for the `$sim/...` helpers, since the new UI has no terminal yet), and 
 directly queue behind each other, as in FluidNC (Setup's probe sends `G91`, `G38.2` and
 `G90` back to back); before M2 a line that arrived while another ran was dropped. `$SD/Delete`
 deletes a file from the served folder (M3). `$/axes/<axis>/max_rate_mm_per_min` answers the
-fake's rapid rate, 5,000 mm/min, as `$/axes/x/max_rate_mm_per_min=5000.000` (M5).
+fake's rapid rate, 5,000 mm/min, as `$/axes/x/max_rate_mm_per_min=5000.000` (M5). Reports
+carry `Ln:<n>` while a line with an N word moves, as FluidNC's do with `use_line_numbers` on;
+`$sim/ln=0` turns it off (M5 part 5c, D93).
 
 The playback models three things taken from FluidNC's source (`InputFile.cpp`, `GCode.cpp`)
 that the Run screen has to cope with. S3 measured them on the controller (2026-11-18,

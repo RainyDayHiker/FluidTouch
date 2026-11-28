@@ -23,6 +23,10 @@ public:
     };
     static const Choice &choice() { return chosen; }
     static void choose(FileService::Card card, const char *folder, const FileService::Entry &entry);
+    // The running job's file becomes the chosen one, previewed during the cut (Run, D72, D94):
+    // `size` from the controller's listing (-1 if unknown); `download` now, or the working
+    // folder's copy of that size
+    static void chooseRunning(int32_t size, bool download);
     // A file was deleted: forget it if it was the chosen one
     static void forget(FileService::Card card, const char *path);
 
@@ -46,6 +50,8 @@ public:
     static const char *runPath() { return job.path; }
     static const char *runName() { return job.name; }
     static int32_t runSize() { return job.size; }
+    // The running job's size learnt later (a job started elsewhere): kept when the name is the same
+    static void learnRunSize(const char *path, int32_t size);
 
     static void start();     // READY: $SD/Run
     static void pause();     // RUNNING: feed hold
@@ -55,7 +61,11 @@ public:
     static void dismiss();   // FINISHED / ABORTED: back to READY (or NONE)
 
     static uint32_t elapsedMs();
-    // Rough time left from the SD: percent, or 0 while unknown (D51)
+    // The time the job has been running, without the waits (prompts, pauses)
+    static uint32_t runningMs();
+    // Rough time left from the SD: percent, or 0 while unknown (D51). It stops while the job
+    // waits, and is the average of the last LEFT_SAMPLES estimates, one every LEFT_SAMPLE_MS
+    // of running time, each counted down since it was taken (D90)
     static uint32_t leftMs();
     static float percent();
     // The M0 message at a prompt
@@ -89,6 +99,16 @@ private:
     static char prompt[128];
     static char endReason[128];
     static float lastPercent;
+    // Running time: what was counted before, and since when it runs now (0 when it doesn't)
+    static uint32_t runDoneMs;
+    static uint32_t runSinceMs;
+    // Time-left estimates: the estimate and the running time it was taken at
+    static const int LEFT_SAMPLES = 5;
+    static const uint32_t LEFT_SAMPLE_MS = 5000;
+    static uint32_t leftEstimate[LEFT_SAMPLES];
+    static uint32_t leftTakenAt[LEFT_SAMPLES];
+    static int leftCount;
+    static void sampleLeft();
 };
 
 #endif // LRT_JOB_SERVICE_H
