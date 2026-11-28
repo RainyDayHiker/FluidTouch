@@ -11,6 +11,9 @@
 // the matched move (a long move taking longer than planned). The value shown counts down too and
 // moves toward the target a part of the way at a time; running time stands still at a prompt or a
 // pause, and so does the value.
+//
+// Probes and homings (D101) have fixed allowances in the plan (`workAhead`, `workAfter`), added as
+// they are; the factor leaves out the running time and the plan across one (`setAside` at a match).
 class TimeLeft {
 public:
     static constexpr double CORRECT_AFTER_S = 120;  // §7: 2 minutes of cutting
@@ -24,12 +27,16 @@ public:
         double feedDone, otherDone;
         double feedAfter, otherAfter;
         double feedTotal, otherTotal;
+        // Allowances (seconds, as they are) of the probes and homings after the matched move's line,
+        // and after the next planned move's line (those in between are being done now)
+        double workAhead, workAfter;
     };
 
     void reset();
     // A match (the first, a new one, or new overrides): `runS` the running time in seconds,
-    // scales 1 = 100%
-    void match(double runS, const Plan &plan, double feedScale, double rapidScale);
+    // scales 1 = 100%. `setAside`: a probe or homing since the last match, so the running time and
+    // the plan since then are left out of the factor
+    void match(double runS, const Plan &plan, double feedScale, double rapidScale, bool setAside = false);
     // The estimate was made again (new axis rates): the same position in new numbers
     void replan(const Plan &plan);
     // Each loop
@@ -53,6 +60,7 @@ private:
     Plan last = {};
     double feedScale = 1, rapidScale = 1;
     double doneScaled = 0;  // planned seconds of the part done, each part over its overrides
+    double setAsideRun = 0;  // running time across probes and homings, not in the factor
     double k = 1, kTarget = 1;
     double matchRun = 0;  // running time at the last match
     bool haveShown = false;

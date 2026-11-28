@@ -8,8 +8,8 @@ double TimeLeft::remainingFrom(double feed, double other) const {
 }
 
 double TimeLeft::target(double runS) const {
-    double fromMatch = remainingFrom(last.feedDone, last.otherDone) * k - (runS - matchRun);
-    double afterMove = remainingFrom(last.feedAfter, last.otherAfter) * k;
+    double fromMatch = remainingFrom(last.feedDone, last.otherDone) * k + last.workAhead - (runS - matchRun);
+    double afterMove = remainingFrom(last.feedAfter, last.otherAfter) * k + last.workAfter;
     return fmax(fromMatch, afterMove);
 }
 
@@ -23,8 +23,11 @@ double TimeLeft::leftUntil(double feedEnd, double otherEnd, double runS) const {
     return fmax(0, fmax(fromMatch, afterMove));
 }
 
-void TimeLeft::match(double runS, const Plan &plan, double fs, double rs) {
-    if (haveMatch) {
+void TimeLeft::match(double runS, const Plan &plan, double fs, double rs, bool setAside) {
+    if (haveMatch && setAside) {
+        // A probe or homing since the last match: neither its time nor the plan around it
+        setAsideRun += fmax(0, runS - matchRun);
+    } else if (haveMatch) {
         // The part done since the last match ran at the overrides of then
         doneScaled += fmax(0, plan.feedDone - last.feedDone) / feedScale +
                       fmax(0, plan.otherDone - last.otherDone) / rapidScale;
@@ -36,8 +39,9 @@ void TimeLeft::match(double runS, const Plan &plan, double fs, double rs) {
     feedScale = fs > 0.01 ? fs : 0.01;
     rapidScale = rs > 0.01 ? rs : 0.01;
     matchRun = runS;
-    if (runS >= CORRECT_AFTER_S && doneScaled > 1) {
-        kTarget = fmin(FACTOR_MAX, fmax(FACTOR_MIN, runS / doneScaled));
+    double cutting = runS - setAsideRun;
+    if (cutting >= CORRECT_AFTER_S && doneScaled > 1) {
+        kTarget = fmin(FACTOR_MAX, fmax(FACTOR_MIN, cutting / doneScaled));
     }
     if (!haveShown) {
         shown = fmax(1, target(runS));

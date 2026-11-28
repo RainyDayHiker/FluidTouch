@@ -351,6 +351,10 @@ void summarise(PreviewService::Summary &sum, const gcode::Analysis &a, uint64_t 
     sum.zMin = list.zMin();
     sum.zMax = list.zMax();
     formatTools(sum.tools, sizeof(sum.tools), a.structure);
+    sum.probes = notes.probes();
+    sum.homings = notes.homings();
+    sum.prompts = notes.prompts();
+    sum.allowanceSeconds = notes.workSeconds() + notes.prompts() * JobNotes::PROMPT_S;
     sum.ops = -1;
     if (a.structure.kind == gcode::StructureKind::Ok) {
         sum.ops = 0;
@@ -485,6 +489,9 @@ void task(void *param) {
                               sum.estimateSeconds, sum.estimateIncomplete ? "+" : "");
                 Serial.printf("PreviewService: %lu messages%s, %d ops\n", (unsigned long)notes.messages(),
                               notes.full() ? " (no room for more)" : "", sum.ops);
+                Serial.printf("PreviewService: %lu probes, %lu homings, %lu prompts: %.0f s allowed\n",
+                              (unsigned long)sum.probes, (unsigned long)sum.homings, (unsigned long)sum.prompts,
+                              sum.allowanceSeconds);
             }
         }
     }

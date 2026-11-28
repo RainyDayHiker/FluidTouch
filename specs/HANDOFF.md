@@ -1,15 +1,30 @@
-# Handoff — state as of 2026-11-27 (M5 part 5c checked on the device; D98 checked there; D99, D100 built)
+# Handoff — state as of 2026-11-27 (5c merged; D101, D102 built on `lrt/m5d-time`)
 
 Sections 1 and 2 are rewritten at the end of each working session.
 
 ## 0. Pick up here (2026-11-27)
 
-**Branch `lrt/m5c-run`.** 5c (D89 to D94) ran on the device on 2026-11-26 (Jeffrey, the
-Third Wheel job from the Controller SD, unmodified). D98 and D99 are built after it; D98 is
-checked on the device (2026-11-27), D99 in the simulator only. D100 (the operation's time
-left beside "op N of M") is the last change before the merge: built, checked in the
-simulator and by replaying the CenterWheel log, not yet on the device. Merge into
-`lrt/main` (`--no-ff`) when Jeffrey says so.
+**Branch `lrt/m5d-time`** (from `lrt/main`, 2026-11-27): D101 and D102, the allowances
+for probes, homings and prompts. Built; checked by the host tests, by replaying the
+CenterWheel log and in the simulator; not on the device. Merge into `lrt/main` (`--no-ff`)
+when Jeffrey says so.
+
+`lrt/m5c-run` (5c, D89 to D94, D98 to D100) is merged into `lrt/main` (2026-11-27). 5c ran on
+the device on 2026-11-26 (Jeffrey, the Third Wheel job from the Controller SD, unmodified);
+D98 is checked on the device (2026-11-27); D99 and D100 in the simulator only.
+
+**The Third Wheel's time left (2026-11-27):** its estimate is 30.8 min, what Run showed at
+the start, so the estimate wasn't short. The climb was the correction factor taking the
+start's probe (about 20 s of running time the plan had nothing for) as slow cutting: the
+first pocket is only 2 min, so the factor went to about 1.2. D101 gives probes (20 s) and
+homings (10 s) fixed allowances and leaves the time across them out of the factor; D102 adds
+45 s a prompt to the Job screen's time. CenterWheel replayed with them: time left starts at
+74.1 min (76.5 really), the factor 1.01 at 3 min (was 1.12), within 1.2 min of the truth
+from 15 min on (was 1.9); each operation's time left within 0.5 min. The Job screen shows
+~1h19 for CenterWheel (the job took 81.8 min with its prompts), ~38 min for Third Wheel.
+Simulator: the info line "13 ops ~1h19", PreviewService logs "3 probes, 3 homings, 7 prompts:
+405 s allowed". On the device: the Job screen's time, and Run's time left on a job with tool
+changes (it should no longer climb after the first probe).
 
 **D100 (2026-11-27):** Run shows "op 4 of 13 ... ~3:12 left", the time to the end of the
 operation's last move, counted as Run's time left (11 §7). Simulator: CenterWheel on the
@@ -39,9 +54,7 @@ operations (a tool change), and anything on the device.
    76.5 min really left (probing and homing included), is 3.7 min high at 3 min while the
    factor settles at 1.12, and from 15 min on is within 1.8 min of the truth (factor 1.05 to
    1.08). So the estimate and D91/D92's constants hold on this job. The Third Wheel's "30 min
-   and went up a good deal" is not explained: its file isn't on the PC to check whether its
-   estimate was short (`tools/host_tests/replay.sh <file> <log>` does this check). A host replay only; on the device, the next full job with the
-   position log on and the time left noted at the start would confirm it.
+   and went up a good deal": explained above (D101).
    The `SD:` percent is far from time (24% at 47 min, 74% at 64 min), as 06 found.
 5. **Download during a cut (D72's open question): answered.** Downloading the job's preview
    while it cut did not disturb the motion. The confirm no longer says only a small file was

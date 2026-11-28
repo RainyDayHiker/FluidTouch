@@ -131,7 +131,7 @@ G18/G19 arc, or one the library couldn't interpret, as a straight move to its en
 | Z range | lowest and highest Z of the segments |
 | Tools | `structure.labelTools` ("T1 T2"); left out when the file has none |
 | Ops | enabled units in `structure`; left out when `structure.kind` isn't Ok |
-| Time | the estimate below, "~" and hours:minutes |
+| Time | the estimate below with the allowances for probes, homing and prompts (D101, D102), "~" and hours:minutes |
 | Warnings | P3 (D82): on the line under it, in orange |
 
 Lengths are whole mm when they are within 0.05 of one, else to a tenth; an inch file's in
@@ -158,7 +158,18 @@ library: an exception to "no G-code knowledge here", chosen so M5 doesn't wait f
   `error:` leaves that axis unknown), and keeps them in MachineService. An arc is capped by
   the slower of X and Y over its length. Rates that arrive after the analysis start the
   estimate again (a pass over the list, a few ms).
-- `G4 P` dwells add their time; prompts (`M0`) add nothing, being waits for the user.
+- `G4 P` dwells add their time.
+- **Allowances (D101, D102).** The moves leave out what has no planned length: a probe
+  (`G38.x`: it stops where the plate is, and the lift after it starts from an unknown Z) and a
+  homing (`$H`, `$HZ`: not a move the library knows). Each gets a fixed allowance, 20 s a
+  probe and 10 s a homing (CenterWheel's position log, 2026-11-27: 19 to 21 s each probe and
+  its lift, 10 s each `$HZ`). The info line adds them, and 45 s for each prompt (`M0`;
+  CenterWheel's 7 took 5.3 min, from 8 s to 2 min each), so its time answers "is there time
+  to run this?". Run's time left adds the probes and homings still ahead but not the
+  prompts: it stops while one waits (D90). The lines are found as FluidNC reads them
+  (JobNotes): comments and anything after `;` left out, letters in either case; a `G38`
+  word (any decimal), an `M0` or `M00` word (not `M1`, not `M03`), a line starting `$H`. The
+  lines of the first 128 probes and homings are kept for Run; all are counted.
 - No acceleration: the estimate is short on jobs of many tiny moves. The S3 log gives a
   first check of how short; the reference job's real time on the device gives a second.
 
@@ -220,7 +231,8 @@ Then:
 ## 7. Time left
 
 From the match: the estimate of the records still to come (§5), with the feed override applied
-to feeds and arcs and the rapid override to rapids, plus nothing for the prompts still to come.
+to feeds and arcs and the rapid override to rapids, plus the allowances of the probes and
+homings still to come (D101), plus nothing for the prompts still to come.
 After 2 minutes of cutting it is scaled by how far the actual time has differed from the
 estimate so far. This replaces the percent formula (D64). Without a segment list (no card, too
 large, or no copy) the percent formula stays, with D90's averaging.
@@ -244,6 +256,15 @@ arcs are scaled by the feed override, rapids and dwells by the rapid override; t
 is summed at the overrides it ran at, so a change of override doesn't spoil the factor. New
 axis rates (§5) make the estimate again; the position is taken over in the new numbers.
 Not with a truncated list (the plan doesn't reach the end): the percent formula.
+
+**Probes and homing (D101).** Their allowances (§5) still ahead of the matched line are added
+to the target as they are, not scaled by the factor nor by the overrides, and counted down
+with the rest. The floor after the matched move leaves out the ones between the matched move
+and the next planned move (the ones being done now), so they count down too. The factor
+learns from cutting only: when the match moves past a probe or homing line, the running time
+since the last match and the plan between the two matches are both left out of it. Without
+this, the probe at the start of a job whose first operation is short (the Third Wheel: a
+2 min pocket) took the factor to about 1.2 and time left climbed from 30 toward 35 minutes.
 
 **The operation's time left (D100)** beside "op N of M": the same count to a nearer point,
 the end of the current operation's last move (found once per operation, reading on from the

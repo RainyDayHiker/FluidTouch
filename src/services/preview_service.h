@@ -56,6 +56,10 @@ public:
         double estimateSeconds;
         double estimateFeedSeconds;  // of which feeds and arcs (the feed override's part)
         bool estimateIncomplete;
+        // Probes, homings and prompts in the file, and the info line's allowance for them (D101,
+        // D102): the estimate above leaves them out
+        uint32_t probes, homings, prompts;
+        double allowanceSeconds;
     };
 
     // A file was chosen (JobService::choose): starts over for it

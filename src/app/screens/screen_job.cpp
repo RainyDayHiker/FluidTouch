@@ -314,7 +314,8 @@ void formatInfo(char *out, size_t outLen, const PreviewService::Summary &r) {
         add(part);
     }
     if (r.moves) {
-        formatEstimate(part, sizeof(part), r.estimateSeconds, r.estimateIncomplete);
+        // With the probes', homings' and prompts' allowances (D101, D102)
+        formatEstimate(part, sizeof(part), r.estimateSeconds + r.allowanceSeconds, r.estimateIncomplete);
         add(part);
     }
 }

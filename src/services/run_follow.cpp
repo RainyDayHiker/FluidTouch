@@ -2,6 +2,7 @@
 #include "services/job_service.h"
 #include "services/machine_service.h"
 #include "services/preview_service.h"
+#include "services/run_plan.h"
 #include "services/run_tracker.h"
 #include "services/time_left.h"
 #include <Arduino.h>
@@ -37,62 +38,11 @@ bool previewIsRunJob() {
     return strcmp(JobService::runName(), PreviewService::jobName()) == 0;
 }
 
-// Planned seconds before `record`: the checkpoint's, then the moves from there (at most 256)
+// The plan at the matched move, with the summary's estimate and the probes' allowances (D101)
 TimeLeft::Plan planAt(const SegmentList &list, uint32_t record) {
     const PreviewService::Summary &sum = PreviewService::summary();
-    TimeLeft::Plan p = {0, 0, 0, 0, sum.estimateFeedSeconds, sum.estimateSeconds - sum.estimateFeedSeconds};
-    if (!list.checkpoints()) return p;
-    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
-    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
-    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
-    SegmentList::Rates rates = PreviewService::rates();
-    SegmentList::Reader reader(list, cp);
-    SegmentList::Move m;
-    bool incomplete = false;
-    bool more;
-    while ((more = reader.next(m)) && m.record < record) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        total += s;
-        feed += SegmentList::feedPart(m, s);
-    }
-    p.feedDone = p.feedAfter = feed;
-    p.otherDone = p.otherAfter = total - feed;
-    if (more && m.record == record) {
-        // The matched move itself
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        p.feedAfter += SegmentList::feedPart(m, s);
-        p.otherAfter += s - SegmentList::feedPart(m, s);
-    }
-    return p;
-}
-
-// The planned seconds at the end of operation `op`'s last move, reading on from `record` (the
-// matched move) until a later operation starts; false when no move of `op` is found
-bool opEndAt(const SegmentList &list, const JobNotes &notes, int op, uint32_t record, double &feedEnd,
-             double &otherEnd) {
-    if (!list.checkpoints()) return false;
-    uint32_t cp = record / SegmentList::CHECKPOINT_EVERY;
-    if (cp >= list.checkpoints()) cp = list.checkpoints() - 1;
-    double total = list.checkpoint(cp).seconds, feed = list.checkpoint(cp).feedSeconds;
-    SegmentList::Rates rates = PreviewService::rates();
-    SegmentList::Reader reader(list, cp);
-    SegmentList::Move m;
-    bool incomplete = false, found = false;
-    while (reader.next(m)) {
-        double s = SegmentList::moveSeconds(m, rates, incomplete);
-        total += s;
-        feed += SegmentList::feedPart(m, s);
-        if (m.record < record) continue;
-        int at = notes.opAt(m.line);
-        if (at == op) {
-            found = true;
-            feedEnd = feed;
-            otherEnd = total - feed;
-        } else if (at > op) {
-            break;
-        }
-    }
-    return found;
+    return RunPlan::at(list, PreviewService::notes(), record, PreviewService::rates(), sum.estimateSeconds,
+                       sum.estimateFeedSeconds);
 }
 
 double runSeconds() { return JobService::runningMs() / 1000.0; }
@@ -185,8 +135,13 @@ void RunFollow::poll() {
     if (s.is_sd_printing) {
         read = (uint64_t)((double)s.sd_percent / 100.0 * (double)PreviewService::jobSize()) + READ_SLACK;
     }
+    bool hadMatch = tracker.matched();
+    uint32_t lastLine = tracker.line();
     bool moved = tracker.update(list, s.wpos_x, s.wpos_y, s.wpos_z, read, s.line_number);
     if (!tracker.matched()) return;
+    // A probe or homing passed since the last match: its time isn't the plan's (D101)
+    const JobNotes *notes = PreviewService::notes();
+    bool setAside = moved && hadMatch && notes && notes->workBetween(lastLine, tracker.line());
     if (moved && (int)tracker.byLineNumber() != lastSource) {
         lastSource = tracker.byLineNumber();
         Serial.printf("RunFollow: following by %s (line %lu)\n", lastSource ? "Ln:" : "position",
@@ -197,18 +152,17 @@ void RunFollow::poll() {
         lastFeedOverride = s.feed_override;
         lastRapidOverride = s.rapid_override;
         timeLeft.match(runSeconds(), planAt(list, tracker.record()), s.feed_override / 100.0,
-                       s.rapid_override / 100.0);
+                       s.rapid_override / 100.0, setAside);
     }
     if (moved) {
-        const JobNotes *notes = PreviewService::notes();
         int op = notes ? notes->opAt(tracker.line()) : 0;
         if (op) lastOp = op;
         inOp = op != 0;
     }
     // Where the operation ends in the plan: once per operation, and again with a new estimate
     if (inOp && lastOp && (opEndFor != lastOp || opEndGen != lastEstimateGen)) {
-        const JobNotes *notes = PreviewService::notes();
-        opEndFound = notes && opEndAt(list, *notes, lastOp, tracker.record(), opEndFeed, opEndOther);
+        opEndFound = notes && RunPlan::opEnd(list, *notes, lastOp, tracker.record(), PreviewService::rates(),
+                                             opEndFeed, opEndOther);
         opEndFor = lastOp;
         opEndGen = lastEstimateGen;
     }
