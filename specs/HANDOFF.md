@@ -20,12 +20,19 @@ simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says 
    running (Run and Home), 5.3 min held at prompts. Per operation, the logged path length over
    the operation's usual feed (1200, 660, 330 mm/min) gives 70.9 min against 74.8 min run, so
    acceleration costs only about 5% on this job: the machine is below 90% of the feed for
-   1 to 24% of each operation's time. D80's no-acceleration estimate should therefore be
-   within 5 to 10% here. Not yet checked: the display's own estimate for this file (the
-   G-code isn't on the PC; with the file the simulator gives the info line and the time left
-   at each point). If the info line said much less than about 75 min, the estimate itself is
-   wrong, not the acceleration. The `SD:` percent is far from time (24% at 47 min, 74% at
-   64 min), as 06 found.
+   1 to 24% of each operation's time.
+   **The display's estimate against it** (`CNC_CenterWheel.gcode`, a host build of
+   SegmentList, RunTracker and TimeLeft, rates 9000/9000/900): 72.6 min against 74.8 min of
+   cutting, 3% short; each operation within 1 to 8% (the pockets 1.2 and 1.4, with the most
+   time below the feed, the furthest). Replaying the log's positions through the tracker and
+   TimeLeft (overrides 100%, running = Run and Home): time left starts at 72.6 min against
+   76.5 min really left (probing and homing included), is 3.7 min high at 3 min while the
+   factor settles at 1.12, and from 15 min on is within 1.8 min of the truth (factor 1.05 to
+   1.08). So the estimate and D91/D92's constants hold on this job. The Third Wheel's "30 min
+   and went up a good deal" is not explained: its file isn't on the PC to check whether its
+   estimate was short. Simulator-side replay only; on the device, the next full job with the
+   position log on and the time left noted at the start would confirm it.
+   The `SD:` percent is far from time (24% at 47 min, 74% at 64 min), as 06 found.
 5. **Download during a cut (D72's open question): answered.** Downloading the job's preview
    while it cut did not disturb the motion. The confirm no longer says only a small file was
    tried (05 §2).
