@@ -14,8 +14,18 @@ simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says 
 2. **The message follows the tool:** the status bar is not ahead of the cut.
 3. **"op N of M"** matches the operation being cut.
 4. **Time left:** started at about 30 minutes, short as expected, and went up a good deal. The
-   real total isn't known (the display was restarted for the next test). Still open; next
-   time with the position log on (Settings > Tools), whose file keeps the start and end.
+   real total isn't known (the display was restarted for the next test).
+   **A full job's position log (2026-11-27, Jeffrey: `CNC_CenterWheel-001.csv`, a different
+   job, 13 operations, three tools):** 81.8 min from start to Program End, 76.0 min of it
+   running (Run and Home), 5.3 min held at prompts. Per operation, the logged path length over
+   the operation's usual feed (1200, 660, 330 mm/min) gives 70.9 min against 74.8 min run, so
+   acceleration costs only about 5% on this job: the machine is below 90% of the feed for
+   1 to 24% of each operation's time. D80's no-acceleration estimate should therefore be
+   within 5 to 10% here. Not yet checked: the display's own estimate for this file (the
+   G-code isn't on the PC; with the file the simulator gives the info line and the time left
+   at each point). If the info line said much less than about 75 min, the estimate itself is
+   wrong, not the acceleration. The `SD:` percent is far from time (24% at 47 min, 74% at
+   64 min), as 06 found.
 5. **Download during a cut (D72's open question): answered.** Downloading the job's preview
    while it cut did not disturb the motion. The confirm no longer says only a small file was
    tried (05 §2).
@@ -29,14 +39,13 @@ simulator only. Not merged into `lrt/main`; merge (`--no-ff`) when Jeffrey says 
 The axis rates on the real machine are `9000 9000 900 mm/min`, matching the config's
 `max_rate_mm_per_min` (Jeffrey).
 
-**Next on the device:** restart the display mid-job (a Controller SD job chosen and
-previewed on Job first). Expected, if the listing is refused: "The controller didn't give the
-size (error:N). A copy from before is on the display." beside a "Load preview" button; its
-confirm offers Use the copy, Download, Not now; Use the copy shows the preview with no
-download. If the button reads "Download preview" with no reason beside it, the listing
-answered and the copy's size differed: then the copy itself needs looking at.
+**D98 on the device (2026-11-27, Jeffrey):** restarting the display mid-job worked as
+expected: the reason beside "Load preview", the confirm offering Use the copy, and the preview
+from the copy with no download. This confirms the controller refuses the size listing during a
+cut. Still to try on the device: a prompt's text surviving the restart (D99); Jeffrey will
+report it if it doesn't.
 
-**Found in the simulator and fixed (D99):** a refused listing's `error:8` line became
+**Found in the simulator and fixed (D99; the device check is the prompt above):** a refused listing's `error:8` line became
 FluidNC's last message (upstream's `FluidNCClient` stores every `error:` line in
 `last_message`) and replaced a prompt's text on Run and the status bar's message. The new UI
 now reads `MachineService::message()`, which passes over an `error:` reply to FileService's
